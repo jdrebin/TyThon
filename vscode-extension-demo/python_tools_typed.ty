@@ -1,0 +1,8 @@
+type Named = { name: str }
+
+# Ruff ignores the erased type declaration and reports the duplicate key.
+record = {"id": 1, "id": 2}
+
+# Select this entire assignment and use Format Selection.
+# Format Document intentionally refuses to erase or rewrite the type above.
+names=["john","kate"]

@@ -1,0 +1,19 @@
+type StringPart(T) = U if T extends infer U extends str else never
+type FirstString(T) = U if T extends (infer U extends str, *()any) else never
+
+type Name = StringPart(str | int)
+type First = FirstString(("Ada", int))
+
+def identity<const T>(value: T) -> T:
+    return value
+
+inferred = identity({"id": 1, "names": ["Ada", "Grace"]})
+checked = {"id": 1} satisfies {"id": int}
+exact = {"id": 1, "names": ["Ada", "Grace"]} as const
+both = {"id": 1} as const satisfies {"id": int}
+
+# Uncomment separately to inspect diagnostics:
+# invalid = {"id": "wrong"} satisfies {"id": int}
+# exact["id"] = 2
+# exact["names"].append("Other")
+# const variable = 1  # Deliberately not part of this language.

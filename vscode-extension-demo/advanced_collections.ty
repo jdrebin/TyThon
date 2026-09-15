@@ -1,0 +1,40 @@
+type HeadedTuple(T, U) = (T, *()U)
+type HeadedList(T, U) = [T, *[]U]
+
+
+pair: (str, int) = ("Ada", 3)
+name, count = pair
+
+row: (str, int, int) = ("Ada", 3, 4)
+first_name, *scores = row
+
+numbers: []int = [1, 2, 3]
+extended = [0, *numbers]
+immutable = (0, *numbers)
+
+headed_tuple: HeadedTuple(str, int) = ("scores", *numbers)
+headed_list: HeadedList(str, int) = ["scores", *numbers]
+
+
+def lengths(values: []str) -> []int:
+    return [len(value) for value in values if value]
+
+
+def length_map(values: []str):
+    return {value: len(value) for value in values}
+
+
+def unique_lengths(values: []str) -> set<int>:
+    return {len(value) for value in values}
+
+
+def lazy_lengths(values: []str) -> Iterator<int>:
+    return (len(value) for value in values)
+
+
+base = {"Ada": 3}
+merged = {**base, "Grace": 5}
+tokok = [x for x in range(2)]
+sample_names: []str = ["Ada", "Grace"]
+computed_lengths = lengths(sample_names)
+computed_map = length_map(sample_names)

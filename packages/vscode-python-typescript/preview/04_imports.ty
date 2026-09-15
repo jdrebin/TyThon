@@ -1,0 +1,5 @@
+# Types come from catalog.d.ty; Jedi's Go to Definition reaches catalog.py.
+from catalog import load_user
+
+loaded = load_user(12)
+name = loaded["name"]

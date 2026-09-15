@@ -1,0 +1,15 @@
+import sample_package.models as models
+from sample_package.models import load_user, User
+
+
+loaded = load_user(7)
+loaded_name = loaded.name
+loaded_label = loaded.label
+renamed = loaded.rename("Grace")
+
+constructed = User(8, "Katherine")
+class_kind = User.kind
+module_loaded = models.load_user(9)
+
+# Try dot completion after `loaded.` and `models.`. Hover the imported class,
+# function, bound method, property, and module-produced value.

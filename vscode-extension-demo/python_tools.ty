@@ -1,0 +1,12 @@
+# Hover Path/read_text for Python docs. Go to Definition falls back to Jedi
+# when our declarations do not provide a target.
+from pathlib import Path
+
+location = Path("README.md")
+text = location.read_text()
+
+# Try completion in "from pathlib import Pa", or import pathlib and type pathlib.
+# Ruff reports the duplicate key. This file is plain Python, so Format Document
+# also works; the spacing below is intentionally untidy.
+record={"id":1,"id":2}
+names=["john","kate"]

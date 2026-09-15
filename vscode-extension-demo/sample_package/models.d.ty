@@ -1,0 +1,12 @@
+declare class User:
+    static kind: str
+    readonly identifier: int
+    name: str
+    tags: [str, str]
+    readonly label: str
+
+    def __init__(self, identifier: int, name: str) -> None: ...
+    def rename(self, name: str) -> User: ...
+
+
+declare def load_user(identifier: int) -> User: ...

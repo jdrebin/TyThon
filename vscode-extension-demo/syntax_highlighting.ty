@@ -1,0 +1,46 @@
+# This file exercises ordinary Python and the Typed-Python lexical additions.
+
+type Maybe(T) = T | None
+type Names = []str
+type Greeter = {
+    def greet(message: str) -> str
+}
+
+
+interface Valued<T>:
+    readonly value: T
+
+
+interface Named<T>(Valued<T>):
+    name: str
+    "name": bytes
+    (str): bytes
+    (*<"">): int
+    whenever: (t: str) -> str
+
+declare class Box<T>:
+    static empty: bool
+    value: T
+
+    def get(self) -> T: ...
+
+
+type BoxAttributes = Extract(keyof Box<str>, *)
+type BoxValue = Box<str>
+type BoxItems = {(K): Box<str>[K] for K in Exclude(keyof Box<str>, *)}
+
+
+def identity<T>(value: Box<T>) -> T:
+    return value.value
+
+ada = Box<'ada'>()
+ada.value = "ada"
+
+grace = Box<'grace'>()
+grace.value = 'grace'
+
+names = [identity(ada), identity(grace)]
+optional_name: Maybe(str) = names[0]
+
+# These words remain comments: type interface keyof unknown.
+literal = "type interface keyof unknown"

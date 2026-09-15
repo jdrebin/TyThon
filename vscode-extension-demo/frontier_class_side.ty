@@ -1,0 +1,22 @@
+# Class-body assignments infer their types without an annotation. Python's
+# class-attribute fallback makes the same member visible on instances.
+
+class User:
+    kind = "user"
+
+class User2(User):
+    idk: bool
+
+    def __init__(self, idk = True):
+        self.idk = idk
+
+u = User2(idk=False)
+
+class_kind = User.kind
+instance_kind = u.kind
+
+# Every Python value receives the common object surface implicitly. Delete
+# part of either dunder and request completion to inspect that surface.
+number = 1
+number_text = number.__str__()
+user_text = u.__repr__()

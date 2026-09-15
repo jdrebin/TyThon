@@ -1,0 +1,43 @@
+interface Manager:
+    __enter__: () -> str
+    __exit__: (error_type: any, error: any, traceback: any) -> bool
+
+
+interface AsyncManager:
+    __aenter__: () -> Awaitable<str>
+    __aexit__: (error_type: any, error: any, traceback: any) -> Awaitable<bool>
+
+
+manager: Manager
+async_manager: AsyncManager
+
+
+async def fetch_name() -> str:
+    return "Ada"
+
+
+async def names() -> AsyncIterator<str>:
+    yield "Ada"
+    yield "Grace"
+
+
+async def collect_names() -> []str:
+    collected = [name async for name in names()]
+    async with async_manager as prefix:
+        return [prefix, *collected]
+
+
+def exchange() -> Generator<int, str, bool>:
+    received = yield 1
+    checked_received: str = received
+    yield from [2, 3]
+    return True
+
+
+with manager as managed_name:
+    checked_managed_name: str = managed_name
+
+
+pending_name: Awaitable<str> = fetch_name()
+pending_collection: Awaitable<[]str> = collect_names()
+number_stream: Generator<int, str, bool> = exchange()

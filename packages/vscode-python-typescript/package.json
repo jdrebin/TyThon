@@ -1,0 +1,136 @@
+{
+    "name": "tython",
+    "displayName": "tython",
+    "description": "Python with an erasable structural type system powered by the adapted TypeScript checker. Independent project.",
+    "publisher": "tython-local",
+    "license": "Apache-2.0",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/jdrebin/TyThon.git",
+        "directory": "packages/vscode-python-typescript"
+    },
+    "homepage": "https://github.com/jdrebin/TyThon#readme",
+    "bugs": { "url": "https://github.com/jdrebin/TyThon/issues" },
+    "private": true,
+    "version": "0.1.0",
+    "capabilities": {
+        "untrustedWorkspaces": { "supported": false }
+    },
+    "engines": {
+        "vscode": "^1.100.0"
+    },
+    "extensionKind": [
+        "workspace"
+    ],
+    "activationEvents": [
+        "onLanguage:python",
+        "onLanguage:typed-python"
+    ],
+    "main": "./dist/extension.bundle.js",
+    "contributes": {
+        "configurationDefaults": {
+            "[typed-python]": { "editor.semanticHighlighting.enabled": true }
+        },
+        "commands": [
+            { "command": "pythonTypeScript.openPreview", "title": "tython: Open Preview Examples" },
+            { "command": "pythonTypeScript.importDeclarations", "title": "tython: Import Python Declarations" },
+            { "command": "pythonTypeScript.saveHeapProfile", "title": "tython: Save Heap Profile" }
+        ],
+        "languages": [
+            {
+                "id": "typed-python",
+                "aliases": [
+                    "tython",
+                    "ty"
+                ],
+                "extensions": [
+                    ".ty",
+                    ".d.ty"
+                ],
+                "configuration": "./language-configuration.json"
+            }
+        ],
+        "grammars": [
+            {
+                "language": "typed-python",
+                "scopeName": "source.python.typed",
+                "path": "./syntaxes/MagicTypedPython.tmLanguage.json"
+            },
+            {
+                "scopeName": "typed-python.injection",
+                "path": "./syntaxes/typed-python.injection.tmLanguage.json",
+                "injectTo": [
+                    "source.python.typed"
+                ]
+            }
+        ],
+        "configuration": {
+            "title": "tython",
+            "properties": {
+                "pythonTypeScript.tools.enabled": {
+                    "type": "boolean", "default": true,
+                    "description": "Use Jedi and Ruff for supplementary Python editor features in trusted workspaces. Native .ty type checking remains authoritative."
+                },
+                "pythonTypeScript.tools.pythonPath": {
+                    "type": "string", "default": "",
+                    "description": "Python executable containing Jedi and Ruff. Empty uses the development tools environment in extension development, otherwise python3 (python on Windows)."
+                },
+                "pythonTypeScript.tools.interpreterPath": {
+                    "type": "string", "default": "",
+                    "description": "Interpreter whose libraries Jedi should inspect. Empty uses the Python extension's selected environment, or the tools environment if unavailable."
+                },
+                "pythonTypeScript.server.memoryLimitMiB": {
+                    "type": "integer", "default": 4096, "minimum": 256, "maximum": 65536,
+                    "description": "Linux server hard RAM limit in MiB. Reload the window after changing."
+                },
+                "pythonTypeScript.server.swapLimitMiB": {
+                    "type": "integer", "default": 512, "minimum": 0, "maximum": 65536,
+                    "description": "Linux swap allowance in MiB. On cgroup v1 this adds to the combined RAM+swap ceiling, not a separate swap ceiling."
+                },
+                "pythonTypeScript.server.goMemoryLimitMiB": {
+                    "type": "integer", "default": 3072, "minimum": 128, "maximum": 65535,
+                    "description": "Go soft memory target. Must be below the hard RAM limit; this alone cannot prevent an OOM."
+                },
+                "pythonTypeScript.server.linuxContainment": {
+                    "type": "boolean", "default": true,
+                    "description": "Require verified Linux cgroup containment via systemd. Disabling this removes hard memory protection. Reload required."
+                },
+                "pythonTypeScript.server.profileDirectory": {
+                    "type": "string", "default": "",
+                    "description": "Optional directory for native Go CPU/allocation profiles (workspace-relative or absolute). Profiles are finalized on graceful exit, not SIGKILL. Reload required."
+                },
+                "pythonTypeScript.compilerPath": {
+                    "type": "string",
+                    "default": "",
+                    "description": "Explicit override for the adapted compiler. Empty uses the matching bundled compiler, or built/local/tsc in extension development."
+                }
+            }
+        }
+    },
+    "scripts": {
+        "tools:prepare": "node scripts/prepare-python-tools.mjs",
+        "tools:test": "node test/pythonTools.test.mjs && node test/declarations.test.mjs",
+        "build": "tsc && npm run bundle",
+        "bundle": "esbuild src/extension.ts --bundle --external:vscode --external:pyright-typeserver --platform=node --format=cjs --outfile=dist/extension.bundle.js --sourcemap --metafile=dist/extension.meta.json",
+        "preview:package": "node scripts/package-preview.mjs",
+        "demo:prepare": "node scripts/prepare-demo.mjs",
+        "grammar:test": "node test/grammar.test.mjs",
+        "grammar:update": "node scripts/update-python-grammar.mjs",
+        "test": "npm run grammar:test && node test/serverLaunch.test.mjs && node test/hoverLatency.test.mjs && node test/compilerPath.test.mjs",
+        "watch": "npm run bundle -- --watch"
+    },
+    "devDependencies": {
+        "@types/vscode": "~1.125.0",
+        "esbuild": "^0.28.2",
+        "@vscode/vsce": "^3.9.2",
+        "vscode-oniguruma": "^2.0.1",
+        "vscode-textmate": "^9.3.2"
+    },
+    "dependencies": {
+        "@vscode/python-extension": "^1.0.6",
+        "pyright-typeserver": "1.1.414",
+        "vscode-jsonrpc": "9.0.2",
+        "vscode-languageclient": "^10.1.1",
+        "vscode-languageserver-protocol": "3.18.3"
+    }
+}

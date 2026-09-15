@@ -1,0 +1,39 @@
+# Every marked line is intentionally wrong. This file is a compact way to
+# verify diagnostic ranges, Python-facing type names, and recovery after an
+# error without making the clean showcase files noisy.
+
+def identity<T>(value: T) -> T:
+    return value
+
+
+wrong_explicit_type = identity<int>("not an int")  # expected error
+
+
+type SplitSurface = {
+    name: str,
+    "name": int,
+    "enabled": bool,
+}
+
+
+split: SplitSurface
+wrong_attribute: int = split.name                 # expected error
+wrong_item: str = split["name"]                   # expected error
+missing_item = split["missing"]                   # expected error
+missing_attribute = split.missing                 # expected error
+
+
+def positional_only(value: str, /, *, enabled: bool) -> str:
+    return value
+
+
+bad_keyword = positional_only(value="Ada", enabled=True)  # expected error
+missing_keyword = positional_only("Ada")                   # expected error
+
+
+def promised_text() -> str:
+    return 42                                       # expected error
+
+
+def wrong_generator() -> Generator<int, str, None>:
+    yield "not an int"                             # expected error

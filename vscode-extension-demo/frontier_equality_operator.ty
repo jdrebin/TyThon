@@ -1,0 +1,10 @@
+# Intended behavior: equality should reach __eq__ dispatch. The current runtime
+# scanner rejects == before the operation resolver gets to handle it.
+
+interface Comparable:
+    __eq__: (other: object) -> bool
+
+
+left: Comparable
+right: Comparable
+same = left == right

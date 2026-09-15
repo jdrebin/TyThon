@@ -1,0 +1,21 @@
+type Maybe(T) = T | None
+
+
+def identity<T>(value: T):
+    return value
+
+
+def choose_name<E extends bool>(name: str, enabled: E) -> str if E extends True else None:
+   if enabled:
+       return name as (str if E extends True else never)
+   else:
+         return None as (never if E extends True else None)
+
+
+# Hover over these expressions to see their inferred types.
+inferred_name = identity("Ada")
+explicit_name = identity("Grace" as str)
+
+names = [inferred_name, explicit_name]
+selected_name: Maybe(str) = names[0]
+optional_name = choose_name(explicit_name, True)

@@ -1,0 +1,7 @@
+# This file intentionally produces errors. All four lines below are checked
+# by the preview regression test; the positive examples should be error-free.
+user: {"id": int} = {"id": "wrong"}
+missing = user["name"]
+def bad_default(name: str = 12):
+    return name
+wrong: int = "wrong"

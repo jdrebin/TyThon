@@ -1,0 +1,11 @@
+{
+    "folders": [
+        {
+            "name": "Python TypeScript Demo",
+            "path": "."
+        }
+    ],
+    "settings": {
+        "workbench.startupEditor": "none"
+    }
+}

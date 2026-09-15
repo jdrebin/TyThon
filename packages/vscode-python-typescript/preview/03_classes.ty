@@ -1,0 +1,16 @@
+class Greeter:
+    kind = "greeter"
+
+    def __init__(self, prefix: str):
+        self.prefix = prefix
+
+    def greet(self, name: str) -> str:
+        return self.prefix + name
+
+    def __call__(self, name: str) -> str:
+        return self.greet(name)
+
+greeter = Greeter("Hello ")
+message = greeter("Kate")
+method = greeter.greet
+again = method("John")

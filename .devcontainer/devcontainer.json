@@ -1,0 +1,30 @@
+// Modified for tython: Python type-system adaptation and independent project integration.
+
+{
+    "name": "tython Development",
+    "image": "mcr.microsoft.com/devcontainers/go:dev-1.26-bookworm",
+    "features": {
+        "ghcr.io/devcontainers/features/node:2": {
+            "version": "24",
+            "pnpmVersion": "latest",
+            "nvmVersion": "latest"
+        },
+        "ghcr.io/devcontainers-extra/features/dprint-asdf:2": {
+            "version": "latest"
+        },
+        "ghcr.io/devcontainers/features/github-cli:1": {}
+    },
+    "postCreateCommand": {
+        "Install dependencies": "npm ci; go -C ./tsc mod download; go -C ./tools mod download",
+        "Install repository tools": "npx hereby install-tools; go install github.com/google/pprof@latest",
+        "Install Graphviz": "sudo apt update -y; sudo apt install -y graphviz"
+    },
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "dprint.dprint",
+                "golang.go"
+            ]
+        }
+    }
+}

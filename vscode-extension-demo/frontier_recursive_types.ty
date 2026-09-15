@@ -1,0 +1,10 @@
+# Recursive structural type functions reserve a checker reference identity,
+# so their member types are instantiated lazily instead of expanding forever.
+
+type Recursive(T) = {
+    value: T,
+    def replace<U>(value: U) -> Recursive(U),
+}
+
+current: Recursive(str)
+updated = current.replace(42)

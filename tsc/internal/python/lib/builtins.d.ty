@@ -1,0 +1,262 @@
+# @no-default-lib
+# Private compiler key. Only this library can name the intrinsic identity;
+# it is not exported and is omitted from public keyof and completion.
+type attr_name = intrinsic
+type some_type = intrinsic
+type structured_type = intrinsic
+type bytes_type = intrinsic
+type complex_type = intrinsic
+type ellipsis_type = intrinsic
+type not_implemented_type = intrinsic
+
+# Nominal value groups. The root object accepts every Python value, including
+# None. These markers are private; further groups use ordinary inheritance.
+interface Some(object):
+    (some_type): unknown
+
+interface Object(Some):
+    (structured_type): unknown
+
+# * is an interface name, with the same generic and structural behavior as
+# any other interface. The private key above distinguishes attrs from items.
+interface *<AttrName extends str = str>:
+    (attr_name): AttrName
+
+interface ObjectProtocol:
+    def __str__(self) -> str
+    def __repr__(self) -> str
+    def __format__(self, format_spec: str) -> str
+    def __hash__(self) -> int
+    def __eq__(self, other: object) -> bool
+    def __ne__(self, other: object) -> bool
+    def __dir__(self) -> []str
+    def __getattribute__(self, name: str) -> any
+    def __setattr__(self, name: str, value: any) -> None
+    def __delattr__(self, name: str) -> None
+
+declare class NotImplementedType(Some):
+    (not_implemented_type): unknown
+
+NotImplemented: NotImplementedType
+
+interface Iterable<T>:
+    def __iter__() -> Iterator<T>
+
+# Ordinary type utilities. Their bodies use the same conditional/mapped type
+# machinery as user declarations; none of these names is a compiler intrinsic.
+type Exclude(T, U) = never if T extends U else T
+type Extract(T, U) = T if T extends U else never
+type ItemKeys(T) = Exclude(keyof T, *)
+
+interface MappingProtocol<T>:
+    def get<K extends ItemKeys(T)>(self, key: K) -> T[K] | None
+    def keys(self) -> Iterator<ItemKeys(T)>
+    def values(self) -> Iterator<T[ItemKeys(T)]>
+    def items(self) -> Iterator<(ItemKeys(T), T[ItemKeys(T)])>
+    def pop<K extends ItemKeys(T)>(self, key: K) -> T[K]
+    def __contains__(self, key: any) -> bool
+    def __iter__(self) -> Iterator<ItemKeys(T)>
+    def __len__(self) -> int
+
+# The shape supplies the actual keys. An open map is expressed by an index
+# signature in that shape, not by a separate key/value generic API.
+type Dict(Shape) = Shape & MappingProtocol<Shape>
+
+# Primitive wrapper bases live in declarations too. Further nominal groups can
+# be introduced here and inherited without adding a checker flag for each one.
+interface IntProtocol(Some):
+    def bit_length(self) -> int
+    def bit_count(self) -> int
+
+interface FloatProtocol(Some):
+    def hex(self) -> str
+    def is_integer(self) -> bool
+
+interface BoolProtocol(Some):
+    def __bool__(self) -> bool
+
+interface StringProtocol(Some):
+    def startswith(self, prefix: str) -> bool
+    def endswith(self, suffix: str) -> bool
+    def removeprefix(self, prefix: str) -> str
+    def removesuffix(self, suffix: str) -> str
+    def strip(self, characters: str = ...) -> str
+    def lstrip(self, characters: str = ...) -> str
+    def rstrip(self, characters: str = ...) -> str
+    def replace(self, old: str, replacement: str) -> str
+    def upper(self) -> str
+    def lower(self) -> str
+    def casefold(self) -> str
+    def split(self, separator: str = ...) -> []str
+    def join(self, values: Iterable<str>) -> str
+    def __iter__(self) -> Iterator<str>
+    def __contains__(self, value: str) -> bool
+    def __len__(self) -> int
+    def __mul__(self, count: int) -> str
+    def __rmul__(self, count: int) -> str
+
+interface ReadonlyListProtocol<T>:
+    def __iter__(self) -> Iterator<T>
+    def __contains__(self, value: any) -> bool
+    def __len__(self) -> int
+    def __add__(self, other: []T) -> []T
+    def __radd__(self, other: []T) -> []T
+    def __mul__(self, count: int) -> []T
+    def __rmul__(self, count: int) -> []T
+
+interface ListProtocol<T>(ReadonlyListProtocol<T>):
+    def append(self, value: T) -> None
+    def pop(self, index: int = ...) -> T
+    def __iadd__(self, other: []T) -> []T
+    def __imul__(self, count: int) -> []T
+
+interface TupleProtocol<T>:
+    def __iter__(self) -> Iterator<T>
+    def __contains__(self, value: any) -> bool
+    def __len__(self) -> int
+    def __add__(self, other: ()T) -> ()T
+    def __radd__(self, other: ()T) -> ()T
+    def __mul__(self, count: int) -> ()T
+    def __rmul__(self, count: int) -> ()T
+
+interface SetProtocol<T>:
+    def __iter__(self) -> Iterator<T>
+    def __contains__(self, value: any) -> bool
+    def add(self, value: T) -> None
+    def discard(self, value: T) -> None
+    def __len__(self) -> int
+    def __and__(self, other: object) -> any
+    def __rand__(self, other: object) -> any
+    def __or__(self, other: object) -> any
+    def __ror__(self, other: object) -> any
+    def __sub__(self, other: object) -> any
+    def __rsub__(self, other: object) -> any
+    def __xor__(self, other: object) -> any
+    def __rxor__(self, other: object) -> any
+    def __iand__(self, other: object) -> any
+    def __ior__(self, other: object) -> any
+    def __isub__(self, other: object) -> any
+    def __ixor__(self, other: object) -> any
+
+interface IteratorProtocol<T>:
+    def __iter__(self) -> { def __next__() -> T }
+    def __next__(self) -> T
+
+interface AsyncIteratorProtocol<T>:
+    def __aiter__(self) -> { def __anext__() -> Awaitable<T> }
+    def __anext__(self) -> Awaitable<T>
+
+interface GeneratorProtocol<Y, S, R>(IteratorProtocol<Y>):
+    def send(self, value: S) -> Y
+
+declare def getattr<T, K extends str>(value: T, name: K) -> T[*<K>]: ...
+declare def hasattr(value: object, name: str) -> bool: ...
+declare def isinstance(value: any, class_or_tuple: any) -> bool: ...
+declare def issubclass(value: any, class_or_tuple: any) -> bool: ...
+declare def callable(value: any) -> bool: ...
+
+declare def len(value: any) -> int: ...
+declare def hash(value: any) -> int: ...
+declare def id(value: any) -> int: ...
+
+@overload
+def int() -> int: ...
+@overload
+def int(value: any) -> int: ...
+
+@overload
+def float() -> float: ...
+@overload
+def float(value: any) -> float: ...
+
+@overload
+def str() -> str: ...
+@overload
+def str(value: any) -> str: ...
+
+declare def repr(value: any) -> str: ...
+declare def bool(value: any = ...) -> bool: ...
+declare def setattr(value: object, name: str, replacement: any) -> None: ...
+declare def print(*values: []any, **options: Dict({ (str): any })) -> None: ...
+
+@overload
+def range(stop: int) -> Iterator<int>: ...
+@overload
+def range(start: int, stop: int) -> Iterator<int>: ...
+@overload
+def range(start: int, stop: int, step: int) -> Iterator<int>: ...
+
+declare def enumerate<T>(values: Iterable<T>, start: int = ...) -> Iterator<(int, T)>: ...
+declare def next<T>(iterator: Iterator<T>) -> T: ...
+
+declare def object() -> object: ...
+
+declare class bytes(Some):
+    (bytes_type): unknown
+    def __init__(self, source: any = ...) -> None
+    def __iter__(self) -> Iterator<int>
+    def __contains__(self, value: int) -> bool
+    def __len__(self) -> int
+    def __getitem__(self, index: int) -> int
+    def __add__(self, other: bytes) -> bytes
+    def __radd__(self, other: bytes) -> bytes
+    def __mul__(self, count: int) -> bytes
+    def __rmul__(self, count: int) -> bytes
+
+declare class complex(Some):
+    (complex_type): unknown
+    def __init__(self, real: float = ..., imaginary: float = ...) -> None
+    def __add__(self, other: int | float | complex) -> complex
+    def __radd__(self, other: int | float | complex) -> complex
+    def __sub__(self, other: int | float | complex) -> complex
+    def __rsub__(self, other: int | float | complex) -> complex
+    def __mul__(self, other: int | float | complex) -> complex
+    def __rmul__(self, other: int | float | complex) -> complex
+    def __truediv__(self, other: int | float | complex) -> complex
+    def __rtruediv__(self, other: int | float | complex) -> complex
+    def __pow__(self, other: int | float | complex) -> complex
+    def __rpow__(self, other: int | float | complex) -> complex
+    def __pos__(self) -> complex
+    def __neg__(self) -> complex
+
+declare class EllipsisType(Some):
+    (ellipsis_type): unknown
+
+Ellipsis: EllipsisType
+
+declare class slice:
+    def __init__(self, start: int | None = ..., stop: int | None = ..., step: int | None = ...) -> None
+
+declare class Template:
+    strings: ()str
+    values: ()object
+
+declare class BaseException:
+    def __init__(self, *args: []any) -> None
+
+declare class Exception(BaseException):
+    def __init__(self, *args: []any) -> None
+
+declare class BaseExceptionGroup<E extends BaseException>(BaseException):
+    exceptions: []E
+
+declare class ExceptionGroup<E extends Exception>(BaseExceptionGroup<E>):
+    exceptions: []E
+
+declare class ValueError(Exception):
+    def __init__(self, *args: []any) -> None
+
+declare class TypeError(Exception):
+    def __init__(self, *args: []any) -> None
+
+declare class KeyError(Exception):
+    def __init__(self, *args: []any) -> None
+
+declare class AttributeError(Exception):
+    def __init__(self, *args: []any) -> None
+
+declare class RuntimeError(Exception):
+    def __init__(self, *args: []any) -> None
+
+declare class StopIteration(Exception):
+    def __init__(self, *args: []any) -> None

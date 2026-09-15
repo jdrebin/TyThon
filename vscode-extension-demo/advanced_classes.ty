@@ -1,0 +1,65 @@
+class Named:
+    name: str
+
+    def display(self) -> str:
+        return self.name
+
+
+class Timestamped:
+    created_at: int
+
+
+class User(Named, Timestamped):
+    kind = "user"
+
+    def __init__(self, name: str, created_at: int):
+        self.name = name
+        self.created_at = created_at
+
+    @property
+    def label(self) -> str:
+        return self.name
+
+    @label.setter
+    def label(self, value: str) -> None:
+        self.name = value
+
+    @classmethod
+    def create(cls, name: str) -> User:
+        return cls(name, 0)
+
+    @staticmethod
+    def valid_name(value: str) -> bool:
+        return bool(value)
+
+
+class TextValue:
+    value: str
+
+
+class NumericValue:
+    value: int
+    scale: int
+
+
+type NumericWithoutValue = {
+    (K): NumericValue[K]
+    for K in Exclude(keyof NumericValue, *<"value">)
+}
+
+# The projection resolves the conflicting attribute without claiming that
+# ResolvedValue remains structurally compatible with all of NumericValue.
+class ResolvedValue(TextValue, NumericValue as NumericWithoutValue):
+    marker: bool
+
+
+user = User.create("Ada")
+bound_display = user.display
+displayed = bound_display()
+object_text = user.__repr__()
+property_value = user.label
+is_valid = User.valid_name("Grace")
+
+resolved: ResolvedValue
+resolved_text = resolved.value
+resolved_scale = resolved.scale

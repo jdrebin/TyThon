@@ -1,0 +1,309 @@
+{
+    "name": "tython syntax additions",
+    "scopeName": "typed-python.injection",
+    "injectionSelector": "L:source.python.typed -comment -string",
+    "patterns": [
+        {
+            "name": "keyword.operator.presence.typed-python",
+            "match": "-?\\?|!(?!=)"
+        },
+        {
+            "include": "#structural-method"
+        },
+        {
+            "include": "#type-alias-declaration"
+        },
+        {
+            "include": "#interface-declaration"
+        },
+        {
+            "include": "#declaration-modifiers"
+        },
+        {
+            "include": "#type-only-import"
+        },
+        {
+            "include": "#type-parameters"
+        },
+        {
+            "include": "#type-keywords"
+        },
+        {
+            "include": "#type-utilities"
+        },
+        {
+            "include": "#attribute-key-context"
+        },
+        {
+            "include": "#collection-shorthand"
+        }
+    ],
+    "repository": {
+        "type-alias-declaration": {
+            "name": "meta.type.declaration.typed-python",
+            "begin": "^(\\s*)(type)\\s+([[:alpha:]_]\\w*)",
+            "beginCaptures": {
+                "2": {
+                    "name": "storage.type.type.typed-python"
+                },
+                "3": {
+                    "name": "entity.name.type.alias.typed-python"
+                }
+            },
+            "end": "(?=#|$)",
+            "patterns": [
+                {
+                    "include": "#type-expression"
+                }
+            ]
+        },
+        "interface-declaration": {
+            "name": "meta.interface.typed-python",
+            "begin": "^(\\s*)(interface)\\s+([[:alpha:]_]\\w*|\\*)",
+            "beginCaptures": {
+                "2": {
+                    "name": "storage.type.interface.typed-python"
+                },
+                "3": {
+                    "name": "entity.name.type.interface.typed-python"
+                }
+            },
+            "end": "(:)",
+            "endCaptures": {
+                "1": {
+                    "name": "punctuation.section.interface.begin.typed-python"
+                }
+            },
+            "patterns": [
+                {
+                    "include": "#type-expression"
+                }
+            ]
+        },
+        "declaration-modifiers": {
+            "patterns": [
+                {
+                    "name": "storage.modifier.declaration.typed-python",
+                    "match": "^(\\s*)(declare)\\b"
+                },
+                {
+                    "name": "storage.modifier.typed-python",
+                    "match": "^(\\s*)(readonly|static)\\b"
+                }
+            ]
+        },
+        "type-only-import": {
+            "match": "\\b(import)\\s+(type)\\b",
+            "captures": {
+                "1": {
+                    "name": "keyword.control.import.python"
+                },
+                "2": {
+                    "name": "storage.modifier.type-only.typed-python"
+                }
+            }
+        },
+        "type-expression": {
+            "patterns": [
+                {
+                    "include": "source.python.typed#comments"
+                },
+                {
+                    "include": "source.python.typed#string"
+                },
+                {
+                    "include": "#structural-method"
+                },
+                {
+                    "include": "#type-parameters"
+                },
+                {
+                    "include": "#type-keywords"
+                },
+                {
+                    "include": "#type-utilities"
+                },
+                {
+                    "include": "#attribute-key"
+                },
+                {
+                    "include": "#collection-shorthand"
+                },
+                {
+                    "include": "#type-containers"
+                },
+                {
+                    "match": "\\b(for)\\s+([[:alpha:]_]\\w*)\\s+(in)\\b",
+                    "captures": {
+                        "1": { "name": "keyword.control.flow.python" },
+                        "2": { "name": "entity.name.type.parameter.typed-python" },
+                        "3": { "name": "keyword.operator.logical.python" }
+                    }
+                },
+                {
+                    "name": "entity.name.type.typed-python",
+                    "match": "\\b(?!(?:if|else|for|in|True|False|None|readonly|static)\\b)[[:alpha:]_]\\w*\\b"
+                },
+                {
+                    "name": "keyword.operator.assignment.typed-python",
+                    "match": "=(?!=)"
+                },
+                {
+                    "name": "keyword.operator.type.typed-python",
+                    "match": "(\\||&|-?\\?)"
+                },
+                {
+                    "include": "source.python.typed#expression"
+                }
+            ]
+        },
+        "type-parameters": {
+            "name": "meta.type.parameters.typed-python",
+            "begin": "(?<=[[:alnum:]_*])(<)(?=\\s*[[:alpha:]_])",
+            "beginCaptures": {
+                "1": {
+                    "name": "punctuation.definition.typeparameters.begin.typed-python"
+                }
+            },
+            "end": "(>)",
+            "endCaptures": {
+                "1": {
+                    "name": "punctuation.definition.typeparameters.end.typed-python"
+                }
+            },
+            "patterns": [
+                {
+                    "include": "source.python.typed#comments"
+                },
+                {
+                    "include": "#type-keywords"
+                },
+                {
+                    "include": "#type-utilities"
+                },
+                {
+                    "include": "#attribute-key"
+                },
+                {
+                    "name": "punctuation.separator.type-parameters.typed-python",
+                    "match": ","
+                },
+                {
+                    "name": "entity.name.type.typed-python",
+                    "match": "\\b[[:alpha:]_]\\w*\\b"
+                }
+            ]
+        },
+        "structural-method": {
+            "match": "\\b(def)\\s+([[:alpha:]_]\\w*)(?=\\s*(?:<[^>]*>)?\\s*\\()",
+            "captures": {
+                "1": {
+                    "name": "storage.type.function.python"
+                },
+                "2": {
+                    "name": "entity.name.function.python"
+                }
+            }
+        },
+        "type-keywords": {
+            "patterns": [
+                {
+                    "name": "keyword.operator.expression.$1.typed-python",
+                    "match": "(?<![\\w.])(keyof|typeof|infer|extends)\\b"
+                },
+                {
+                    "name": "keyword.control.satisfies.typed-python",
+                    "match": "(?<![\\w.])satisfies\\b"
+                },
+                {
+                    "name": "storage.modifier.typed-python",
+                    "match": "\\bconst\\b"
+                },
+                {
+                    "name": "support.type.builtin.typed-python",
+                    "match": "\\b(any|never|unknown)\\b"
+                }
+            ]
+        },
+        "type-utilities": {
+            "name": "support.function.type-utility.typed-python",
+            "match": "\\b(Exclude|Extract)\\b(?=\\s*\\()"
+        },
+        "attribute-key": {
+            "patterns": [
+                {
+                    "name": "meta.type.attribute-key.typed-python",
+                    "begin": "(\\*)(<)",
+                    "beginCaptures": {
+                        "1": {
+                            "name": "entity.name.type.interface.typed-python"
+                        },
+                        "2": {
+                            "name": "punctuation.definition.typeparameters.begin.typed-python"
+                        }
+                    },
+                    "end": "(>)",
+                    "endCaptures": {
+                        "1": {
+                            "name": "punctuation.definition.typeparameters.end.typed-python"
+                        }
+                    },
+                    "patterns": [
+                        {
+                            "include": "#type-expression"
+                        }
+                    ]
+                },
+                {
+                    "name": "entity.name.type.interface.typed-python",
+                    "match": "\\*(?![\\w*(\\[])"
+                }
+            ]
+        },
+        "attribute-key-context": {
+            "patterns": [
+                {
+                    "begin": "(\\*)(<)",
+                    "beginCaptures": {
+                        "1": { "name": "entity.name.type.interface.typed-python" },
+                        "2": { "name": "punctuation.definition.typeparameters.begin.typed-python" }
+                    },
+                    "end": ">",
+                    "patterns": [{ "include": "#type-expression" }]
+                },
+                {
+                    "match": "(?<=[:\\[,(=|&])\\s*(\\*)(?=\\s*(?:[,>\\]})=:]|$))",
+                    "captures": { "1": { "name": "entity.name.type.interface.typed-python" } }
+                }
+            ]
+        },
+        "type-containers": {
+            "patterns": [
+                {
+                    "begin": "\\{", "end": "\\}",
+                    "patterns": [{ "include": "#type-expression" }]
+                },
+                {
+                    "begin": "\\[", "end": "\\]",
+                    "patterns": [{ "include": "#type-expression" }]
+                },
+                {
+                    "begin": "\\(", "end": "\\)",
+                    "patterns": [{ "include": "#type-expression" }]
+                }
+            ]
+        },
+        "collection-shorthand": {
+            "patterns": [
+                {
+                    "name": "meta.type.list.typed-python punctuation.definition.type.list.typed-python",
+                    "match": "\\[\\](?=\\s*(?:[[:alpha:]_(]|$))"
+                },
+                {
+                    "name": "meta.type.tuple.typed-python punctuation.definition.type.tuple.typed-python",
+                    "match": "\\(\\)(?=\\s*(?:[[:alpha:]_(]|$))"
+                }
+            ]
+        }
+    }
+}

@@ -1,0 +1,9 @@
+def identity<T>(value: T):
+    return value
+
+
+valid_name = identity("Ada")
+
+# The explicit type argument says int, but the supplied value is a string.
+# The extension should place a red diagnostic on this call.
+invalid_name = identity<int>("Grace")

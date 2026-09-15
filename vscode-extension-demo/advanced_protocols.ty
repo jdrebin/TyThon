@@ -1,0 +1,33 @@
+interface Vector:
+    x: int
+    y: int
+    __add__: (other: Vector) -> Vector
+    __eq__: (other: object) -> bool
+
+
+interface NumberStream:
+    __iter__: () -> NumberStream
+    __next__: () -> int
+
+
+interface Catalog:
+    (str): int
+    __contains__: (name: str) -> bool
+    __getitem__: (name: str) -> int
+    __setitem__: (name: str, value: int) -> None
+
+
+left: Vector
+right: Vector
+combined = left + right
+
+stream: NumberStream
+first_seen: int = 0
+for number in stream:
+    first_seen = number
+    break
+
+catalog: Catalog
+contains_ada = "Ada" in catalog
+ada_score = catalog["Ada"]
+catalog["Grace"] = 100

@@ -1,0 +1,56 @@
+# Python parameter categories feed the same generic inference and overload
+# selection machinery used by TypeScript signatures.
+
+@overload
+def normalize(value: str) -> str: ...
+
+
+@overload
+def normalize(value: bytes) -> bytes: ...
+
+
+def normalize(value):
+    return value
+
+
+def first<T, U>(value: T, /, *rest: []U) -> T:
+    return value
+
+
+def configure<T, U extends {}>(
+    value: T,
+    /,
+    label: str = "value",
+    *,
+    enabled: bool = True,
+    tags: []str = [],
+    **metadata: U,
+) -> T:
+    return value
+
+
+def transform<T, U>(value: T, callback: (value: T) -> U) -> U:
+    return callback(value)
+
+
+def collect_metadata<U extends {}>(**metadata: U) -> U:
+    return metadata
+
+
+normalized_text = normalize("Ada")
+first_number = first(1, 2, 3)
+configured_tags: []str = ["demo", "typed"]
+configured = configure(
+    "ready",
+    label="status",
+    enabled=True,
+    tags=configured_tags,
+    owner="compiler",
+    idk="who"
+)
+transformed = transform("Ada", lambda value: value)
+collected_metadata = collect_metadata(owner="compiler", priority=1)
+
+# Delete `enabled` or `tags`, type a prefix, and invoke completion. The
+# positional-only parameter and names already supplied should not be offered.
+completion_target = configure("demo", enabled=True, tags=configured_tags)

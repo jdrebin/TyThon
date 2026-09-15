@@ -1,0 +1,48 @@
+# Quoted members are item keys. Unquoted members are attributes. The two
+# surfaces deliberately contain the same spelling with different types.
+
+type Registry = {
+    version: 'v1' | 'v2',
+    *<"hi" | "bye">: int,
+    readonly size: int,
+    "version": int,
+    "retries": int,
+    def describe(prefix: str) -> str,
+    (bytes): str,
+}
+type OO(O = keyof Registry) = F if O extends *<infer F> else never
+type O = OO()
+# A static quoted-key shape is not automatically a concrete Dict.
+type RegistryItems = { "version": int, "retries": int }
+
+type L = Registry.version
+registry: Registry
+
+attribute_version = registry.version
+indexed_version = registry["version"]
+retry_count = registry["retries"]
+binary_flag = registry[b"enabled"]
+description = registry.describe("registry")
+attribute_version = 'v2'
+
+type RegistryKeys = keyof Registry
+type RegistryAttributes = Extract(keyof Registry, *)
+type RegistryItemKeys = Exclude(keyof Registry, *)
+type VersionAttribute = Registry[*<"version">]
+type RegistryDictionary = {(K): Registry[K] for K in RegistryItemKeys}
+type RegistryClassShape = {version: int, retries: int}
+
+
+# Hover each key: a naked dictionary retains a closed, per-key item shape and
+# also has the ordinary Python dictionary surface.
+snapshot = {
+    "version": attribute_version,
+    "retries": retry_count,
+    "description": description,
+}
+
+snapshot_version = snapshot["version"]
+snapshot_keys = snapshot.keys()
+
+# Delete the key text and invoke completion inside the quotes.
+completion_from_item_surface = registry["version"]

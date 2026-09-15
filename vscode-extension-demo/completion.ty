@@ -1,0 +1,77 @@
+type User(T) = {
+    name: str,
+    age: int,
+    unknown: T,
+    "item-only": bool,
+    "unknown": T,
+    def greet(message: str) -> str,
+    0: int,
+}
+
+def display_name(user: User(str)):
+    # Put the cursor after `user.na` and press Ctrl+Space. Completion replaces
+    # the partial name with `name`; the indexed-only key is not suggested.
+    greeting = user.greet("hello")
+    # Delete item-only but leave either the bracket or opening quote to see
+    # indexed-key completion. Attribute-only names are not suggested here.
+    indexed = user["item-only"]
+    return user.name
+namer = ("john", "kate")
+names = ["john", "kate"]
+
+# A generic callable annotation contextually types an ordinary Python lambda.
+lambda_identity: <T>(value: T) -> T = lambda value: value
+lambda_name = lambda_identity("Ada")
+lambda_number = lambda_identity(42)
+
+# Inline annotations and generics use Python lambda parameters without
+# parentheses. The body determines the return type unless it uses `as`.
+inline_identity = lambda<T extends str> value: T: value
+inline_name = inline_identity("Grace")
+inline_widen = lambda<T extends str> value: T: value as str
+widened_name = inline_widen("Linus")
+invoke = lambda callback: () -> str: callback()
+invoked_name = invoke(lambda: "Guido")
+
+type Omit(Obj, K) = {
+    (P): Obj[P]
+    for P in keyof Obj
+    if (False if P extends K else True) extends True
+}
+
+user: Omit(User(int), *) = {
+    "item-only": True,
+    "unknown": 42,
+    0: 23
+}
+
+user2 = {
+    "item-only": True,
+    "unknown": 42,
+    0: 23
+} as Omit(User(int), *)
+
+# Visible-name completion is scope-aware. Start another line in this function
+# with `local_` and invoke completion.
+def choose_name(primary: str, fallback: str):
+    local_choice = primary or fallback
+    return local_choice
+
+# Type-position completion is separate from runtime-name completion. Delete
+# `User(int)`, type `Us`, and invoke completion after the colon.
+selected_user: User(int) = user
+
+# Keyword completion comes from the checked callable signature. Delete
+# `uppercase=True`, type `up`, and invoke completion after the comma.
+def format_name<U extends bool = False>(value: str, *, uppercase: U = False as U, limit: int = 10):
+    return value
+
+formatted = format_name("john", uppercase=True)
+
+# Signature help uses the inferred checker instantiation at the call site.
+def identity<T>(value: T) -> T:
+    return value
+
+identity_result = identity("hello")
+
+test = { "user": user, "formatted": formatted, "identity_result": identity_result }

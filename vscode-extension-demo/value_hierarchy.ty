@@ -1,0 +1,48 @@
+# Atomic values are Some, but a bare primitive does not satisfy Object.
+count: Some = 0
+enabled: Some = False
+name: Some = ""
+root: object = None
+empty_shape: {} = None
+asserted: int = True as int
+
+record: Object = {"id": 1}
+sequence: Object = [1, 2]
+pair: Object = (1, "name")
+callback: Object = lambda value: value
+
+def require_some<T>(value: T) -> T & Some:
+    if value is None:
+        raise ValueError("missing value")
+    return value
+
+def non_none(value: object) -> Some:
+    if value is not None:
+        return value
+    return False
+
+# Inheriting a primitive retains its primitive type and adds an object shape.
+class Label(str):
+    id = 1
+
+interface Identified(Object):
+    id: int
+
+type LabeledText = str & Identified
+label = Label()
+text: str = label
+shaped: Object = label
+labeled: LabeledText = label
+plain_shape: str & { id: int } = label
+identifier: int = label.id
+
+type PresentValues = Extract(str | int | None, Some)
+type Present(T) = T & Some
+type Nothing = None & Some
+type AllowedConstraint = str & Object
+type HiddenMarkers = keyof Some  # never
+
+# Uncomment individually to inspect diagnostics:
+# missing: Some = None
+# bare_primitive: Object = "text"
+# count.missing_attribute

@@ -1,0 +1,23 @@
+# These imports resolve to the real declarations beside this file.
+# Add experiments here while editing builtins.d.ty; no library copy is involved.
+from builtins import type ItemKeys as LibraryItemKeys, type MappingProtocol as LibraryMapping
+from builtins import type Exclude as LibraryExclude, type Extract as LibraryExtract, type Dict as LibraryDict
+
+type User = { "id": int, "name": str }
+type UserKeys = LibraryItemKeys(User)
+
+def read_name(user: User & LibraryMapping<User>):
+    return user.get("name")
+
+user = { "id": 12, "name": "Kate" }
+name = read_name(user)
+
+type WithoutNames = LibraryExclude(str | int | None, str)
+type NamesOnly = LibraryExtract(str | int | None, str)
+
+counts: LibraryDict({"visits": int}) = {"visits": 12}
+visits = counts["visits"]
+maybe_visits = counts.get("visits")
+
+# Uncomment to check the declared key constraint:
+# invalid = user.get("missing")

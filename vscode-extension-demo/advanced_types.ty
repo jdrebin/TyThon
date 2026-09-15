@@ -1,0 +1,60 @@
+# Type functions use (), while generic declarations and specializations use <>.
+
+type Maybe(T) = T | None
+type Many(T) = []T
+type WithFallback(T extends object, U = None) = T | U
+type ScalarResult(T) = str if T extends str else bytes
+
+
+interface Box<T>:
+    readonly ?value: T
+
+    def get(self) -> T: ...
+
+
+type User(T) = {
+    name: str,
+    payload: T,
+    "id": int,
+    "enabled": bool,
+    def inspect<U>(value: U) -> U,
+}
+
+
+# Computed map keys preserve whether K is an attribute key or an item key.
+type PublicAttributes(T) = {
+    (K): T[K]
+    for K in Extract(keyof T, *)
+}
+
+type GetterSurface = { (*<f"get_{str}">): int }
+type ItemShape(T) = {(K): T[K] for K in Exclude(keyof T, *)}
+
+type UserKeys = keyof User(str)
+type UserAttributeNames = Extract(keyof User(str), *)
+type UserName = User(str)[*<"name">]
+type UserNameViaDot = User(str).name
+type BoxContents = Box<str>.value
+# Go to Definition on * opens its actual bundled interface declaration.
+type NameKey = *<"name">
+type UserItems = ItemShape(User(str))
+type PublicUser = PublicAttributes(User(str))
+type OptionalBox = WithFallback(Box<str>)
+type StringResult = ScalarResult(str)
+
+
+def unwrap<T>(box: Box<T>):
+    return box.get()
+
+
+def preserve<T>(value: T) -> T:
+    return value
+
+
+string_box: Box<str>
+boxed_value = unwrap(string_box)
+literal_value = preserve("literal")
+optional_value: Maybe(str) = boxed_value
+many_values: Many(int) = [1, 2, 3]
+getter_surface: GetterSurface
+getter_result = getter_surface.get_name

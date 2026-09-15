@@ -1,0 +1,24 @@
+def load_name(flag: bool) -> str:
+    value: str = ""
+    try:
+        if flag:
+            raise ValueError("missing name")
+        value = "Ada"
+    except ValueError as error:
+        checked_error: ValueError = error
+        value = "fallback"
+    else:
+        value = "clean"
+    finally:
+        print(value)
+    return value
+
+
+def wrap_failure() -> never:
+    try:
+        raise ValueError("bad value")
+    except ValueError as error:
+        raise RuntimeError("wrapped") from error
+
+
+loaded_name = load_name(False)

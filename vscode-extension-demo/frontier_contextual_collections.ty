@@ -1,0 +1,8 @@
+# Intended behavior: contextual typing should widen this fixed literal for a
+# mutable []str parameter without requiring an intermediate annotation.
+
+def join_names(values: []str) -> str:
+    return values[0]
+
+
+joined = join_names(values=["Ada", "Grace"])

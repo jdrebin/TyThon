@@ -1,0 +1,11 @@
+# Run “Typed-Python: Import Python Declarations” with this file active.
+# Enter .demo_catalog and save the preview beside this file as demo_catalog.d.ty.
+# Then edit this file to request fresh diagnostics. No imports run during conversion.
+from demo_catalog import Greeting, lookup
+
+name = lookup("name")
+count = lookup("count")
+greeting = Greeting(name)
+message = greeting.render(prefix="Welcome")
+
+# After importing, try lookup("missing") or Greeting(123) to test diagnostics.

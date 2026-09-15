@@ -1,0 +1,40 @@
+# Optionality is a member contract, not a value such as None or undefined.
+type Profile = {
+    "id": int,
+    ?"nickname": str | None,
+    ?display_name: str,
+}
+
+type Nickname = Profile["nickname"]
+type Copy(T) = { (K): T[K] for K in keyof T }
+type CopiedProfile = Copy(Profile)
+type Required(T) = { -?(K): T[K] for K in keyof T }
+type RequiredProfile = Required(Profile)
+
+# A mapping protocol supplies membership; a bare shape promises only access.
+def nickname(profile: Profile & MappingProtocol<Profile>):
+    if "nickname" in profile:
+        return profile["nickname"]
+    return None
+
+def update(profile: Profile):
+    profile["nickname"] = "Ada"
+    current = profile["nickname"]
+    del profile["nickname"]
+    # The return remains Profile: assignment did not rewrite its contract.
+    return profile
+
+def label(profile: Profile):
+    if hasattr(profile, "display_name"):
+        return profile.display_name
+    return "Anonymous"
+
+def asserted(profile: Profile):
+    # Asserts presence only. The value is still str | None.
+    return profile["nickname"]!
+
+# Uncomment individually to inspect diagnostics:
+# def unsafe(profile: Profile):
+#     return profile["nickname"]
+# def invalid_delete(profile: Profile):
+#     del profile["id"]

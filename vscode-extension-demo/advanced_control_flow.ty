@@ -1,0 +1,46 @@
+declare def next_name() -> str | None: ...
+
+
+class User:
+    name: str
+    active: bool
+
+
+def normalize(value: str | None) -> str:
+    if value is None:
+        return ""
+    return value
+
+
+def display(value: User | None) -> str:
+    match value:
+        case None:
+            return "anonymous"
+        case User(name=nam, active=ac):
+            a=ac
+            checked_name = nam
+            return checked_name
+    return "inactive"
+
+
+def read_row(row: { "name": str, "score": int }) -> str:
+    match row:
+        case {"name": name, "score": score}:
+            checked_score = score
+            return name
+    return ""
+
+
+def find_first(values: []str):
+    for value in values:
+        return value
+    else:
+        return ""
+
+
+while (current := next_name()) is not None:
+    narrowed_current: str = current
+    break
+
+
+normalized = normalize(next_name())
