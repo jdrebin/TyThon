@@ -5,7 +5,7 @@
     "patterns": [
         {
             "name": "keyword.operator.presence.typed-python",
-            "match": "-?\\?|!(?!=)"
+            "match": "-optional\\b|!(?!=)"
         },
         {
             "include": "#structural-method"
@@ -88,7 +88,7 @@
                 },
                 {
                     "name": "storage.modifier.typed-python",
-                    "match": "^(\\s*)(readonly|static)\\b"
+                    "match": "(?<![\\w.])(readonly|static|optional)\\b(?=\\s+[^\\s:=])"
                 }
             ]
         },
@@ -113,6 +113,9 @@
                 },
                 {
                     "include": "#structural-method"
+                },
+                {
+                    "include": "#declaration-modifiers"
                 },
                 {
                     "include": "#type-parameters"
@@ -150,7 +153,7 @@
                 },
                 {
                     "name": "keyword.operator.type.typed-python",
-                    "match": "(\\||&|-?\\?)"
+                    "match": "(\\||&)"
                 },
                 {
                     "include": "source.python.typed#expression"

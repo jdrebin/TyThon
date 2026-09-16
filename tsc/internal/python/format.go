@@ -327,7 +327,7 @@ func formatPythonObject(c *checker.Checker, t *checker.Type, state *typeFormatSt
 				prefix = "readonly "
 			}
 			if property.Flags&ast.SymbolFlagsOptional != 0 {
-				prefix += "?"
+				prefix += "optional "
 			}
 			parts = append(parts, prefix+property.Name+": "+formatType(c, c.PythonMemberValueType(property), state))
 		}
@@ -338,7 +338,7 @@ func formatPythonObject(c *checker.Checker, t *checker.Type, state *typeFormatSt
 			}
 			key := formatPythonObjectKey(c, info.KeyType(), state)
 			if info.IsOptional() {
-				prefix += "?"
+				prefix += "optional "
 			}
 			parts = append(parts, prefix+key+": "+formatType(c, info.ValueType(), state))
 		}
@@ -374,7 +374,7 @@ func formatPythonObject(c *checker.Checker, t *checker.Type, state *typeFormatSt
 				prefix = "readonly "
 			}
 			if property.Flags&ast.SymbolFlagsOptional != 0 {
-				prefix += "?"
+				prefix += "optional "
 			}
 			parts = append(parts, prefix+property.Name+": "+formatType(c, c.PythonMemberValueType(property), state))
 		}
@@ -466,7 +466,7 @@ func formatPythonMappingShape(c *checker.Checker, t *checker.Type, infos []*chec
 			prefix = "readonly "
 		}
 		if property.Flags&ast.SymbolFlagsOptional != 0 {
-			prefix += "?"
+			prefix += "optional "
 		}
 		attributeParts = append(attributeParts, prefix+property.Name+": "+formatType(c, c.PythonMemberValueType(property), state))
 	}
@@ -478,7 +478,7 @@ func formatPythonMappingShape(c *checker.Checker, t *checker.Type, infos []*chec
 		}
 		key := formatPythonObjectKey(c, info.KeyType(), state)
 		if info.IsOptional() {
-			prefix += "?"
+			prefix += "optional "
 		}
 		parts = append(parts, prefix+key+": "+formatType(c, info.ValueType(), state))
 	}

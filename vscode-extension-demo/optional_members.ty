@@ -1,14 +1,14 @@
 # Optionality is a member contract, not a value such as None or undefined.
 type Profile = {
     "id": int,
-    ?"nickname": str | None,
-    ?display_name: str,
+    optional "nickname": str | None,
+    optional display_name: str,
 }
 
 type Nickname = Profile["nickname"]
 type Copy(T) = { (K): T[K] for K in keyof T }
 type CopiedProfile = Copy(Profile)
-type Required(T) = { -?(K): T[K] for K in keyof T }
+type Required(T) = { -optional (K): T[K] for K in keyof T }
 type RequiredProfile = Required(Profile)
 
 # A mapping protocol supplies membership; a bare shape promises only access.

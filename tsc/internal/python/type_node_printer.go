@@ -53,9 +53,9 @@ func printPythonTypeNode(node *ast.Node, emit *printer.EmitContext) string {
 			}
 			prefix := ""
 			if mapped.QuestionToken != nil {
-				prefix = "?"
+				prefix = "optional "
 				if mapped.QuestionToken.Kind == ast.KindMinusToken {
-					prefix = "-?"
+					prefix = "-optional "
 				}
 			}
 			return "{ " + prefix + "(" + key + "): " + render(mapped.Type) + " for " + name + " in " + render(parameter.Constraint) + filter + " }"
@@ -118,7 +118,7 @@ func printPythonTypeNode(node *ast.Node, emit *printer.EmitContext) string {
 		case ast.KindPropertySignature:
 			prefix := ""
 			if node.QuestionToken() != nil {
-				prefix = "?"
+				prefix = "optional "
 			}
 			return prefix + render(node.Name()) + ": " + render(node.Type())
 		case ast.KindIndexSignature:

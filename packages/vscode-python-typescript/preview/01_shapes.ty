@@ -7,7 +7,7 @@ name = user["name"]
 maybe_name = user.get("name")
 keys = user.keys()
 
-type Patch = { ?"name": str }
+type Patch = { optional "name": str }
 
 def display(patch: Dict(Patch)):
     if "name" in patch:

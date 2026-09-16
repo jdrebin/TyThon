@@ -694,6 +694,19 @@ func isRuntimeClassControlStatement(text string) bool {
 	return false
 }
 
+// optional is a contextual modifier, not a reserved Python identifier.
+func trimOptionalMemberModifier(text string) string {
+	rest, found := strings.CutPrefix(text, "optional")
+	if !found || len(rest) == 0 || rest[0] != ' ' && rest[0] != '\t' && rest[0] != '\f' {
+		return text
+	}
+	rest = strings.TrimSpace(rest)
+	if strings.HasPrefix(rest, ":") {
+		return text
+	}
+	return rest
+}
+
 func parseObjectMember(line logicalLine) (*ObjectMemberDeclaration, []TypeParseError) {
 	text := strings.TrimSpace(strings.TrimSuffix(line.text, "..."))
 	member := &ObjectMemberDeclaration{Loc: lineRange(line)}
@@ -706,15 +719,14 @@ func parseObjectMember(line logicalLine) (*ObjectMemberDeclaration, []TypeParseE
 			member.Readonly = true
 			member.ConstructorWritable = true
 			text = strings.TrimSpace(strings.TrimPrefix(text, "readonly "))
+		case trimOptionalMemberModifier(text) != text:
+			member.Optional = true
+			text = trimOptionalMemberModifier(text)
 		default:
 			goto modifiersDone
 		}
 	}
 modifiersDone:
-	if strings.HasPrefix(text, "?") {
-		member.Optional = true
-		text = strings.TrimSpace(text[1:])
-	}
 	colon := findTopLevel(text, ':')
 	if colon < 0 {
 		return nil, []TypeParseError{errorForLine(line, "expected ':' in object member")}
@@ -764,7 +776,7 @@ modifiersDone:
 			errors = append(errors, errorForLine(line, "non-identifier item keys must be literals or wrapped in parentheses"))
 		}
 		if strings.Contains(left, "?") {
-			errors = append(errors, errorForLine(line, "optional member '?' syntax is not supported"))
+			errors = append(errors, errorForLine(line, "optional members use the 'optional' modifier"))
 		}
 	}
 	return member, errors

@@ -7,7 +7,7 @@ type ScalarResult(T) = str if T extends str else bytes
 
 
 interface Box<T>:
-    readonly ?value: T
+    readonly optional value: T
 
     def get(self) -> T: ...
 

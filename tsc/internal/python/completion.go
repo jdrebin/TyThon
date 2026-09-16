@@ -270,11 +270,16 @@ func PrepareTypeCompletion(source string, offset int) (TypeCompletionQuery, bool
 
 func isDeclaredMemberLeft(left string) bool {
 	left = strings.TrimSpace(left)
-	if strings.HasPrefix(left, "readonly ") || strings.HasPrefix(left, "static ") {
-		fields := strings.Fields(left)
-		left = fields[len(fields)-1]
+	for {
+		if rest := trimOptionalMemberModifier(left); rest != left {
+			left = rest
+		} else if strings.HasPrefix(left, "readonly ") || strings.HasPrefix(left, "static ") {
+			left = strings.TrimSpace(left[strings.IndexByte(left, ' ')+1:])
+		} else {
+			break
+		}
 	}
-	return len(left) >= 2 && (left[0] == '\'' || left[0] == '"') && left[len(left)-1] == left[0] || strings.HasPrefix(left, "[") && strings.HasSuffix(left, "]")
+	return isSimpleIdentifier(left) || len(left) >= 2 && (left[0] == '\'' || left[0] == '"') && left[len(left)-1] == left[0] || strings.HasPrefix(left, "[") && strings.HasSuffix(left, "]") || strings.HasPrefix(left, "(") && strings.HasSuffix(left, ")")
 }
 
 func insideDeclaredTypeBlock(source string, lineStart int) bool {

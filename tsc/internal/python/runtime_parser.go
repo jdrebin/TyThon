@@ -328,8 +328,8 @@ func (p *runtimeFileParser) parseSuite(start int, indent int) ([]RuntimeStatemen
 			index++
 			continue
 		}
-		if colon := findTopLevel(text, ':'); findRuntimeAssignment(text) < 0 && colon >= 0 && (isSimpleIdentifier(strings.TrimSpace(text[:colon])) || indent == p.classIndent && isSimpleIdentifier(strings.TrimPrefix(strings.TrimSpace(text[:colon]), "?"))) {
-			name := strings.TrimPrefix(strings.TrimSpace(text[:colon]), "?")
+		if colon := findTopLevel(text, ':'); findRuntimeAssignment(text) < 0 && colon >= 0 && (isSimpleIdentifier(strings.TrimSpace(text[:colon])) || indent == p.classIndent && isSimpleIdentifier(trimOptionalMemberModifier(strings.TrimSpace(text[:colon])))) {
+			name := trimOptionalMemberModifier(strings.TrimSpace(text[:colon]))
 			typeText := strings.TrimSpace(text[colon+1:])
 			typeOffset := logicalLineTextOffset(line, typeText)
 			annotation, errors := ParseTypeExpression(typeText)
@@ -430,10 +430,10 @@ func (p *runtimeFileParser) parseAssignment(line logicalLine) RuntimeStatement {
 	if colon := findTopLevel(left, ':'); colon >= 0 {
 		name = strings.TrimSpace(left[:colon])
 		if line.indent == p.classIndent {
-			if strings.HasPrefix(name, "?") {
+			if trimOptionalMemberModifier(name) != name {
 				p.diagnostics = append(p.diagnostics, RuntimeParseError{Range: lineRange(line), Message: "declare the optional attribute separately from its initializer"})
 			}
-			name = strings.TrimPrefix(name, "?")
+			name = trimOptionalMemberModifier(name)
 		}
 		typeText := strings.TrimSpace(left[colon+1:])
 		typeOffset := logicalLineTextOffset(line, typeText)

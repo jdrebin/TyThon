@@ -387,16 +387,26 @@ func (p *typeParser) parseMapping() TypeExpr {
 
 	members := []MappingMember{}
 	for {
-		readonly := false
-		if _, ok := p.consumeIdentifier("readonly"); ok {
-			readonly = true
+		readonly, optional := false, false
+		for p.atIdentifier("readonly") || p.atIdentifier("optional") {
+			// These are contextual modifiers: `optional: T` is still an
+			// ordinary attribute named "optional".
+			if p.pos+1 < len(p.tokens) && p.tokens[p.pos+1].kind == tokenColon {
+				break
+			}
+			if p.atIdentifier("readonly") {
+				readonly = true
+			} else {
+				optional = true
+			}
+			p.pos++
 		}
 		_, removeOptional := p.consume(tokenMinus)
-		optional := false
 		if removeOptional {
-			p.expect(tokenQuestion, "expected '?' after '-' in mapped modifier")
-		} else {
-			_, optional = p.consume(tokenQuestion)
+			p.expectIdentifier("optional", "expected 'optional' after '-' in mapped modifier")
+			if optional {
+				p.errorAtCurrent("cannot both add and remove optionality")
+			}
 		}
 		member := MappingMember{Readonly: readonly, Optional: optional}
 		var attributeToken typeToken
@@ -468,7 +478,7 @@ func (p *typeParser) parseMapping() TypeExpr {
 			}
 		}
 		if removeOptional {
-			p.errorAtCurrent("'-?' is only valid in a type comprehension")
+			p.errorAtCurrent("'-optional' is only valid in a type comprehension")
 		}
 		members = append(members, member)
 		if _, ok := p.consume(tokenComma); !ok {

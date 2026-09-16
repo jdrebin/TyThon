@@ -86,13 +86,24 @@ const intrinsicInterface = tokenize("interface *<AttrName extends str = str>:\n 
 assertScope(intrinsicInterface, 0, "*", "entity.name.type.interface.typed-python");
 assertScope(intrinsicInterface, 0, "<", "punctuation.definition.typeparameters.begin.typed-python");
 
-const presence = tokenize('type Optional = { ?"name": str }\nvalue = obj["name"]!\ntext = "keep!"\ncheck = value != None');
-assertScope(presence, 0, "?", "keyword.operator.presence.typed-python");
+const presence = tokenize('type Optional = { optional "name": str }\nvalue = obj["name"]!\ntext = "keep!"\ncheck = value != None');
+assertScope(presence, 0, "optional", "storage.modifier.typed-python");
 assertScope(presence, 1, "!", "keyword.operator.presence.typed-python");
 assertNotScope(presence, 2, "keep!", "keyword.operator.presence.typed-python");
 assertNotScope(presence, 3, "!=", "keyword.operator.presence.typed-python");
-const requiredMapping = tokenize('type Required(T) = { -?(K): T[K] for K in keyof T }');
-assertScope(requiredMapping, 0, "-?", "keyword.operator.presence.typed-python");
+const requiredMapping = tokenize('type Required(T) = { -optional (K): T[K] for K in keyof T }');
+assertScope(requiredMapping, 0, "-optional", "keyword.operator.presence.typed-python");
+
+const optionalModifiers = tokenize('type Patch = { optional name: str, readonly optional "id": int }\ninterface Model:\n    optional label: str\ntype Partial(T) = { optional (K): T[K] for K in keyof T }');
+assertScope(optionalModifiers, 0, "optional", "storage.modifier.typed-python");
+assertScope(optionalModifiers, 0, "readonly", "storage.modifier.typed-python");
+assertScope(optionalModifiers, 2, "optional", "storage.modifier.typed-python");
+assertScope(optionalModifiers, 3, "optional", "storage.modifier.typed-python");
+const optionalNames = tokenize('optional = "optional"\nobj.optional\ntype Named = { optional: str }\n# optional name: str');
+assertNotScope(optionalNames, 0, "optional", "storage.modifier.typed-python");
+assertNotScope(optionalNames, 1, "optional", "storage.modifier.typed-python");
+assertNotScope(optionalNames, 2, "optional", "storage.modifier.typed-python");
+assertNotScope(optionalNames, 3, "optional", "storage.modifier.typed-python");
 
 const coreOperators = tokenize('def identity<const T>(value: T) -> T:\n    return value\nitem = {"id": 1} as const satisfies {"id": int}');
 assertScope(coreOperators, 0, "const", "storage.modifier.typed-python");

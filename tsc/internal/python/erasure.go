@@ -358,16 +358,18 @@ func eraseVariableAnnotations(source string, removed []bool, diagnostics *[]Eras
 			if equals >= 0 {
 				left := line[:equals]
 				colon := findTopLevel(left, ':')
-				if colon >= 0 && isSimpleIdentifier(strings.TrimPrefix(strings.TrimSpace(left[:colon]), "?")) {
+				if colon >= 0 && isSimpleIdentifier(trimOptionalMemberModifier(strings.TrimSpace(left[:colon]))) {
 					markErased(removed, lineStart+colon, lineStart+equals)
-					if question := strings.IndexByte(left[:colon], '?'); question >= 0 {
+					name := strings.TrimSpace(left[:colon])
+					if trimOptionalMemberModifier(name) != name {
+						modifier := strings.Index(left[:colon], "optional")
 						// The position-preserving provider projection cannot remove a
-						// leading marker without altering Python suite indentation.
-						*diagnostics = append(*diagnostics, ErasureDiagnostic{Range: TextRange{Start: lineStart + question, End: lineStart + question + 1}, Message: "declare the optional attribute separately from its initializer"})
-						markErased(removed, lineStart+question, lineStart+question+1)
+						// leading modifier without altering Python suite indentation.
+						*diagnostics = append(*diagnostics, ErasureDiagnostic{Range: TextRange{Start: lineStart + modifier, End: lineStart + modifier + len("optional")}, Message: "declare the optional attribute separately from its initializer"})
+						markErased(removed, lineStart+modifier, lineStart+modifier+len("optional"))
 					}
 				}
-			} else if colon := findTopLevel(line, ':'); colon >= 0 && isSimpleIdentifier(strings.TrimPrefix(strings.TrimSpace(line[:colon]), "?")) {
+			} else if colon := findTopLevel(line, ':'); colon >= 0 && isSimpleIdentifier(trimOptionalMemberModifier(strings.TrimSpace(line[:colon]))) {
 				// A bare Python annotation statement has no runtime value after
 				// static erasure; erase its name as well instead of turning it into
 				// an accidental expression statement.

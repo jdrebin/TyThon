@@ -9,23 +9,23 @@ import (
 
 func TestOptionalShapeContracts(t *testing.T) {
 	c := newPythonChecker(t)
-	source := `type User = { ?"name": str | None, ?label: str }
+	source := `type User = { optional "name": str | None, optional label: str }
 type RequiredUser = { "name": str | None, label: str }
 type Copy(T) = { (K): T[K] for K in keyof T }
 type Copied = Copy(User)
 type Value = User["name"]
 type Label = User.label
-type Nested = { ?"user": User }["user"]["name"]
-type MakeOptional(T) = { ?(K): T[K] for K in keyof T }
+type Nested = { optional "user": User }["user"]["name"]
+type MakeOptional(T) = { optional (K): T[K] for K in keyof T }
 type MadeOptional = MakeOptional(RequiredUser)
 empty: User = {}
 class Model:
-    ?label: str
+    optional label: str
     def __init__(self):
         pass
 interface OptionalInterface:
-    ?label: str
-    ?"name": str | None
+    optional label: str
+    optional "name": str | None
 `
 	p := BuildProgram(c, []SourceInput{{FileName: "main.ty", Text: source}})
 	if len(p.Diagnostics) != 0 {
@@ -68,17 +68,17 @@ interface OptionalInterface:
 		t.Fatal("Required removed None")
 	}
 	got, _ := formatPythonObject(c, user, newTypeFormatState(nil, nil))
-	if !strings.Contains(got, "?\"name\"") || !strings.Contains(got, "?label") {
+	if !strings.Contains(got, "optional \"name\"") || !strings.Contains(got, "optional label") {
 		t.Fatalf("optional hover: %s", got)
 	}
 }
 
 func TestRequiredMappingSyntax(t *testing.T) {
 	c := newPythonChecker(t)
-	source := `type User = { ?"name": str | None, readonly ?label: str }
-type Required(T) = { -?(K): T[K] for K in keyof T }
+	source := `type User = { optional "name": str | None, readonly optional label: str }
+type Required(T) = { -optional (K): T[K] for K in keyof T }
 type Complete = Required(User)
-type Again(T) = { ?(K): T[K] for K in keyof T }
+type Again(T) = { optional (K): T[K] for K in keyof T }
 type RoundTrip = Required(Again(User))
 def read(user: Complete):
     return user["name"]
@@ -100,16 +100,16 @@ def read(user: Complete):
 		}
 	}
 	info, _, ok := p.QuickInfoAt("required.ty", strings.Index(source, "Required(T)"))
-	if !ok || !strings.Contains(FormatQuickInfo(c, info), "-?(K)") {
+	if !ok || !strings.Contains(FormatQuickInfo(c, info), "-optional (K)") {
 		t.Fatalf("hover lost modifier: %s", FormatQuickInfo(c, info))
 	}
-	if _, errors := ParseTypeExpression(`{ -?"name": str }`); len(errors) == 0 {
+	if _, errors := ParseTypeExpression(`{ -optional "name": str }`); len(errors) == 0 {
 		t.Fatal("accepted removal modifier outside a comprehension")
 	}
 }
 
 func TestOptionalPresenceFlow(t *testing.T) {
-	source := `type User = { ?"name": str | None, ?label: str }
+	source := `type User = { optional "name": str | None, optional label: str }
 def update(obj: User):
     obj["name"] = "Ada"
     value: str | None = obj["name"]
@@ -137,7 +137,7 @@ def branches(obj: User, flag: bool):
     else:
         obj["name"] = None
     return obj["name"]
-def nested(obj: { ?"child": User }):
+def nested(obj: { optional "child": User }):
     obj["child"]!.label = "Ada"
     return obj["child"]!.label
 def early(obj: User & MappingProtocol<User>):
@@ -182,7 +182,7 @@ func TestOptionalPresenceErrors(t *testing.T) {
 		{"readonly_delete", `del obj["locked"]`, "delete"},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			source := "type User = { ?\"name\": str, \"id\": int, id: int, readonly ?\"locked\": str }\ndef f(obj: User, other: User, flag: bool):\n    " + test.body + "\n"
+			source := "type User = { optional \"name\": str, \"id\": int, id: int, readonly optional \"locked\": str }\ndef f(obj: User, other: User, flag: bool):\n    " + test.body + "\n"
 			p := BuildProgram(newPythonChecker(t), []SourceInput{{FileName: "main.ty", Text: source}})
 			for _, d := range p.Diagnostics {
 				if strings.Contains(d.Message, test.message) {
@@ -209,19 +209,19 @@ func TestOptionalKeywordSpreadCalls(t *testing.T) {
 	for _, test := range []struct {
 		name, source, message string
 	}{
-		{"required", `type Payload = { ?"name": str }
+		{"required", `type Payload = { optional "name": str }
 def greet(name: str):
     return name
 def forward(payload: Payload):
     return greet(**payload)
 `, `missing required argument "name"`},
-		{"defaulted", `type Payload = { ?"name": str }
+		{"defaulted", `type Payload = { optional "name": str }
 def greet(name: str = "Anonymous"):
     return name
 def forward(payload: Payload):
     return greet(**payload)
 `, ""},
-		{"incompatible defaulted", `type Payload = { ?"name": int }
+		{"incompatible defaulted", `type Payload = { optional "name": int }
 def greet(name: str = "Anonymous"):
     return name
 def forward(payload: Payload):
@@ -233,27 +233,27 @@ def greet(name: str):
 def forward(payload: Payload):
     return greet(**payload)
 `, ""},
-		{"overload", `type Payload = { ?"name": str }
+		{"overload", `type Payload = { optional "name": str }
 declare def greet(name: str) -> int
 declare def greet(name: str = ...) -> str
 def forward(payload: Payload) -> str:
     return greet(**payload)
 `, ""},
-		{"generic pack", `type Payload = { ?"name": str | None }
+		{"generic pack", `type Payload = { optional "name": str | None }
 def collect<T extends {}>(**kwargs: T) -> T:
     return kwargs
 def forward(payload: Payload):
     result = collect(**payload)
     return result["name"]
 `, "may be absent"},
-		{"required pack shape", `type Payload = { ?"name": str }
+		{"required pack shape", `type Payload = { optional "name": str }
 def greet(**kwargs: { "name": str }):
     return kwargs["name"]
 def forward(payload: Payload):
     return greet(**payload)
 `, "keyword arguments are not assignable"},
-		{"optional pack shape", `type Payload = { ?"name": str }
-def greet(**kwargs: { ?"name": str }):
+		{"optional pack shape", `type Payload = { optional "name": str }
+def greet(**kwargs: { optional "name": str }):
     return kwargs
 def forward(payload: Payload):
     return greet(**payload)
@@ -262,7 +262,7 @@ def forward(payload: Payload):
     return kwargs["name"]
 result = greet(name="Ada")
 `, ""},
-		{"duplicate pack keys", `type Payload = { ?"name": str }
+		{"duplicate pack keys", `type Payload = { optional "name": str }
 def collect<T extends {}>(**kwargs: T) -> T:
     return kwargs
 def forward(payload: Payload):
@@ -288,9 +288,85 @@ def forward(payload: Payload):
 }
 
 func TestOptionalClassInitializerIsNotSilentlyMiserased(t *testing.T) {
-	source := "class Model:\n    ?label: str = \"Ada\"\n    def method(self):\n        pass\n"
+	source := "class Model:\n    optional label: str = \"Ada\"\n    def method(self):\n        pass\n"
 	_, diagnostics := EraseTypedPython(source)
 	if len(diagnostics) == 0 {
 		t.Fatal("inline optional initializer must report the projection limitation")
+	}
+}
+
+func TestOptionalModifierSyntax(t *testing.T) {
+	for _, source := range []string{
+		`{ optional "name": str }`,
+		`{ optional name: str }`,
+		`{ optional ("name"): str }`,
+		`{ readonly optional name: str }`,
+		`{ optional readonly name: str }`,
+		`{ optional def greet(message: str) -> str }`,
+	} {
+		t.Run(source, func(t *testing.T) {
+			expr := parseTypeForTest(t, source).(*MappingTypeExpr)
+			if len(expr.Members) != 1 || !expr.Members[0].Optional {
+				t.Fatalf("optional modifier lost: %#v", expr.Members)
+			}
+			if strings.Contains(source, "readonly") && !expr.Members[0].Readonly {
+				t.Fatal("readonly modifier lost")
+			}
+		})
+	}
+	for _, source := range []string{
+		`{ ?"name": str }`, `{ ?name: str }`, `{ name?: str }`,
+		`{ ?(K): T[K] for K in keyof T }`,
+		`{ -?(K): T[K] for K in keyof T }`,
+		`{ optional -optional (K): T[K] for K in keyof T }`,
+	} {
+		if _, errors := ParseTypeExpression(source); len(errors) == 0 {
+			t.Errorf("accepted obsolete or conflicting modifiers: %s", source)
+		}
+	}
+}
+
+func TestOptionalRemainsAnOrdinaryIdentifier(t *testing.T) {
+	source := `type Named = { optional: str }
+interface NamedInterface:
+    optional : str
+class Model:
+    optional : str = "ready"
+optional = "ready"
+def identity(optional: str):
+    return optional
+result = identity(optional)
+`
+	c := newPythonChecker(t)
+	p := BuildProgram(c, []SourceInput{{FileName: "names.ty", Text: source}})
+	if len(p.Diagnostics) != 0 {
+		t.Fatalf("diagnostics: %v", p.Diagnostics)
+	}
+	if _, diagnostics := EraseTypedPython(source); len(diagnostics) != 0 {
+		t.Fatalf("ordinary identifiers must erase normally: %v", diagnostics)
+	}
+	for _, name := range []string{"Named", "NamedInterface", "Model"} {
+		value := p.Modules[0].Types.symbols[name].Instance
+		if c.PythonMemberIsOptional(value, c.GetStringLiteralType("optional"), true) {
+			t.Fatalf("%s.optional is a name, not a modifier", name)
+		}
+	}
+}
+
+func TestOptionalClassAttributeErasure(t *testing.T) {
+	source := "class Model:\n    optional\tlabel: str\n    def __init__(self):\n        self.label = 'ready'\n"
+	program := BuildProgram(newPythonChecker(t), []SourceInput{{FileName: "model.ty", Text: source}})
+	if len(program.Diagnostics) != 0 {
+		t.Fatalf("diagnostics: %v", program.Diagnostics)
+	}
+	emitted, diagnostics := EraseTypedPython(source)
+	if len(diagnostics) != 0 {
+		t.Fatalf("erasure diagnostics: %v", diagnostics)
+	}
+	if strings.Contains(emitted, "optional") || !strings.Contains(emitted, "        self.label = 'ready'") {
+		t.Fatalf("incorrect erasure:\n%s", emitted)
+	}
+	if len(emitted) != len(source) {
+		t.Fatal("erasure changed source offsets")
 	}
 }

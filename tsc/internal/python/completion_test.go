@@ -7,6 +7,16 @@ import (
 	pythonfrontend "github.com/microsoft/TypeScript/tsc/internal/python"
 )
 
+func TestTypeCompletionAfterOptionalModifier(t *testing.T) {
+	for _, member := range []string{`optional label`, `optional "name"`, `readonly optional "full name"`, `optional ("name")`, "optional\tlabel"} {
+		source := "interface User:\n    " + member + ": Us"
+		query, ok := pythonfrontend.PrepareTypeCompletion(source, len(source))
+		if !ok || query.Prefix != "Us" {
+			t.Fatalf("missing completion for %q: %#v, %v", member, query, ok)
+		}
+	}
+}
+
 func TestAttributeCompletionUsesCheckedAttributeFacet(t *testing.T) {
 	const fileName = "/workspace/main.ty"
 	const source = `type User(T) = {

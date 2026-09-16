@@ -428,8 +428,8 @@ Rules:
   nominal attribute type.
 - Methods may be declared with `def` or as callable-valued properties.
 - An exact attribute may refine a compatible broad attribute signature.
-- A prefix `?` marks a potentially absent member: `?name: str` or
-  `?"name": str`. This is presence metadata, not a value union. Python still
+- The `optional` modifier marks a potentially absent member: `optional name: str` or
+  `optional "name": str`. This is presence metadata, not a value union. Python still
   raises on a missing runtime lookup; no public `undefined` value is introduced.
 - Successful reads and type-level indexing expose the declared value type,
   including any explicit `None`. Type-level indexing can chain through optional
@@ -446,18 +446,18 @@ Rules:
 - Required shapes are assignable to corresponding optional shapes, not the
   reverse. Native TS optional-property relations and mapped modifiers own this
   behavior. Mapping over `keyof T` preserves presence metadata independently of
-  `T[K]`; adding `?` to the mapped member explicitly makes it optional.
+  `T[K]`; adding `optional` to the mapped member explicitly makes it optional.
 - Keyword spreading preserves that metadata: an optional key cannot satisfy a
   required parameter, but can supply a compatible defaulted parameter. Possible
   duplicate bindings are still errors. Generic `**kwargs` inference retains
   optional keys and explicit `None`; shaped keyword packs use the native
   structural relation to check required members, including an empty pack.
-- Prefix `-?` removes optionality in a type comprehension:
-  `type Required(T) = { -?(K): T[K] for K in keyof T }`. It lowers directly to
+- The `-optional` modifier removes optionality in a type comprehension:
+  `type Required(T) = { -optional (K): T[K] for K in keyof T }`. It lowers directly to
   TS's exclude-optional mapped modifier, without an independent Required
   evaluator, and preserves explicit `None` in member value types.
 - Current frontend limit: declare optional class attributes on their own line
-  (`?name: str`) and initialize them separately. A leading optional marker on
+  (`optional name: str`) and initialize them separately. A leading optional modifier on
   an initialized field cannot yet be erased by the position-preserving Python
   provider projection without changing indentation; it is diagnosed explicitly.
   Presence-flow references currently cover named receivers, dotted paths, and
@@ -1056,7 +1056,7 @@ Implemented in the prototype:
   protocols, operators, exceptions, and context managers at prototype depth;
 - checker-backed inference, relations, conditional types, recursive types,
   mapped types, indexed access, and flow analysis;
-- prefix-optional shape members, erased presence assertions, declaration-stable
+- `optional` shape members, erased presence assertions, declaration-stable
   return inference, and local presence checking through the existing flow graph;
 - hover, diagnostics, signature help, dot/item/type/call completion;
 - VS Code grammar and an Extension Development Host demo;

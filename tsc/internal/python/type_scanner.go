@@ -32,7 +32,6 @@ const (
 	tokenEllipsis
 	tokenArrow
 	tokenDot
-	tokenQuestion
 	tokenMinus
 )
 
@@ -101,8 +100,6 @@ func scanTypeTokens(source string) ([]typeToken, []TypeParseError) {
 		kind := tokenEOF
 		width := size
 		switch r {
-		case '?':
-			kind = tokenQuestion
 		case '(':
 			kind = tokenLeftParen
 		case ')':
