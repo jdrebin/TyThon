@@ -16,6 +16,7 @@ import {
 import { registerHoverFeature } from "./hover";
 import { createServerLaunch } from "./serverLaunch";
 import { PythonTools } from "./pythonTools";
+import { BundledFormatter } from "./formatter";
 import { resolveCompilerPath } from "./compilerPath";
 
 let languageClient: LanguageClient | undefined;
@@ -146,6 +147,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     }));
     try {
         await languageClient.start();
+        context.subscriptions.push(new BundledFormatter(context, output));
         pythonTools = new PythonTools(context, languageClient, output);
         context.subscriptions.push(pythonTools);
         context.subscriptions.push(registerHoverFeature(documentSelector, languageClient,

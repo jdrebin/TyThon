@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=68", "wheel>=0.42"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "tython-lang"
+dynamic = ["version"]
+description = "Python with an erasable structural type system powered by the adapted TypeScript checker"
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "Apache-2.0"}
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3",
+    "Topic :: Software Development :: Compilers",
+    "Topic :: Software Development :: Quality Assurance",
+]
+
+[project.urls]
+Homepage = "https://github.com/jdrebin/TyThon"
+Issues = "https://github.com/jdrebin/TyThon/issues"
+
+[project.scripts]
+tython = "tython_cli:main"
+
+[tool.setuptools]
+packages = ["tython_cli"]
+include-package-data = false
+
+[tool.setuptools.package-data]
+tython_cli = ["bin/*", "library/*", "licenses/**/*", "*.json", "*.txt", "*.md"]

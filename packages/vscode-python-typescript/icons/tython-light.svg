@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 32 32">
+  <title>tython</title>
+  <path fill="#3B5FD1" d="M10 3h12a7 7 0 0 1 7 7v2h-6v-2a1 1 0 0 0-1-1H10a1 1 0 0 0-1 1v1a1 1 0 0 0 1 1h4v6h-4a7 7 0 0 1-7-7v-1a7 7 0 0 1 7-7Z"/>
+  <circle cx="25" cy="6.5" r="1.1" fill="#FFFFFF"/>
+  <g transform="rotate(180 16 16)">
+    <path fill="#7540C8" d="M10 3h12a7 7 0 0 1 7 7v2h-6v-2a1 1 0 0 0-1-1H10a1 1 0 0 0-1 1v1a1 1 0 0 0 1 1h4v6h-4a7 7 0 0 1-7-7v-1a7 7 0 0 1 7-7Z"/>
+    <circle cx="25" cy="6.5" r="1.1" fill="#FFFFFF"/>
+  </g>
+</svg>

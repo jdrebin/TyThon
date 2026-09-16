@@ -14,6 +14,7 @@
         "packages/*"
     ],
     "scripts": {
+        "licenses:prepare": "node tools/scripts/prepare-tython-notices.mjs",
         "licenses:check": "node tools/scripts/check-tython-notices.mjs",
         "build": "hereby build",
         "build:watch": "hereby build:watch",
@@ -27,6 +28,7 @@
         "extension:build": "npm run -w tython build",
         "extension:watch": "npm run -w tython watch",
         "preview:package": "npm run -w tython preview:package",
+        "release:package": "node tools/scripts/package-tython-release.mjs",
         "setup-hooks": "node tools/scripts/link-hooks.mjs"
     },
     "devDependencies": {

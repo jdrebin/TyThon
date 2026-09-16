@@ -23,7 +23,8 @@ function run(command, args, cwd = extension, capture = false, env = process.env)
     return result.stdout?.trim();
 }
 run("npm", ["run", "licenses:check"], root);
-run("go", ["test", "-p", "1", "./internal/python", "./internal/checker", "./internal/lsp", "-count=1", "-timeout=120s"], path.join(root, "tsc"), false, goEnv);
+run("npm", ["run", "formatter:prepare"]);
+run("go", ["test", "-p", "1", "./cmd/tsc", "./internal/python", "./internal/checker", "./internal/lsp", "-count=1", "-timeout=120s"], path.join(root, "tsc"), false, goEnv);
 for (const script of ["build", "test", "tools:test"]) run("npm", ["run", script]);
 
 const output = path.join(root, "built/preview");
@@ -37,7 +38,7 @@ const copy = async (source, relative) => {
     await cp(source, target, { recursive: true, dereference: true });
 };
 // Explicit allowlist: no workspace settings, caches, credentials, or user code.
-for (const relative of ["README.md", "language-configuration.json", "syntaxes", "preview", "dist/extension.bundle.js", "dist/extension.bundle.js.map",
+for (const relative of ["README.md", "language-configuration.json", "icons", "syntaxes", "preview", "dist/extension.bundle.js", "dist/extension.bundle.js.map",
     "scripts/contained-server.sh", "scripts/python-provider.py", "scripts/python_declarations.py"]) {
     await copy(path.join(extension, relative), relative);
 }
@@ -52,16 +53,21 @@ delete manifest.scripts;
 delete manifest.devDependencies;
 delete manifest.dependencies; // JS dependencies are bundled or explicitly vendored below.
 manifest.files = ["README.md", "LICENSE.txt", "NOTICE.txt", "LICENSING.md", "THIRD_PARTY_NOTICES.md", "build-info.json", "language-configuration.json",
-    "bin/**", "dist/**", "library/**", "licenses/**", "preview/**", "scripts/**", "syntaxes/**", "vendor/**"];
+    "bin/**", "dist/**", "icons/**", "library/**", "licenses/**", "preview/**", "scripts/**", "syntaxes/**", "vendor/**"];
 await writeFile(path.join(stage, "package.json"), JSON.stringify(manifest, null, 2) + "\n");
 await mkdir(path.join(stage, "bin"));
 run("go", ["build", "-trimpath", "-buildvcs=false", "-o", path.join(stage, "bin/typed-python"), "./cmd/tsc"], path.join(root, "tsc"), false, goEnv);
+const formatter = path.join(root, "built/local/black-formatter");
+await copy(formatter, "bin/formatter");
+const formatterInfo = JSON.parse(await readFile(path.join(formatter, "build-info.json"), "utf8"));
 
 // Pyright's npm distribution is self-contained on Linux (fsevents is optional).
 const pyright = path.dirname(require.resolve("pyright-typeserver/package.json"));
 await copy(pyright, "vendor/pyright-typeserver");
 const notices = ["# Third-party notices", "", "This independent project adapts TypeScript. Its upstream Apache-2.0 license and notices are retained in LICENSE.txt and NOTICE.txt. This distribution contains modified checker, Python frontend and editor integration code. The filesystem watcher license is in licenses/fswatch/LICENSE.", "", "Grammar attribution is in syntaxes/LICENSE.magicpython. Pyright includes its MIT license and typeshed notices in vendor/pyright-typeserver. The bundled Type Server Protocol is sourced from Pyright under that MIT license.", ""];
 const dependencies = [];
+dependencies.push({ ecosystem: "binary", name: "black-tython-adaptation", version: formatterInfo.version, payloadSHA256: formatterInfo.payloadSHA256 });
+notices.push(`Bundled Black ${formatterInfo.version}, modified by tython's grammar/layout adapter: bin/formatter/LICENSE.black. Python dependency metadata, PyInstaller notices, and native runtime license/provenance records are retained in bin/formatter/licenses/.`, "");
 const goToolchain = JSON.parse(run("go", ["env", "-json", "GOROOT", "GOVERSION"], path.join(root, "tsc"), true, goEnv));
 // The linked Go runtime is not a go.mod dependency. Retain its license and
 // patent files, including the toolchain's vendored component notices.
@@ -139,13 +145,17 @@ const info = {
     sourceCommit: run("git", ["rev-parse", "HEAD"], root, true),
     sourceDirty: !!run("git", ["status", "--porcelain"], root, true),
     compilerSHA256: compilerHash,
+    formatterSHA256: await sha(path.join(stage, "bin/formatter/black-formatter")),
     extensionSHA256: extensionHash,
     librarySHA256: await sha(path.join(stage, "library/builtins.d.ty")),
     lockfileSHA256: await sha(path.join(root, "package-lock.json")), dependencies,
 };
 await writeFile(path.join(stage, "build-info.json"), JSON.stringify(info, null, 2) + "\n");
 const pending = path.join(work, "unverified.vsix");
-await createVSIX({ cwd: stage, packagePath: pending, target: "linux-x64", dependencies: false, allowMissingRepository: true, rewriteRelativeLinks: false });
+const packagingProgress = setInterval(() => console.log("VSIX packaging/security scan is still running…"), 30000);
+try {
+    await createVSIX({ cwd: stage, packagePath: pending, target: "linux-x64", dependencies: false, allowMissingRepository: true, rewriteRelativeLinks: false });
+} finally { clearInterval(packagingProgress); }
 const extracted = path.join(work, "extracted");
 const zip = new AdmZip(pending);
 for (const entry of zip.getEntries()) {
@@ -155,9 +165,11 @@ for (const entry of zip.getEntries()) {
 zip.extractAllTo(extracted, false, true);
 const installed = path.join(extracted, "extension");
 assert.equal(await sha(path.join(installed, "bin/typed-python")), info.compilerSHA256);
+assert.equal(await sha(path.join(installed, "bin/formatter/black-formatter")), info.formatterSHA256);
 assert.equal(await sha(path.join(installed, "dist/extension.bundle.js")), info.extensionSHA256);
 assert.equal(await sha(path.join(installed, "library/builtins.d.ty")), info.librarySHA256);
 run(process.execPath, [path.join(extension, "test/packagedPreview.test.mjs"), installed], root);
+run(process.execPath, [path.join(extension, "test/icons.test.mjs"), installed], root);
 // Only a passing extracted artifact gets a distributable filename.
 const artifact = path.join(output, `tython-${manifest.version}-${info.buildID}-linux-x64.vsix`);
 assert(!existsSync(artifact), `Artifact already exists: ${artifact}; do not overwrite a verified build.`);
@@ -165,3 +177,4 @@ await rename(pending, artifact);
 await writeFile(`${artifact}.sha256`, `${await sha(artifact)}  ${path.basename(artifact)}\n`);
 await writeFile(`${artifact}.build-info.json`, JSON.stringify({ ...info, verified: true, checks: ["go-python-checker-lsp", "extension", "python-tools", "extracted-vsix-lsp"] }, null, 2) + "\n");
 console.log(`\nVerified local preview: ${artifact}\nBuild staging retained for inspection: ${work}`);
+export const verifiedArtifact = artifact;

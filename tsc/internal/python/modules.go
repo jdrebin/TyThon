@@ -5,8 +5,8 @@ import (
 )
 
 // ModuleFiles groups the possible files that describe one Python module.
-// Implementation and TypedImplementation are mutually exclusive because a
-// .ty source emits the corresponding .py path.
+// Implementation and TypedImplementation are mutually exclusive source roles.
+// Generated Python lives in a separate output tree, not beside its .ty source.
 type ModuleFiles struct {
 	Stem                string
 	Implementation      string

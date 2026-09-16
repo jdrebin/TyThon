@@ -45,13 +45,8 @@ const typedLint = await request("lint", 'import os\n\nvalue      = {"a": 1, "a":
 assert(typedLint.some(value => value.code === "F601"));
 assert(!typedLint.some(value => value.code === "F401"));
 assert.deepEqual(await request("lint", "class A:\n          \n", { erased: true }), []);
-assert.equal(await request("format", "x={ 'a':1,'b':2}\n"), 'x = {"a": 1, "b": 2}\n');
-await assert.rejects(request("format", "x      = 1\n", { erased: true }), /not supported/);
-assert.equal(await request("formatRange", "             \nx={ 'a':1}\n", { erased: true, startLine: 1, endLine: 2 }), 'x = {"a": 1}\n');
-await assert.rejects(request("formatRange", "def f():\n    x=1\n    return x\n", { startLine: 1, endLine: 2 }), /complete top-level/);
-await assert.rejects(request("formatRange", 'x = """hello\nworld\n"""\n', { startLine: 1, endLine: 2 }), /complete top-level/);
 const controller = new AbortController();
 controller.abort();
 await assert.rejects(runPythonTool(python, helper, {}, controller.signal), /Cancelled/);
 await assert.rejects(runPythonTool("/missing/python-provider", helper, {}, new AbortController().signal), /ENOENT/);
-console.log("Python tools: real Jedi docs/completions/navigation, Ruff lint/fixes/format, UTF16, protected ranges, cancellation passed.");
+console.log("Python tools: real Jedi docs/completions/navigation, Ruff lint/fixes, UTF16, protected ranges, cancellation passed.");

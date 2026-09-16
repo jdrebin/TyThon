@@ -40,7 +40,11 @@ files are not automatically claimed to be copied from upstream.
 
 ## Release checks
 
-Run `npm run licenses:check` with the baseline commit available locally. It
+Run `npm run licenses:check` with the baseline commit available locally. After
+starting a fresh Git history, run `npm run licenses:prepare` once to fetch that
+exact upstream commit into the ignored `built/local/upstream-notices.git` audit
+cache. This does not add commits, remotes, or branches to the project repository.
+The audit reads the cached objects without weakening the checks below. It
 checks retained upstream legal files, change markers on modified same-path
 inherited files, and known copied-component licenses. It cannot infer every
 copy, detect every removed attribution, or establish ownership: review newly

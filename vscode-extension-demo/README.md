@@ -4,8 +4,13 @@ Open the repository root in VS Code. In **Run and Debug**, select
 **Launch tython demo** and press **F5**. The pre-launch task builds
 the compiler and extension without `hereby`, then opens
 `python-typescript-demo.code-workspace` in an Extension Development Host.
-If `built/local/tsc` already exists, launching only rebuilds the small extension
-bundle. A missing compiler is built once on the first launch.
+The launch reuses the compiler and formatter when current, otherwise rebuilds
+them, then builds the small extension bundle. The formatter includes its own
+Python runtime; the first preparation installs pinned build dependencies.
+
+To test formatting, open `formatting.ty` and run **Format Document**
+(`Shift+Alt+F`). It is deliberately unformatted. If another formatter is selected,
+choose **Format Document With… → tython**. Undo the edit to try again.
 
 To perform the same steps manually, build the compiler and extension from the
 repository root:

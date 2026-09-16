@@ -3,13 +3,19 @@ import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { readFileSync, existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
+import path from "node:path";
 
 const root = fileURLToPath(new URL("../..", import.meta.url));
 const base = "f6b1667aa5c0468900eb2819ffcb41c0efd2cf09";
-const git = args => execFileSync("git", args, { cwd: root, encoding: "utf8", maxBuffer: 16 * 1024 * 1024 });
+// The independent repository need not retain upstream history. A separate,
+// pinned, read-only provenance cache supplies objects for the same audit.
+const objects = path.join(root, "built/local/upstream-notices.git/objects");
+const env = existsSync(objects) ? { ...process.env, GIT_ALTERNATE_OBJECT_DIRECTORIES: objects } : process.env;
+const git = args => execFileSync("git", args, { cwd: root, env, encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
 const read = name => readFileSync(new URL(name, new URL("../../", import.meta.url)), "utf8");
 const normalize = text => text.replaceAll("\r\n", "\n");
-git(["cat-file", "-e", `${base}^{commit}`]); // Fail closed on shallow/missing provenance.
+try { git(["cat-file", "-e", `${base}^{commit}`]); }
+catch (cause) { throw new Error("Cannot read upstream provenance. Run npm run licenses:prepare if it is missing. No audit checks have been skipped.", { cause }); }
 const inheritedLegal = git(["ls-tree", "-r", "--name-only", base]).split("\n")
     .filter(name => /(^|\/)(license|notice)([.-]|$)/i.test(name));
 for (const name of inheritedLegal) {

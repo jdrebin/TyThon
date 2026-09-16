@@ -10,7 +10,9 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/microsoft/TypeScript/tsc/internal/outputpaths"
 	pythonfrontend "github.com/microsoft/TypeScript/tsc/internal/python"
+	"github.com/microsoft/TypeScript/tsc/internal/tspath"
 )
 
 func isPythonInput(fileName string) bool {
@@ -19,16 +21,25 @@ func isPythonInput(fileName string) bool {
 
 func runPython(args []string) int {
 	if len(args) == 0 || len(args) == 1 && (args[0] == "-h" || args[0] == "--help") {
-		fmt.Fprintln(os.Stderr, "usage: tsgo --python [--emit] [--type-at=BYTE_OFFSET] [--stdin-file=PATH] <module.py|module.ty|module.d.ty> [...]")
+		fmt.Fprintln(os.Stderr, "usage: tsgo --python [--emit] [--out-dir=dist] [--root-dir=.] [--type-at=BYTE_OFFSET] [--stdin-file=PATH] <module.py|module.ty|module.d.ty> [...]")
 		return 2
 	}
 	emit := false
 	typeAt := -1
 	stdinFile := ""
+	rootDir, outDir := ".", "dist"
 	files := make([]string, 0, len(args))
 	for _, argument := range args {
 		if argument == "--emit" {
 			emit = true
+			continue
+		}
+		if strings.HasPrefix(argument, "--out-dir=") {
+			outDir = strings.TrimPrefix(argument, "--out-dir=")
+			continue
+		}
+		if strings.HasPrefix(argument, "--root-dir=") {
+			rootDir = strings.TrimPrefix(argument, "--root-dir=")
 			continue
 		}
 		if strings.HasPrefix(argument, "--type-at=") {
@@ -50,7 +61,16 @@ func runPython(args []string) int {
 		fmt.Fprintln(os.Stderr, "no Python input files")
 		return 2
 	}
-	inputs, err := collectPythonInputs(files)
+	if rootDir == "" || outDir == "" {
+		fmt.Fprintln(os.Stderr, "--root-dir and --out-dir must not be empty")
+		return 2
+	}
+	rootDir, err := filepath.Abs(rootDir)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 2
+	}
+	inputs, err := collectPythonInputsAtRoot(files, rootDir)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return 2
@@ -106,24 +126,9 @@ func runPython(args []string) int {
 		return 1
 	}
 	if emit {
-		for _, module := range program.Modules {
-			if module.Files.TypedImplementation == "" {
-				continue
-			}
-			output, diagnostics := pythonfrontend.EraseTypedPython(module.TypedSource)
-			for _, diagnostic := range diagnostics {
-				line, column := sourceLineAndColumn(module.TypedSource, diagnostic.Range.Start)
-				fmt.Fprintf(os.Stderr, "%s:%d:%d: error: %s\n", module.Files.TypedImplementation, line, column, diagnostic.Message)
-			}
-			if len(diagnostics) != 0 {
-				return 1
-			}
-			outputFile, _ := pythonfrontend.OutputFileName(module.Files.TypedImplementation)
-			if err := os.WriteFile(outputFile, []byte(output), 0o644); err != nil {
-				fmt.Fprintf(os.Stderr, "write %s: %v\n", outputFile, err)
-				return 1
-			}
-			fmt.Fprintf(os.Stdout, "Emitted %s\n", outputFile)
+		if err := emitPythonProgram(program, inputs, rootDir, outDir); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			return 1
 		}
 	}
 	fmt.Fprintf(os.Stdout, "Checked %d Python module(s) with no errors.\n", len(program.Modules))
@@ -131,8 +136,15 @@ func runPython(args []string) int {
 }
 
 func collectPythonInputs(args []string) ([]pythonfrontend.SourceInput, error) {
+	return collectPythonInputsAtRoot(args, "")
+}
+
+func collectPythonInputsAtRoot(args []string, rootDir string) ([]pythonfrontend.SourceInput, error) {
 	entries := []string{}
 	roots := []string{}
+	if rootDir != "" {
+		roots = append(roots, rootDir)
+	}
 	for _, argument := range args {
 		absolute, err := filepath.Abs(argument)
 		if err != nil {
@@ -171,6 +183,96 @@ func collectPythonInputs(args []string) ([]pythonfrontend.SourceInput, error) {
 		inputs = append(inputs, pythonfrontend.SourceInput{FileName: fileName, Text: files[fileName]})
 	}
 	return inputs, nil
+}
+
+// Keep Python erasure in the frontend and path relocation in the existing TS
+// output mapper. Only filesystem validation and copying ordinary .py modules
+// belong here; neither import expressions nor runtime behavior are rewritten.
+func emitPythonProgram(program *pythonfrontend.PythonProgram, inputs []pythonfrontend.SourceInput, rootDir, outDir string) error {
+	root, err := filepath.Abs(rootDir)
+	if err != nil {
+		return err
+	}
+	out, err := filepath.Abs(outDir)
+	if err != nil {
+		return err
+	}
+	if root == out {
+		return fmt.Errorf("output directory must be separate from the source root")
+	}
+	inside := func(dir, file string) bool {
+		rel, err := filepath.Rel(dir, file)
+		return err == nil && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator)) && !filepath.IsAbs(rel)
+	}
+	inputFiles := make([]os.FileInfo, 0, len(inputs))
+	for _, input := range inputs {
+		if !inside(root, input.FileName) {
+			return fmt.Errorf("source %s is outside --root-dir %s", input.FileName, root)
+		}
+		if inside(out, input.FileName) {
+			return fmt.Errorf("source %s is inside the output directory", input.FileName)
+		}
+		info, err := os.Stat(input.FileName)
+		if err != nil {
+			return err
+		}
+		inputFiles = append(inputFiles, info)
+	}
+	type outputFile struct{ name, text string }
+	outputs := []outputFile{}
+	for _, module := range program.Modules {
+		source, text := module.Files.Implementation, module.Implementation
+		if module.Files.TypedImplementation != "" {
+			source = module.Files.TypedImplementation
+			erased, diagnostics := pythonfrontend.EraseTypedPython(module.TypedSource)
+			if len(diagnostics) != 0 {
+				return fmt.Errorf("cannot emit %s: %s", source, diagnostics[0].Message)
+			}
+			text = erased
+		}
+		if source == "" { // Declaration-only modules have no runtime output.
+			continue
+		}
+		name := filepath.FromSlash(outputpaths.GetSourceFilePathInNewDir(filepath.ToSlash(source), filepath.ToSlash(out), filepath.ToSlash(root), tspath.EnsureTrailingDirectorySeparator(filepath.ToSlash(root)), true))
+		if module.Files.TypedImplementation != "" {
+			name, _ = pythonfrontend.OutputFileName(name)
+		}
+		if !inside(out, name) {
+			return fmt.Errorf("output %s escapes the output directory", name)
+		}
+		// Do not follow output symlinks into source/user files, or overwrite a
+		// source through a hard link. Validate every target before writing any.
+		for part := name; ; part = filepath.Dir(part) {
+			info, err := os.Lstat(part)
+			if err != nil && !os.IsNotExist(err) {
+				return err
+			}
+			if err == nil && info.Mode()&os.ModeSymlink != 0 {
+				return fmt.Errorf("output path contains a symbolic link: %s", part)
+			}
+			if part == filepath.Dir(part) {
+				break
+			}
+		}
+		if info, err := os.Stat(name); err == nil {
+			for _, input := range inputFiles {
+				if os.SameFile(info, input) {
+					return fmt.Errorf("output would overwrite a source file: %s", name)
+				}
+			}
+		}
+		outputs = append(outputs, outputFile{name, text})
+	}
+	for _, output := range outputs {
+		if err := os.MkdirAll(filepath.Dir(output.name), 0o755); err != nil {
+			return err
+		}
+		if err := os.WriteFile(output.name, []byte(output.text), 0o644); err != nil {
+			return err
+		}
+		fmt.Fprintf(os.Stdout, "Emitted %s\n", output.name)
+	}
+	return nil
 }
 
 func sourceLineAndColumn(source string, offset int) (int, int) {

@@ -38,12 +38,6 @@ export class PythonTools implements vscode.Disposable {
             vscode.workspace.onDidChangeConfiguration(event => {
                 if (event.affectsConfiguration("pythonTypeScript.tools")) this.refresh();
             }),
-            vscode.languages.registerDocumentFormattingEditProvider(selector, {
-                provideDocumentFormattingEdits: (document, _options, token) => this.format(document, token),
-            }),
-            vscode.languages.registerDocumentRangeFormattingEditProvider(selector, {
-                provideDocumentRangeFormattingEdits: (document, range, _options, token) => this.format(document, token, range),
-            }),
             vscode.languages.registerCodeActionsProvider(selector, {
                 provideCodeActions: (document, range) => this.codeActions(document, range),
             }, { providedCodeActionKinds: [vscode.CodeActionKind.QuickFix] }),
@@ -291,25 +285,6 @@ export class PythonTools implements vscode.Disposable {
                     new vscode.Range(document.positionAt(edit.start), document.positionAt(edit.end)), edit.text)));
                 return action;
             });
-    }
-
-    private async format(document: vscode.TextDocument, token: vscode.CancellationToken, selection?: vscode.Range): Promise<vscode.TextEdit[]> {
-        if (!this.enabled(document)) return [];
-        const version = document.version;
-        let projection: Projection;
-        try { projection = await this.projection(document); } catch { return []; }
-        if (version !== document.version || projection.version !== version) return [];
-        const range = selection ? new vscode.Range(selection.start.line, 0,
-            selection.end.line + (selection.end.character > 0 ? 1 : 0), 0)
-            : new vscode.Range(document.positionAt(0), document.positionAt(document.getText().length));
-        if (!safeRange(projection, document.offsetAt(range.start), document.offsetAt(range.end))) {
-            void vscode.window.showInformationMessage("Ruff cannot format .ty type syntax yet. Select a complete top-level Python statement without type syntax to format it safely.");
-            return [];
-        }
-        const response = await this.request<string>(selection ? "formatRange" : "format", document, token, undefined,
-            selection ? { startLine: range.start.line, endLine: range.end.line } : {});
-        if (!response || version !== document.version) return [];
-        return [vscode.TextEdit.replace(range, response.value)];
     }
 
     dispose(): void {

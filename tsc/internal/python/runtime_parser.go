@@ -1488,12 +1488,14 @@ func (p *runtimeParser) tryParseTypeArguments() ([]TypeExpr, bool) {
 			return nil, false
 		}
 		typeExpression, errors := ParseTypeExpression(trimmed)
+		typeOffset := p.offset + partOffset + strings.Index(part, trimmed)
 		if len(errors) != 0 || typeExpression == nil {
 			for _, parseError := range errors {
-				p.diagnostics = append(p.diagnostics, RuntimeParseError{Range: TextRange{Start: p.offset + partOffset + parseError.Range.Start, End: p.offset + partOffset + parseError.Range.End}, Message: parseError.Message})
+				p.diagnostics = append(p.diagnostics, RuntimeParseError{Range: TextRange{Start: typeOffset + parseError.Range.Start, End: typeOffset + parseError.Range.End}, Message: parseError.Message})
 			}
 			return nil, false
 		}
+		relocateTypeExpression(typeExpression, typeOffset)
 		arguments = append(arguments, typeExpression)
 		partOffset += len(part) + 1
 	}

@@ -26,6 +26,9 @@ else {
     await run("go", ["build", "-o", compilerPath, "./cmd/tsc"], compilerDirectory);
 }
 
+console.log("Preparing the pinned bundled formatter (the first run downloads it)...");
+await run(process.execPath, [path.join(extensionDirectory, "scripts/prepare-formatter.mjs")], extensionDirectory);
+
 console.log("[2/2] Building the VS Code extension...");
 await run(npm, ["run", "build"], extensionDirectory);
 

@@ -30,6 +30,62 @@ modified inherited files, and run `npm run licenses:check` before distribution.
 The release packager includes the reuse documentation and separate MIT licenses
 for copied VS Code/Pyright code. See `docs/LICENSING.md` for scope and limitations.
 
+## Bundled formatter work
+
+The reversible Python encoding approach is shelved. The extension now uses our
+Black 26.5.1 adaptation on actual typed source, replacing the interim Ruff
+projection formatter. Ruff remains the optional Python linter.
+
+Implemented:
+
+- Format Document for file-backed `.ty` and `.d.ty` documents, registered as
+  the default formatter for the typed-python language. Ordinary Python editor
+  formatting is not intercepted. Selection formatting is deliberately not
+  advertised until typed ranges have independent validation.
+- A pinned Black/Python bundle plus the existing native parser/erasure helper.
+  Build dependencies are checksum-pinned and PyInstaller runs in an isolated
+  build environment, not the user's selected interpreter. Installed extensions
+  do not download dependencies or depend on Python/Go/Black on PATH.
+- The development launch prepares the bundle automatically. Matching build
+  inputs and payload hashes allow reuse; package-preview copies the same bundle
+  to `bin/formatter`. Linux x64 / WSL Ubuntu 24.04 is the tested build target;
+  other OS/ABI targets are not yet verified.
+- Wheel licenses, PyInstaller notices, and bundled native runtime provenance
+  are retained. Release licensing checks remain mandatory.
+- Black owns Python layout and configuration discovery. Currently we honor
+  `[tool.black]` line-length and skip-magic-trailing-comma, preserve literal
+  spelling for type-aware equivalence, and leave other options unexposed.
+- Native declaration/runtime-tree equivalence, erased-Python AST equivalence,
+  and second-pass stability run before output. No checker or runtime code is
+  executed. Unsupported syntax produces a visible error and no edits.
+- The editor sends unsaved source directly; it does not wait for a server
+  projection. Trust checks, bounded input/output, a 15-second timeout, process
+  group cancellation, and stale-document checks protect edits.
+
+Coverage: 43 typed examples and 10 Python controls matching stock Black, plus
+real frozen-bundle and registered-provider tests (including relocated execution
+without Python/PATH, CRLF, Unicode, configuration, cancellation, and stale edits).
+The five original formatter gap fixtures are positive regressions.
+
+Added-syntax rules follow Black patterns: keep typed/generic lambda headers and
+runtime generic argument groups intact, wrap surrounding expressions/body where
+possible, use function-signature layout for callable types and declare def,
+and keep postfix ! attached to its access expression. Indivisible headers may
+exceed line length. Arbitrary preexisting multiline lambda annotations still
+need eraser work; formatting does not introduce them.
+
+Remaining: exhaustive syntax/declaration/import coverage, string normalization,
+typed selection formatting, upstream Black regressions, cross-platform runtime
+compatibility, and end-to-end VSIX release verification. Process-local internal
+Black adaptations run only in an isolated one-request formatter process; this is
+not a public Black plugin or a new Python layout engine. Source and formatting
+rules remain in `tools/black-formatter-spike/` (historical directory name).
+
+The pre-existing release license audit still references an upstream Git object
+lost during history reset. That gate has not been bypassed: release provenance
+must be repaired before producing a verified distribution. A working development
+launch and relocated formatter tests are not a claim of a release-ready VSIX.
+
 ## Goal
 
 Adapt the existing TypeScript implementation into an erasable, structural type
@@ -897,9 +953,10 @@ Implemented boundaries:
 - Only Ruff-designated safe fixes whose complete edits avoid protected spans
   are offered. Document changes clear diagnostics/actions and cancel old work.
 - Whole-document formatting works for `.ty` files containing ordinary Python.
-  In typed files, selection formatting supports complete top-level Python
-  statements containing no erased spans, after Python AST boundary validation.
-  Full typed-syntax formatting, nested selections and mapping arbitrary formatter
+  Formatting now uses the separate bundled provider described above. In typed
+  files, Ruff's range formatter owns parsing and statement-boundary expansion;
+  edits are accepted only when their complete range avoids erased spans.
+  Full typed-syntax formatting and mapping arbitrary formatter
   rewrites through type syntax are **not implemented**. No formatting operation
   replaces a typed document with its erased view.
 - Tools run only on trusted, file-backed `typed-python` documents, excluding
@@ -1135,6 +1192,48 @@ Every change to the key model must prove:
 11. Runtime dictionary literals retain exact per-key shapes and dictionary
     methods.
 12. Item completion never offers nominal attribute keys.
+
+## Local installable alpha artifacts
+
+- Build a matching Linux x64/WSL VSIX and `tython-lang` wheel with
+  `npm run release:package`; publish nothing automatically.
+- The wheel's `tython check` / `tython build` commands delegate directly to the
+  existing native compiler. No alternate checker, emitter, or runtime is added.
+  Build writes a separate `dist/` tree by default, with `--out-dir` and
+  `--root-dir` controls. Use TS's existing output-path mapper. Keep module
+  grouping strict: source `.py` and `.ty` remain competing implementations.
+  Preserve package layout/initializers and copy discovered local Python modules;
+  do not rewrite imports, inject a runtime, or automatically bundle assets.
+  Protect source files and reject output aliases through symlinks/hard links.
+- Stage the wheel from the verified VSIX's exact binary and canonical library.
+  Use setuptools and an explicit `py3-none-linux_x86_64` tag, not a universal
+  pure-Python or unverified manylinux claim. No user Go/Node/build step.
+- Verify offline installation in a fresh temporary venv outside the checkout,
+  compiler/library identity, CLI errors, imports and executable emitted Python.
+  Promote the pair only after tests; include installation instructions, hashes,
+  provenance, and applicable upstream/Go notices.
+- Restore the existing license audit's reference through a pinned, separate
+  ignored Git object cache after the history reset; do not restore upstream
+  commits into this repository or skip audit checks.
+- VSIX owns the bundled formatter; Jedi/Ruff remain optional environment tools.
+  Other targets, public package publication, and CLI formatting are deferred.
+
+The first wheel verification exposed the conflict between sibling `.py`
+emission and source discovery. The user's decision (2026-09-16) is to use a
+separate output directory. Keep the repeat-build/check regression and execute
+generated package code under Python before promoting the updated release pair.
+Do not delete generated files in the test to hide source-discovery conflicts.
+
+Verification (2026-09-16): build `15ca9fd64f9e0992` passed the full native CLI,
+Python/checker/LSP, editor, formatter, optional Python-tool, and extracted-VSIX
+checks. The matching Linux x64 wheel passed offline installation in a fresh
+venv, binary/library identity checks, repeated check/build cycles, executable
+Python output, copied local Python dependencies, and package execution with
+relative imports and initializers. The verified pair, checksums and exact
+installation instructions are under
+`built/release/tython-0.1.0-15ca9fd64f9e0992-0d72f616-linux-x64/`.
+Nothing was published or installed into the user's VS Code. Automated package
+verification does not substitute for an interactive extension-host smoke test.
 
 ## Deferred decisions
 

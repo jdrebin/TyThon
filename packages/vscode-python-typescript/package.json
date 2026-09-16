@@ -29,7 +29,7 @@
     "main": "./dist/extension.bundle.js",
     "contributes": {
         "configurationDefaults": {
-            "[typed-python]": { "editor.semanticHighlighting.enabled": true }
+            "[typed-python]": { "editor.semanticHighlighting.enabled": true, "editor.defaultFormatter": "tython-local.tython" }
         },
         "commands": [
             { "command": "pythonTypeScript.openPreview", "title": "tython: Open Preview Examples" },
@@ -47,7 +47,11 @@
                     ".ty",
                     ".d.ty"
                 ],
-                "configuration": "./language-configuration.json"
+                "configuration": "./language-configuration.json",
+                "icon": {
+                    "light": "./icons/tython-light.svg",
+                    "dark": "./icons/tython-dark.svg"
+                }
             }
         ],
         "grammars": [
@@ -67,6 +71,10 @@
         "configuration": {
             "title": "tython",
             "properties": {
+                "pythonTypeScript.formatting.enabled": {
+                    "type": "boolean", "default": true,
+                    "description": "Enable the bundled Black-based formatter for .ty and .d.ty documents. Independent of optional Python tooling. Unsupported syntax is left unchanged with an error."
+                },
                 "pythonTypeScript.tools.enabled": {
                     "type": "boolean", "default": true,
                     "description": "Use Jedi and Ruff for supplementary Python editor features in trusted workspaces. Native .ty type checking remains authoritative."
@@ -113,10 +121,12 @@
         "build": "tsc && npm run bundle",
         "bundle": "esbuild src/extension.ts --bundle --external:vscode --external:pyright-typeserver --platform=node --format=cjs --outfile=dist/extension.bundle.js --sourcemap --metafile=dist/extension.meta.json",
         "preview:package": "node scripts/package-preview.mjs",
+        "formatter:prepare": "node scripts/prepare-formatter.mjs",
+        "formatter:test": "node test/formatter.test.mjs && node test/formatterProvider.test.mjs",
         "demo:prepare": "node scripts/prepare-demo.mjs",
-        "grammar:test": "node test/grammar.test.mjs",
+        "grammar:test": "node test/grammar.test.mjs && node test/icons.test.mjs",
         "grammar:update": "node scripts/update-python-grammar.mjs",
-        "test": "npm run grammar:test && node test/serverLaunch.test.mjs && node test/hoverLatency.test.mjs && node test/compilerPath.test.mjs",
+        "test": "npm run grammar:test && node test/serverLaunch.test.mjs && node test/hoverLatency.test.mjs && node test/compilerPath.test.mjs && npm run formatter:test",
         "watch": "npm run bundle -- --watch"
     },
     "devDependencies": {

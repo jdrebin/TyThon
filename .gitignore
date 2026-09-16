@@ -1,3 +1,4 @@
+# Modified for tython: ignore independent project build outputs and caches.
 # Logs
 logs
 *.log

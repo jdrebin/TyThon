@@ -1,0 +1,11 @@
+# Try Format Document (Shift+Alt+F), then undo to try it again.
+# This file is intentionally unformatted.
+type DisplayName=<T extends str>(value:T)->T
+type User={id:int,"name":str,optional "nickname":str}
+
+identity=lambda<T extends str> value:T:value
+
+def welcome(name:str="world")->str:
+  return f"Hello, {name}"
+
+message=identity<str>(welcome())

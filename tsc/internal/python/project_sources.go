@@ -50,6 +50,23 @@ func CollectProjectSources(ctx context.Context, entries, roots []string, overlay
 	for len(queue) > 0 && ctx.Err() == nil {
 		name := queue[0]
 		queue = queue[1:]
+		// Importing a submodule also executes its package initializers. Keep
+		// those modules in the same discovery/checking graph, including for
+		// output-directory builds. Namespace packages need no synthetic file.
+		for directory := filepath.Dir(name); directory != filepath.Dir(directory); directory = filepath.Dir(directory) {
+			withinRoot := false
+			for _, root := range roots {
+				rel, err := filepath.Rel(root, directory)
+				if err == nil && rel != "." && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator)) && !filepath.IsAbs(rel) {
+					withinRoot = true
+					break
+				}
+			}
+			if !withinRoot {
+				break
+			}
+			addModule(filepath.Join(directory, "__init__.py"))
+		}
 		for _, request := range ScanImportRequests(files[name]) {
 			if imported := resolveProjectImport(name, request, roots, load); imported != "" {
 				addModule(imported)

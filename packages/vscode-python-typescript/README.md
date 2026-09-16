@@ -27,9 +27,11 @@ not yet navigate every value directly to its `.d.ty` declaration.
 
 ## Optional Python tooling
 
-Supplementary Python docs/import completion come from Jedi; linting and safe
-formatting come from Ruff. These require your own Python environment with those
-tools. No environment is installed or modified automatically.
+Supplementary Python docs/import completion come from Jedi; linting comes from
+Ruff. These optional features require your own Python environment with those
+tools. No environment is installed or modified automatically. Formatting uses
+a separate, pinned Black adaptation bundled with the extension; it does not require
+Python, Jedi, or Ruff in your environment.
 
 For a dedicated environment, run:
 
@@ -43,6 +45,42 @@ Set `pythonTypeScript.tools.interpreterPath` to your project's interpreter, or u
 the Python extension's selected environment. Disable `pythonTypeScript.tools.enabled`
 if you only want the native typed-language features. Declaration import uses the
 bundled Pyright Type Server for stub resolution, not as a second `.ty` checker.
+
+## File icons
+
+The extension supplies an original blue-purple, paired-snake SVG file icon for
+`.ty` and `.d.ty`, with separate light/dark palettes. Reload the extension host
+after updating to see it. This is a language-default icon: your active file-icon
+theme can override it or disable language defaults. We do not change that theme.
+
+## Formatting
+
+Use **Format Document** (`Shift+Alt+F` on Linux/Windows) in a `.ty` or `.d.ty`
+file. Select **tython** in **Format Document With…** if another formatter is
+selected. This runs our pinned Black adaptation on the actual typed source,
+not an erased Python projection. Ordinary `.py` formatters are unaffected.
+
+Black's configuration discovery reads `line-length` and
+`skip-magic-trailing-comma` from `[tool.black]` in `pyproject.toml`.
+Literal spelling/quotes are currently preserved for type-aware equivalence;
+other Black options are not exposed yet. **Format Selection is not registered**
+until typed range formatting has been validated.
+
+`pythonTypeScript.formatting.enabled` controls formatting independently of
+`pythonTypeScript.tools.enabled`. The installed extension never downloads or
+installs a formatter. For development, `npm run -w tython demo:prepare` prepares
+the formatter bundle; subsequent runs reuse it when its inputs and payload match.
+Restart the development launch after rebuilding. The bundle includes Black,
+Python, and the native parser helper: no selected Python environment or separate
+formatter installation is needed at runtime. Build dependencies are hash-pinned;
+licenses and native runtime provenance are retained. Current builds are tested
+on Linux x64 / WSL Ubuntu 24.04, not yet other platforms.
+`npm run -w tython formatter:test` exercises the real bundle and provider.
+
+Typed formatting is available, but grammar coverage is not yet exhaustive.
+Unsupported syntax or a failed native/Black equivalence check produces a warning
+and **no edits**. Inputs are limited to 1 MB, formatting to 15 seconds; cancellation
+also stops the native helper. Unsaved source is used, and stale edits are discarded.
 
 ## What this preview exercises
 
@@ -63,8 +101,8 @@ bundled Pyright Type Server for stub resolution, not as a second `.ty` checker.
   unsupported annotations rather than inventing types.
 - Hover formatting still has Python-specific paths; full native TS display
   policy reuse remains unfinished.
-- Whole-file formatting of `.ty` is intentionally unavailable. Ruff cannot
-  safely rewrite type syntax; only supported, untyped regions may be formatted.
+- Typed formatting supports the covered syntax, not every declaration/import
+  form yet. Selection formatting and string normalization remain deferred.
 - Type erasure is not runtime validation, and decorators do not gain inferred
   transformations. No automatic tracking of arbitrary runtime monkey-patching.
 

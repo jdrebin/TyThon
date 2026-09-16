@@ -48,6 +48,44 @@ fallback; it won't color all of tython's type syntax correctly. See
 
 ## Try it
 
+### Install without cloning
+
+Use a matching **Linux x64/WSL** wheel and VSIX from the same tython build:
+
+1. In your Linux/WSL VS Code window, run **Extensions: Install from VSIX…**
+   and choose the `.vsix`. Reload the window.
+2. With your project's Python virtual environment active, install the downloaded
+   wheel (replace `VERSION` with its actual filename):
+
+```sh
+python -m pip install /path/to/tython_lang-VERSION-py3-none-linux_x86_64.whl
+tython check app.ty
+tython build app.ty
+python dist/app.py
+```
+
+No Go, Node, source checkout, or compiler build is needed. The wheel requires
+Python 3.10+ and provides the `tython` command; the VSIX bundles its own matching
+compiler, library, and Black-based formatter. Either package works independently.
+The VSIX is tested on Ubuntu 24.04/WSL with working systemd/cgroup containment.
+Optional Jedi/Ruff integrations still require separate Python packages.
+
+`build` preserves the source layout under `dist/` and overwrites generated
+outputs there, never sibling source files. Use `--out-dir PATH` to change the
+destination and `--root-dir PATH` to set the source/import root (default: current
+directory). Discovered local `.py` dependencies and package initializers are
+copied unchanged; data files and dynamically loaded modules are not bundled.
+For a package entry point, run `python -m package.module` from the output root.
+Relative data-file paths still depend on the working directory. Use `check`
+when you only want diagnostics. To explore without writing your own
+sample, run **tython: Open Preview Examples** in VS Code.
+
+These artifacts are built locally for now, not automatically published to PyPI,
+GitHub Releases, or the Marketplace. **Do not `pip install tython`**: that PyPI
+name belongs to an unrelated project. Our distribution is named `tython-lang`.
+Maintainers can build the pair with `npm run release:package`; see
+[release packaging](docs/RELEASING.md).
+
 ### From source
 
 Use the Node/npm versions specified in [package.json](package.json), Go 1.26,
@@ -83,7 +121,7 @@ then **tython: Open Preview Examples**. The compiler and declarations are bundle
 native typing features do not require Go, Node, or this checkout.
 
 See the [extension guide](packages/vscode-python-typescript/README.md) for optional
-Jedi documentation/navigation, Ruff linting/formatting, interpreter selection,
+Jedi documentation/navigation, Ruff linting, bundled Black-based formatting, interpreter selection,
 memory limits, and installation details. Those integrations complement the
 tython checker; they do not replace it.
 
@@ -94,11 +132,13 @@ From a source checkout, after building, create a `demo.ty` containing valid code
 ```sh
 ./built/local/tsc --python demo.ty
 ./built/local/tsc --python --emit demo.ty
-python3 demo.py
+python3 dist/demo.py
 ```
 
-`--emit` writes the sibling `demo.py` after checking. **It can overwrite that
-file**; don't use an existing, separately maintained `.py` file as an output target.
+`--emit` writes `dist/demo.py` after checking. Native options `--out-dir=PATH`
+and `--root-dir=PATH` control the output/source roots. Existing generated output
+files are overwritten; source files are protected. Old output files are not
+automatically deleted when a source is removed or renamed.
 The `tsc` binary name is currently an internal compatibility detail.
 
 ## Language guide
@@ -841,7 +881,7 @@ demonstrate type transformations already checked by tython itself.
 | Generic indexing | Some constrained generic indexed-access function bodies and type-utility calls in function constraints still need frontend fixes. See the audit for reproductions. |
 | Inheritance | Base-constructor signatures and instance attributes inferred inside a base `__init__` do not yet propagate reliably to subclasses. The inheritance example above exercises declared methods. |
 | Editor | Hover still has custom rendering paths. Navigation is partial; complete reference/rename/refactor parity is not promised. |
-| Formatting | Ruff handles supported untyped regions. Whole-file rewriting of typed syntax is not yet safe or enabled. |
+| Formatting | The bundled Black adaptation formats typed documents without a user Python-tool installation. Unsupported syntax is rejected without edits; range formatting is not yet exposed. |
 | Runtime | Erasure is not validation. No inferred arbitrary decorator transformations, general monkey-patch tracking, or runtime enforcement of readonly/presence assertions. |
 | Distribution | Verified preview packaging is Linux x64/WSL. Memory containment is required by default; it is not silently disabled on startup failure. |
 

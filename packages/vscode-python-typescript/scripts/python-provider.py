@@ -68,43 +68,6 @@ def handle(request):
             raise ValueError("Python declaration input exceeds 1 MB")
         return convert(source)
     source = request["source"]
-    if method == "formatRange":
-        tree = ast.parse(source)
-        start, end = request["startLine"], request["endLine"]
-        contained = []
-        for node in tree.body:
-            first = (
-                min(
-                    [node.lineno]
-                    + [
-                        decorator.lineno
-                        for decorator in getattr(node, "decorator_list", [])
-                    ]
-                )
-                - 1
-            )
-            last = node.end_lineno
-            if first < end and last > start:
-                if first < start or last > end:
-                    raise ValueError(
-                        "Select complete top-level Python statements for formatting"
-                    )
-                contained.append(node)
-        if not contained:
-            return "".join(source.splitlines(keepends=True)[start:end])
-        return ruff(
-            {**request, "source": "".join(source.splitlines(keepends=True)[start:end])},
-            "format",
-            [],
-        )
-    if method == "format":
-        # Formatting erased Python would discard types. The caller must supply
-        # an unchanged document, and Ruff performs the actual formatting.
-        if request.get("erased"):
-            raise ValueError(
-                "Full-document formatting of .ty syntax is not supported yet"
-            )
-        return ruff(request, "format", [])
     if method == "lint":
         if request.get("erased"):
             try:
