@@ -1,5 +1,5 @@
 # Hover the definitions, then try dot and quoted-key completion.
-type User = { "id": int, "name": str }
+type User = {"id": int, "name": str}
 type StoredUser = Dict(User)
 
 user: StoredUser = {"id": 12, "name": "Kate"}
@@ -7,16 +7,19 @@ name = user["name"]
 maybe_name = user.get("name")
 keys = user.keys()
 
-type Patch = { optional "name": str }
+type Patch = {optional "name": str}
+
 
 def display(patch: Dict(Patch)):
     if "name" in patch:
         return patch["name"]
     return "Anonymous"
 
+
 names = ["John", "Kate"]
-pair = ("John", "Kate")
+pair = ("John", "Kate") as ()str
+
 
 # For an open map, put the index signature in the shape.
-def read_count(counts: Dict({ (str): int }), key: str):
+def read_count(counts: Dict({(str): int}), key: str):
     return counts[key]

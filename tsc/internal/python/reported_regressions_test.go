@@ -3,6 +3,8 @@ package python
 import (
 	"strings"
 	"testing"
+
+	"github.com/microsoft/TypeScript/tsc/internal/checker"
 )
 
 func TestPythonFunctionsDoNotExposeJavaScriptMembers(t *testing.T) {
@@ -176,5 +178,77 @@ func TestErasureRetainsNonemptySuites(t *testing.T) {
 		if strings.Join(strings.Fields(projection.Text), " ") != strings.Join(strings.Fields(erased), " ") {
 			t.Fatalf("projection differs from erasure: %q != %q", projection.Text, erased)
 		}
+	}
+}
+
+func TestBareDictKwargsInInitDoesNotPanic(t *testing.T) {
+	source := `class User:
+    id: str
+
+    def __init__(self,/, id: str, **kwargs: Dict):
+        (super() as any).__init__(id, **kwargs)
+        self.id = id
+
+def set_id(obj: { id: str }, id: str) -> asserts obj is { id: str }:
+    obj.id = id
+
+def set_name(obj: { name: str }, name: str) -> asserts obj is { name: str }:
+    obj.name = name
+
+class User2(User):
+    name: str
+
+    def __init__(self, **kwargs):
+        set_id(self, '9')
+        set_name(self, 'hello')
+
+a = {"ok": 32, "never": 2323}
+
+type AS = () if int | str extends int else never
+`
+	defer func() {
+		if recovered := recover(); recovered != nil {
+			t.Fatalf("panic building program: %v", recovered)
+		}
+	}()
+	program := BuildProgram(newPythonChecker(t), []SourceInput{{FileName: "app.ty", Text: source}})
+	found := false
+	for _, diagnostic := range program.Diagnostics {
+		if strings.Contains(diagnostic.Message, `type function "Dict" must be called with parentheses`) {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("missing Dict diagnostic: %v", program.Diagnostics)
+	}
+	if hover, ok := program.HoverAt("app.ty", strings.Index(source, "Dict")); !ok {
+		t.Fatal("hover on Dict missing")
+	} else if !strings.Contains(hover, "Dict") {
+		t.Fatalf("Dict hover = %q", hover)
+	}
+	if _, ok := program.HoverAt("app.ty", strings.Index(source, "kwargs")); !ok {
+		t.Fatal("hover on kwargs missing")
+	}
+}
+
+func TestBareTypeFunctionDoesNotPoisonLaterCalls(t *testing.T) {
+	source := "value: Identity\ntype Identity(T) = T\nalias: Identity(str)\n"
+	program := BuildProgram(newPythonChecker(t), []SourceInput{{FileName: "app.ty", Text: source}})
+	found := false
+	for _, diagnostic := range program.Diagnostics {
+		if strings.Contains(diagnostic.Message, `type function "Identity" must be called with parentheses`) {
+			found = true
+		}
+		if strings.Contains(diagnostic.Message, `type function "Identity" expects`) {
+			t.Fatalf("poisoned type function: %v", program.Diagnostics)
+		}
+	}
+	if !found {
+		t.Fatalf("missing Identity diagnostic: %v", program.Diagnostics)
+	}
+	alias, ok := program.Modules[0].Types.Value("alias")
+	if !ok || alias == nil || alias.Flags()&checker.TypeFlagsString == 0 {
+		t.Fatalf("Identity(str) = %#v, %v", alias, ok)
 	}
 }

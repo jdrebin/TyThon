@@ -2,9 +2,11 @@ package checker
 
 import (
 	"fmt"
+	"os"
 	"slices"
 	"sort"
 	"strconv"
+	"time"
 
 	"github.com/microsoft/TypeScript/tsc/internal/ast"
 	"github.com/microsoft/TypeScript/tsc/internal/core"
@@ -782,8 +784,20 @@ func (c *Checker) SetObjectTypeFacets(t *Type, facets ObjectFacets) {
 				minArgumentCount++
 			}
 			symbol := c.newSymbolEx(flags, parameter.Name, checkFlags)
-			c.valueSymbolLinks.Get(symbol).resolvedType = parameter.Type
-			if isUnitType(parameter.Type) {
+			parameterType := parameter.Type
+			if parameterType == nil {
+				parameterType = c.unknownType
+			}
+			c.valueSymbolLinks.Get(symbol).resolvedType = parameterType
+			// #region agent log
+			if parameter.Type == nil {
+				if f, err := os.OpenFile("/home/user/projects/TypeScript/.cursor/debug-e531f3.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err == nil {
+					fmt.Fprintf(f, `{"sessionId":"e531f3","hypothesisId":"A","location":"objectfacets.go:isUnitType","message":"nil parameter.Type before isUnitType","data":{"name":%q,"kind":%d},"timestamp":%d}`+"\n", parameter.Name, parameter.Kind, time.Now().UnixMilli())
+					f.Close()
+				}
+			}
+			// #endregion
+			if isUnitType(parameterType) {
 				signatureFlags |= SignatureFlagsHasLiteralTypes
 			}
 			parameters = append(parameters, symbol)

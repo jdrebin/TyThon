@@ -1,18 +1,22 @@
 type Present(T) = Exclude(T, None)
 type OnlyStrings = Extract(str | int | None, str)
-type Items(T) = { (K): T[K] for K in keyof T if K extends str }
+type Items(T) = {(K): T[K] for K in keyof T if K extends str}
 
-type Mixed = { label: str, "id": int, "name": str }
+type Mixed = {label: str, "id": int, "name": str}
 type ItemShape = Items(Mixed)
+
 
 def identity<T>(value: T) -> T:
     return value
 
+
 number = identity(12)
 text = identity("Kate")
 
+
 def apply<T>(value: T, transform: (value: T) -> str) -> str:
     return transform(value)
+
 
 greeting = apply("Kate", lambda value: "Hello " + value)
 fixed = {"mode": "ready", "retries": 3} as const

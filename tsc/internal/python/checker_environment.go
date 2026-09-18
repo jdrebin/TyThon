@@ -3,9 +3,11 @@ package python
 import (
 	_ "embed"
 	"fmt"
+	"os"
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/microsoft/TypeScript/tsc/internal/ast"
 	"github.com/microsoft/TypeScript/tsc/internal/checker"
@@ -398,6 +400,10 @@ func (e *CheckerTypeEnvironment) resolveCheckerSymbol(name string) *checker.Type
 	if symbol.owner != nil && symbol.owner != e {
 		return symbol.owner.resolveCheckerSymbol(symbol.Name)
 	}
+	if symbol.Kind == TypeSymbolFunction {
+		e.resolveCheckerTypeFunctionSymbol(symbol)
+		return e.checker.GetUnknownType()
+	}
 	if symbol.Kind == TypeSymbolGeneric && symbol.BuiltinArity == 0 {
 		e.resolveCheckerGenericSymbol(symbol)
 		if e.checker.GetMinTypeArgumentCount(symbol.TypeParameters) == 0 {
@@ -410,6 +416,14 @@ func (e *CheckerTypeEnvironment) resolveCheckerSymbol(name string) *checker.Type
 		return e.checker.GetUnknownType()
 	}
 	if symbol.resolved {
+		// #region agent log
+		if symbol.Instance == nil || symbol.Kind == TypeSymbolFunction {
+			if f, err := os.OpenFile("/home/user/projects/TypeScript/.cursor/debug-e531f3.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err == nil {
+				fmt.Fprintf(f, `{"sessionId":"e531f3","hypothesisId":"A","location":"checker_environment.go:resolved-return","message":"resolveCheckerSymbol resolved return","data":{"name":%q,"kind":%d,"instanceNil":%t,"declaredNil":%t},"timestamp":%d}`+"\n", name, symbol.Kind, symbol.Instance == nil, symbol.Declared == nil, time.Now().UnixMilli())
+				f.Close()
+			}
+		}
+		// #endregion
 		return symbol.Instance
 	}
 	if symbol.resolving {
@@ -440,6 +454,12 @@ func (e *CheckerTypeEnvironment) resolveCheckerSymbol(name string) *checker.Type
 		e.resolveCheckerClassInto(symbol, symbol.Class, nil)
 	default:
 		symbol.Instance = e.checker.GetUnknownType()
+		// #region agent log
+		if f, err := os.OpenFile("/home/user/projects/TypeScript/.cursor/debug-e531f3.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err == nil {
+			fmt.Fprintf(f, `{"sessionId":"e531f3","hypothesisId":"A","location":"checker_environment.go:default-resolve","message":"resolveCheckerSymbol default branch","data":{"name":%q,"kind":%d,"hasAlias":%t},"timestamp":%d}`+"\n", name, symbol.Kind, symbol.Alias != nil, time.Now().UnixMilli())
+			f.Close()
+		}
+		// #endregion
 	}
 	symbol.resolving = false
 	symbol.resolved = true
@@ -516,6 +536,10 @@ func (e *CheckerTypeEnvironment) resolveCheckerTypeWorker(expression TypeExpr, s
 		}
 		if e.symbols[expression.Name] == nil && e.intrinsicType(expression.Name) == nil {
 			e.reportChecker(expression.Range(), fmt.Sprintf("unknown type %q", expression.Name))
+			return e.checker.GetUnknownType()
+		}
+		if symbol := e.symbols[expression.Name]; symbol != nil && symbol.Kind == TypeSymbolFunction {
+			e.reportChecker(expression.Range(), fmt.Sprintf("type function %q must be called with parentheses", expression.Name))
 			return e.checker.GetUnknownType()
 		}
 		return e.resolveCheckerSymbol(expression.Name)
@@ -1229,6 +1253,22 @@ func (e *CheckerTypeEnvironment) resolveCheckerCallableWithParameterTypes(expres
 		parameterType := e.resolveCheckerType(parameter.Type, local)
 		if inferred := parameterTypes[index]; inferred != nil {
 			parameterType = inferred
+		}
+		// #region agent log
+		if parameterType == nil || parameter.Kind == ParameterVarKeyword || parameter.Name == "kwargs" {
+			exprNil := parameter.Type == nil
+			exprKind := -1
+			if parameter.Type != nil {
+				exprKind = int(parameter.Type.Kind())
+			}
+			if f, err := os.OpenFile("/home/user/projects/TypeScript/.cursor/debug-e531f3.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err == nil {
+				fmt.Fprintf(f, `{"sessionId":"e531f3","hypothesisId":"B","location":"checker_environment.go:callable-param","message":"callable parameter type","data":{"name":%q,"kind":%d,"typeNil":%t,"exprNil":%t,"exprKind":%d,"dropReceiver":%t},"timestamp":%d}`+"\n", parameter.Name, parameter.Kind, parameterType == nil, exprNil, exprKind, dropReceiver, time.Now().UnixMilli())
+				f.Close()
+			}
+		}
+		// #endregion
+		if parameterType == nil {
+			parameterType = e.checker.GetUnknownType()
 		}
 		e.recordNamedHover(parameter.NameLoc, parameterType, QuickInfoParameter, parameter.Name, nil)
 		if index >= start {
