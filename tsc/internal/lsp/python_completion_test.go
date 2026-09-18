@@ -100,7 +100,7 @@ def show(user: User(str)):
 		Capabilities: &lsproto.ClientCapabilities{},
 	})
 	assert.Assert(t, ok && initMessage.AsResponse().Error == nil, "initialize failed")
-	assert.Equal(t, initResult.ServerInfo.Name, "typed-python")
+	assert.Equal(t, initResult.ServerInfo.Name, "TyThon")
 	assert.Assert(t, initResult.Capabilities.CompletionProvider != nil)
 	assert.Assert(t, slices.Contains(*initResult.Capabilities.CompletionProvider.TriggerCharacters, "["))
 	assert.Assert(t, slices.Contains(*initResult.Capabilities.CompletionProvider.TriggerCharacters, `"`))
@@ -243,7 +243,7 @@ profile: Profile
 	assert.Assert(t, diagnosticOK && diagnosticMessage.AsResponse().Error == nil, "diagnostics failed")
 	assert.Assert(t, diagnosticResponse.FullDocumentDiagnosticReport != nil)
 	assert.Assert(t, len(diagnosticResponse.FullDocumentDiagnosticReport.Items) != 0, "expected incomplete completion fixture to produce diagnostics")
-	assert.Equal(t, *diagnosticResponse.FullDocumentDiagnosticReport.Items[0].Source, "typed-python")
+	assert.Equal(t, *diagnosticResponse.FullDocumentDiagnosticReport.Items[0].Source, "TyThon")
 	positionAfter := func(needle string) lsproto.Position {
 		offset := strings.Index(source, needle) + len(needle)
 		before := source[:offset]
@@ -263,6 +263,8 @@ profile: Profile
 	localName := findCompletionItem(visible, "local_name")
 	assert.Assert(t, localName != nil, "expected local name completion, got %#v", visible)
 	assert.Equal(t, *localName.Detail, "str")
+	insideString := complete(`result = render("hel`)
+	assert.Equal(t, len(insideString), 0, "ordinary strings must not suggest local names or keyword arguments")
 
 	types := complete("alias: Us")
 	assert.Assert(t, findCompletionItem(types, "User") != nil, "expected User type completion, got %#v", types)

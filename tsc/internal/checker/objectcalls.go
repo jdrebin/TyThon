@@ -341,6 +341,26 @@ func (c *Checker) ResolveObjectCallWithContext(callable *Type, arguments []Objec
 	if callable.flags&TypeFlagsAny != 0 {
 		return ObjectCallResolution{ReturnType: c.anyType}, nil
 	}
+	// JS union-signature synthesis aligns parameters by position. Python must
+	// also preserve each constituent's keyword names and parameter categories.
+	// Resolve those domains with the existing binder/inference/relations, then
+	// use the native union signature for the return and assertion contract.
+	if callable.flags&TypeFlagsUnion != 0 {
+		var signatures []*Signature
+		var diagnostics []ObjectCallDiagnostic
+		for _, part := range callable.Types() {
+			resolution, errors := c.ResolveObjectCallWithContext(part, arguments, typeArguments, contextualReturn)
+			diagnostics = append(diagnostics, errors...)
+			if resolution.Signature != nil {
+				signatures = append(signatures, resolution.Signature)
+			}
+		}
+		if len(diagnostics) != 0 || len(signatures) == 0 {
+			return ObjectCallResolution{ReturnType: c.unknownType}, diagnostics
+		}
+		signature := c.createUnionSignature(signatures[0], signatures)
+		return ObjectCallResolution{Signature: signature, ReturnType: c.getReturnTypeOfSignature(signature)}, nil
+	}
 	signatures := c.reorderCandidates(c.getSignaturesOfType(callable, SignatureKindCall), SignatureFlagsNone)
 	if len(signatures) == 0 {
 		return ObjectCallResolution{ReturnType: c.unknownType}, []ObjectCallDiagnostic{{Argument: -1, Message: "type is not callable"}}
@@ -365,6 +385,26 @@ func (c *Checker) resolveObjectCallCandidates(signatures []*Signature, arguments
 	var bestApplicableDiagnostics []ObjectCallDiagnostic
 	var bestSignature *Signature
 	for _, signature := range signatures {
+		if signature.composite != nil && signature.composite.isUnion {
+			var parts []*Signature
+			var diagnostics []ObjectCallDiagnostic
+			for _, part := range signature.composite.signatures {
+				resolution, errors, ok := c.resolveObjectCallCandidates([]*Signature{part}, arguments, typeArguments, relation, contextualReturn)
+				if !ok {
+					diagnostics = append(diagnostics, errors...)
+				} else {
+					parts = append(parts, resolution.Signature)
+				}
+			}
+			if len(diagnostics) == 0 && len(parts) == len(signature.composite.signatures) {
+				combined := c.createUnionSignature(parts[0], parts)
+				return ObjectCallResolution{Signature: combined, ReturnType: c.getReturnTypeOfSignature(combined)}, nil, true
+			}
+			if bestApplicableDiagnostics == nil || len(diagnostics) < len(bestApplicableDiagnostics) {
+				bestApplicableDiagnostics, bestSignature = diagnostics, signature
+			}
+			continue
+		}
 		instantiated, instantiationDiagnostics := c.instantiateObjectCallSignature(signature, arguments, typeArguments, contextualReturn)
 		if len(instantiationDiagnostics) != 0 {
 			if bestBindingDiagnostics == nil || len(instantiationDiagnostics) < len(bestBindingDiagnostics) {
@@ -522,8 +562,20 @@ func (c *Checker) GetObjectKeywordParameterType(signature *Signature, name strin
 // can then type context-sensitive syntax before ordinary call applicability is
 // checked, just as resolveCall does for TypeScript expressions.
 func (c *Checker) GetObjectCallArgumentTypes(signature *Signature, arguments []ObjectCallArgument) ([]*Type, []ObjectCallDiagnostic) {
+	return c.getObjectCallArgumentTypes(signature, arguments, false)
+}
+
+// GetObjectCallArgumentCompletionTypes preserves the binder's successful
+// argument bindings while a call is incomplete (for example, a later required
+// argument is not written yet). Normal call checking keeps its strict behavior.
+func (c *Checker) GetObjectCallArgumentCompletionTypes(signature *Signature, arguments []ObjectCallArgument) []*Type {
+	types, _ := c.getObjectCallArgumentTypes(signature, arguments, true)
+	return types
+}
+
+func (c *Checker) getObjectCallArgumentTypes(signature *Signature, arguments []ObjectCallArgument, allowIncomplete bool) ([]*Type, []ObjectCallDiagnostic) {
 	bindings, diagnostics := c.bindObjectCallArguments(signature, arguments)
-	if len(diagnostics) != 0 {
+	if len(diagnostics) != 0 && !allowIncomplete {
 		return nil, diagnostics
 	}
 	result := make([]*Type, len(arguments))
@@ -534,7 +586,7 @@ func (c *Checker) GetObjectCallArgumentTypes(signature *Signature, arguments []O
 			result[binding.argumentIndex] = parameterType
 		}
 	}
-	return result, nil
+	return result, diagnostics
 }
 
 func (c *Checker) objectCallBindingParameterType(signature *Signature, binding objectCallBinding, packPositions map[int]int) *Type {

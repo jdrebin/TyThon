@@ -1249,3 +1249,115 @@ verification does not substitute for an interactive extension-host smoke test.
 These are deferred because none should compromise the core rule: Python syntax
 and runtime semantics at the boundary, existing TypeScript type machinery at
 the center.
+
+### Required instance fields and inferred build roots
+
+Required, non-static fields declared in executable `.ty` classes need a class-body
+initializer or definite assignment on every normally completing `__init__` path.
+Optional fields, interfaces and declaration-only classes do not acquire this
+requirement. Python annotations do not overwrite inherited attributes. Presence
+facts use the existing TypeScript flow-graph adapter for branches and joins;
+constructor exits include early returns and `finally` effects. Field value types
+remain unchanged by initialization tracking.
+
+When a class defines its own `__init__`, inherited required instance fields are
+checked too. A successfully checked `super().__init__(...)` or known
+`Base.__init__(self, ...)` call applies the assertion of that call (the common
+guarantees of possible bases for `super`) on that flow path. Other classes' initialization contracts are trusted;
+their constructor bodies are not analyzed at each call. New required fields still
+need initialization, while optional members and class-body values/descriptors are
+exempt. Without an overriding constructor, inherited initialization is retained;
+new required fields are not silently considered initialized. Direct assignments
+remain valid: there is no mandatory `super()` call. This uses the existing TS flow
+graph, not a separate Python flow engine.
+A conditional base-initializer call does not guarantee initialization. If an
+inherited required attribute remains uninitialized on a normal exit, report the
+missing attribute on the subclass declaration, not an error on the condition or
+on the `super()` call itself.
+
+#### Initializer assertions and cooperative forwarding
+
+`__init__` is an assertion on its receiver, not a value-producing function.
+Its runtime result remains implicitly `None`; returning another value is an
+error. Inferred assertions describe initialized required storage without
+upgrading declared optional attributes. Explicit assertions use the existing
+syntax `-> asserts self is { id: str }`. The implementation must establish its
+required fields and explicit guarantees on every normally completing path.
+Legacy `-> None` initializer annotations still receive inferred assertions.
+
+Initializer signatures are exempt from the ordinary base/base method-conflict
+and override rules. Ordinary methods retain the existing TS rules. For a
+cooperative `super().__init__` call, the outgoing arguments must satisfy the
+current initializer and each participating base initializer. They need not
+share parameter lists. The initializer must accept `**kwargs` and forward a
+keyword spread. This checks type contracts, not argument provenance: compatible
+replacement values are allowed, and their meaning is the author's responsibility.
+
+The super assertion is a union of base assertions, so only common required
+attributes are guaranteed. A missing initializer contributes no contract;
+inherited initializer contracts do count. Explicit `Base.__init__(self, ...)`
+calls apply that initializer's assertion. No MRO execution simulation or base
+body/call-history tracking is retained.
+
+Where no base contributes an initializer, forwarding requires distinguishing
+the terminal object initializer. The supported runtime guard is:
+
+```python
+next_init = super().__init__
+if next_init == object.__init__.__get__(self):
+    next_init()
+else:
+    next_init(id=id, **kwargs)
+```
+
+The object branch accepts no arguments. The other branch checks the cooperative
+contract. The descriptor surface is declared in the actual built-in library;
+the guard uses the existing native boolean flow machinery. No runtime helpers
+are emitted.
+
+Implementation boundary: TS signature predicates, generic instantiation,
+assignability, unions and flow joins remain native. Python's keyword-aware
+binder checks each union-call constituent rather than using JS's positional
+parameter alignment. TS deliberately does not combine assertion predicates on
+union call signatures; initializer assertion composition is a Python adapter
+operation over native TS types, not a change to general TS assertion behavior.
+
+Pending design decision: whether implicit initializer members should be excluded
+from instance structural assignability. Composition now permits differing
+initializer signatures, but ordinary structural comparisons still see the
+exposed `__init__` member. Do not silently change that relation without approval.
+
+Without `--root-dir`, builds use TypeScript's common-source-directory calculation
+over emitted source files. Python package directories containing `__init__.py`
+or `__init__.ty` remain intact to preserve package-relative imports. An explicit
+root still takes precedence. No `src`-specific heuristic is used.
+
+### Checking scope: TyThon sources only
+
+The extension and native checker accept only `.ty` and `.d.ty` sources. Ordinary
+`.py` files must not enter document synchronization, diagnostic snapshots, or
+project source discovery, even beside declarations or through imports. Explicit
+CLI `.py` inputs are rejected. A `.py` sibling does not conflict with `.ty`.
+Python libraries are represented by `.d.ty` contracts, not checked bodies.
+Builds emit typed implementations only; Python runtime dependencies must be
+provided separately. Optional library documentation/stub import tools remain
+separate from enrollment in the checking graph.
+
+### Context-aware string completions
+
+Retain contextual string/key types from the normal Python checking pass,
+including speculative overload contexts and the native keyword-aware argument
+binder. Extract literal candidates through the existing TS language-service
+routine; do not add an editor-side inference engine. Cover arguments, annotated
+assignments, returns/defaults, nested dictionary values/keys, and sequences.
+Keys exclude attribute facets and keys already present in that dictionary.
+Python syntax recovery closes unfinished strings/containers for checking only;
+completion edits replace literal contents without inserting recovery text.
+
+Project lexer-derived string/comment cursor ranges in UTF-16 alongside the
+existing erasure ranges. Python-tool fallback must respect those ranges even
+when native completion is empty, and fail closed with an older server that
+lacks this metadata. Native candidates and edits remain authoritative; existing
+Jedi module/import suggestions and safe Ruff edits remain supplementary.
+Reject stale completion results after a document edit. Disable VS Code's generic
+word suggestions by default for TyThon, while enabling string quick suggestions.

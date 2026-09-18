@@ -29,6 +29,7 @@ assert.equal(await request('\ufeffvalue="é"\n'), '\ufeffvalue = "é"\n', "prese
 
 // All formerly missing forms pass through the same executable the editor runs.
 for (const [source, expected] of [
+    ['class User:\n id:str\n\nclass Me(User):\n id:"Shloimy"\n', 'class User:\n    id: str\n\n\nclass Me(User):\n    id: "Shloimy"\n'],
     ['type A=[]str\n', 'type A = []str\n'],
     ['type Identity=<T>(value:T)->T\n', 'type Identity = <T>(value: T) -> T\n'],
     ['value=user["name"]!\n', 'value = user["name"]!\n'],

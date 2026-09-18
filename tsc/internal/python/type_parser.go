@@ -639,6 +639,12 @@ func (p *typeParser) parseTypeParameters() []TypeParameterExpr {
 }
 
 func canStartType(token typeToken) bool {
+	if token.kind == tokenIdentifier {
+		switch token.text {
+		case "if", "else", "extends", "for", "in", "as", "satisfies":
+			return false
+		}
+	}
 	switch token.kind {
 	case tokenIdentifier, tokenString, tokenFString, tokenNumber, tokenLeftParen, tokenLeftBracket, tokenLeftBrace, tokenLessThan, tokenStar:
 		return true

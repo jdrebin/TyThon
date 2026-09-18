@@ -24,32 +24,106 @@ func EraseTypedPython(source string) (string, []ErasureDiagnostic) {
 			output[index] = ' '
 		}
 	}
+	for index, value := range erasedSuitePlaceholders(source, removed) {
+		output[index] = value
+	}
 	return string(output), diagnostics
+}
+
+// Python requires a statement in every retained suite. If erasure removes an
+// entire body, use a no-op in an already-erased span. Three dots fit even the
+// shortest annotation (x:T), keeping byte and editor positions unchanged.
+func erasedSuitePlaceholders(source string, removed []bool) map[int]byte {
+	result := make(map[int]byte)
+	lines := collectLogicalLines(source)
+	hasRuntime := func(line logicalLine) bool {
+		for index := line.contentStart; index < line.end; index++ {
+			if removed[index] {
+				continue
+			}
+			if source[index] == '#' {
+				return false
+			}
+			if !strings.ContainsRune(" \t\r\n", rune(source[index])) {
+				return true
+			}
+		}
+		return false
+	}
+	for index, line := range lines {
+		if !hasRuntime(line) || !strings.HasSuffix(strings.TrimSpace(line.text), ":") || index+1 == len(lines) || lines[index+1].indent <= line.indent {
+			continue
+		}
+		end := blockEnd(lines, index)
+		empty := true
+		for _, child := range lines[index+1 : end] {
+			if hasRuntime(child) {
+				empty = false
+				break
+			}
+		}
+		if !empty {
+			continue
+		}
+		first := lines[index+1]
+		if first.contentStart+3 > first.end {
+			continue
+		}
+		for pos := first.start; pos < first.contentStart; pos++ {
+			result[pos] = source[pos]
+		}
+		for pos := first.contentStart; pos < first.contentStart+3; pos++ {
+			result[pos] = '.'
+		}
+	}
+	return result
 }
 
 // ToolingProjection preserves UTF-16 positions for editor tools. Erased spans
 // are protected: diagnostics and edits must not be mapped through those spans.
 type ToolingProjection struct {
-	Text   string   `json:"text"`
-	Erased [][2]int `json:"erased"`
-	Errors []string `json:"errors"`
+	Text         string   `json:"text"`
+	Erased       [][2]int `json:"erased"`
+	Errors       []string `json:"errors"`
+	NoCompletion [][2]int `json:"noCompletion"`
 }
 
 func ProjectTypedPython(source string) ToolingProjection {
 	removed, diagnostics := typedPythonErasureMask(source)
+	placeholders := erasedSuitePlaceholders(source, removed)
 	result := ToolingProjection{Erased: make([][2]int, 0), Errors: make([]string, 0)}
+	blocked := NonCodeCompletionRanges(source)
+	positions := make(map[int]int, len(blocked)*2)
+	for _, span := range blocked {
+		positions[span.Start], positions[span.End] = 0, 0
+	}
 	for _, diagnostic := range diagnostics {
 		result.Errors = append(result.Errors, diagnostic.Message)
 	}
 	var output strings.Builder
 	position := 0
+	placeholderDots := 0
 	for index, r := range source {
+		if _, needed := positions[index]; needed {
+			positions[index] = position
+		}
 		width := 1
 		if r > 0xffff {
 			width = 2
 		}
 		if removed[index] && r != '\n' && r != '\r' {
-			output.WriteString(strings.Repeat(" ", width))
+			if placeholders[index] == '.' && (index == 0 || placeholders[index-1] != '.') {
+				placeholderDots = 3
+			}
+			if placeholderDots != 0 {
+				dots := min(width, placeholderDots)
+				output.WriteString(strings.Repeat(".", dots) + strings.Repeat(" ", width-dots))
+				placeholderDots -= dots
+			} else if value, ok := placeholders[index]; ok && value != '.' {
+				output.WriteByte(value)
+			} else {
+				output.WriteString(strings.Repeat(" ", width))
+			}
 			if n := len(result.Erased); n > 0 && result.Erased[n-1][1] == position {
 				result.Erased[n-1][1] += width
 			} else {
@@ -61,6 +135,11 @@ func ProjectTypedPython(source string) ToolingProjection {
 		position += width
 	}
 	result.Text = output.String()
+	positions[len(source)] = position
+	result.NoCompletion = make([][2]int, 0, len(blocked))
+	for _, span := range blocked {
+		result.NoCompletion = append(result.NoCompletion, [2]int{positions[span.Start], positions[span.End]})
+	}
 	return result
 }
 

@@ -284,6 +284,9 @@ func (c *Checker) GetApparentProperties(t *Type) []*ast.Symbol {
 
 func (c *Checker) getAugmentedPropertiesOfType(t *Type) []*ast.Symbol {
 	t = c.getApparentType(t)
+	if c.hasSeparateAttributeAndItemFacets(t) {
+		return c.getPropertiesOfType(t)
+	}
 	propsByName := createSymbolTable(c.getPropertiesOfType(t))
 	var functionType *Type
 	if len(c.getSignaturesOfType(t, SignatureKindCall)) > 0 {

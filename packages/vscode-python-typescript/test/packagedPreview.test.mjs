@@ -73,6 +73,21 @@ try {
         capabilities: { textDocument: { semanticTokens: { requests: { full: true }, tokenTypes: ["class", "type", "variable", "property", "function", "parameter"], tokenModifiers: [], formats: ["relative"] } } } });
     await notify("initialized", {});
     assert.equal(await request("typedPython/builtinSource"), await readFile(path.join(installed, "library/builtins.d.ty"), "utf8"), "Embedded library must be the shipped source");
+    const literalUri = await open("literal-completions.ty", 'local_value = 1\nmode: "read" | "write" = ""\ntext = ""\n');
+    const literals = await request("textDocument/completion", {
+        textDocument: { uri: literalUri }, position: { line: 1, character: 'mode: "read" | "write" = "'.length },
+    });
+    assert.deepEqual(literals.items.map(item => item.label).sort(), ["read", "write"], "Packaged server must provide contextual literal completions");
+    const ordinaryString = await request("textDocument/completion", {
+        textDocument: { uri: literalUri }, position: { line: 2, character: 'text = "'.length },
+    });
+    assert.deepEqual(ordinaryString?.items ?? [], [], "Packaged server must not suggest variables in ordinary strings");
+    const literalProjection = await request("typedPython/project", { textDocument: { uri: literalUri } });
+    assert(literalProjection.noCompletion.length > 0, "Packaged server must supply Python fallback exclusion ranges");
+    const plainPython = await open("ignored.py", "class Broken:\n");
+    assert.deepEqual((await request("textDocument/diagnostic", { textDocument: { uri: plainPython } })).items, [], "Packaged server must not check .py documents");
+    await notify("textDocument/didClose", { textDocument: { uri: literalUri } });
+    await notify("textDocument/didClose", { textDocument: { uri: plainPython } });
     for (const name of ["01_shapes.ty", "02_types.ty", "03_classes.ty", "04_imports.ty"]) {
         const uri = await open(name, await readFile(path.join(workspace, name), "utf8"));
         const result = await request("textDocument/diagnostic", { textDocument: { uri } });

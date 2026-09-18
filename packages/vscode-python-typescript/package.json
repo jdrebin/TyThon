@@ -1,6 +1,6 @@
 {
     "name": "tython",
-    "displayName": "tython",
+    "displayName": "TyThon",
     "description": "Python with an erasable structural type system powered by the adapted TypeScript checker. Independent project.",
     "publisher": "tython-local",
     "license": "Apache-2.0",
@@ -23,13 +23,17 @@
         "workspace"
     ],
     "activationEvents": [
-        "onLanguage:python",
         "onLanguage:typed-python"
     ],
     "main": "./dist/extension.bundle.js",
     "contributes": {
         "configurationDefaults": {
-            "[typed-python]": { "editor.semanticHighlighting.enabled": true, "editor.defaultFormatter": "tython-local.tython" }
+            "[typed-python]": {
+                "editor.semanticHighlighting.enabled": true,
+                "editor.defaultFormatter": "tython-local.tython",
+                "editor.wordBasedSuggestions": "off",
+                "editor.quickSuggestions": { "other": "on", "comments": "off", "strings": "on" }
+            }
         },
         "commands": [
             { "command": "pythonTypeScript.openPreview", "title": "tython: Open Preview Examples" },
@@ -40,7 +44,7 @@
             {
                 "id": "typed-python",
                 "aliases": [
-                    "tython",
+                    "TyThon",
                     "ty"
                 ],
                 "extensions": [
@@ -126,7 +130,7 @@
         "demo:prepare": "node scripts/prepare-demo.mjs",
         "grammar:test": "node test/grammar.test.mjs && node test/icons.test.mjs",
         "grammar:update": "node scripts/update-python-grammar.mjs",
-        "test": "npm run grammar:test && node test/serverLaunch.test.mjs && node test/hoverLatency.test.mjs && node test/compilerPath.test.mjs && npm run formatter:test",
+        "test": "npm run grammar:test && node test/documentScope.test.mjs && node test/completionFallback.test.mjs && node test/serverLaunch.test.mjs && node test/hoverLatency.test.mjs && node test/compilerPath.test.mjs && npm run formatter:test",
         "watch": "npm run bundle -- --watch"
     },
     "devDependencies": {

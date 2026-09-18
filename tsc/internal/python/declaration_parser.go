@@ -448,7 +448,7 @@ func parseInterfaceDeclaration(header logicalLine, body []logicalLine) (*Interfa
 			errors = append(errors, TypeParseError{Range: parameter.NameLoc, Message: "const type parameters are only allowed on functions, methods, and classes"})
 		}
 	}
-	members, memberErrors := parseObjectMembers(body, true)
+	members, memberErrors := parseObjectMembers(body, true, nil)
 	errors = append(errors, memberErrors...)
 	return &InterfaceDeclaration{
 		declarationBase: declarationBase{Loc: TextRange{Start: header.start, End: blockRangeEnd(header, body)}},
@@ -468,17 +468,19 @@ func parseClassDeclaration(header logicalLine, body []logicalLine, declarationOn
 	name, typeParameters, _, errors := parseObjectHeader(text, header)
 	baseDeclarations, metaclass, baseErrors := parseClassBaseDeclarations(text, header)
 	errors = append(errors, baseErrors...)
-	members, memberErrors := parseObjectMembers(body, declarationOnly)
+	initialized := make(map[string]bool)
+	members, memberErrors := parseObjectMembers(body, declarationOnly, initialized)
 	errors = append(errors, memberErrors...)
 	return &ClassDeclaration{
-		declarationBase: declarationBase{Loc: TextRange{Start: header.start, End: blockRangeEnd(header, body)}},
-		Name:            name,
-		NameLoc:         declarationNameRange(header, name),
-		TypeParameters:  typeParameters,
-		Bases:           baseDeclarations,
-		Metaclass:       metaclass,
-		Members:         members,
-		Ambient:         ambient,
+		declarationBase:       declarationBase{Loc: TextRange{Start: header.start, End: blockRangeEnd(header, body)}},
+		Name:                  name,
+		NameLoc:               declarationNameRange(header, name),
+		TypeParameters:        typeParameters,
+		Bases:                 baseDeclarations,
+		Metaclass:             metaclass,
+		Members:               members,
+		Ambient:               ambient,
+		InitializedAttributes: initialized,
 	}, errors
 }
 
@@ -594,7 +596,7 @@ func parseClassBaseDeclarations(text string, line logicalLine) ([]BaseDeclaratio
 	return bases, metaclass, errors
 }
 
-func parseObjectMembers(lines []logicalLine, declarationOnly bool) ([]ObjectMemberDeclaration, []TypeParseError) {
+func parseObjectMembers(lines []logicalLine, declarationOnly bool, initialized map[string]bool) ([]ObjectMemberDeclaration, []TypeParseError) {
 	members := []ObjectMemberDeclaration{}
 	errors := []TypeParseError{}
 	pendingOverload := false
@@ -613,6 +615,9 @@ func parseObjectMembers(lines []logicalLine, declarationOnly bool) ([]ObjectMemb
 			continue
 		}
 		text := line.text
+		if text == "pass" || text == "..." {
+			continue
+		}
 		if strings.HasPrefix(text, "@") {
 			switch {
 			case text == "@overload":
@@ -633,6 +638,9 @@ func parseObjectMembers(lines []logicalLine, declarationOnly bool) ([]ObjectMemb
 			function, parseErrors := parseFunctionDeclaration(line, true, pendingOverload, allowInferredReturn)
 			errors = append(errors, parseErrors...)
 			if function != nil {
+				if initialized != nil {
+					initialized[function.Name] = true
+				}
 				if pendingProperty {
 					members = append(members, ObjectMemberDeclaration{
 						Loc: lineRange(line), Kind: ObjectMemberAttribute, Name: function.Name, NameLoc: function.NameLoc,
@@ -673,12 +681,18 @@ func parseObjectMembers(lines []logicalLine, declarationOnly bool) ([]ObjectMemb
 			equals := findRuntimeAssignment(text)
 			colon := findTopLevel(text, ':')
 			if equals >= 0 && (colon < 0 || colon > equals) {
+				if name := strings.TrimSpace(text[:equals]); initialized != nil && isSimpleIdentifier(name) {
+					initialized[name] = true
+				}
 				continue
 			}
 		}
 		member, parseErrors := parseObjectMember(line)
 		errors = append(errors, parseErrors...)
 		if member != nil {
+			if initialized != nil && member.Name != "" && findRuntimeAssignment(text) >= 0 {
+				initialized[member.Name] = true
+			}
 			members = append(members, *member)
 		}
 	}

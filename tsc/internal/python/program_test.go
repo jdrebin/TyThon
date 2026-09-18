@@ -57,7 +57,7 @@ func TestBuildDeclarationDrivenProgram(t *testing.T) {
 	if len(program.Diagnostics) != 0 {
 		t.Fatalf("diagnostics = %v", program.Diagnostics)
 	}
-	if len(program.Modules) != 1 || program.Modules[0].Implementation != implementation {
+	if len(program.Modules) != 1 || program.Modules[0].Implementation != "" || program.Modules[0].Runtime != nil {
 		t.Fatalf("program modules = %#v", program.Modules)
 	}
 	user, ok := program.Modules[0].Types.Symbol("User")
@@ -66,7 +66,7 @@ func TestBuildDeclarationDrivenProgram(t *testing.T) {
 	}
 }
 
-func TestPlainPythonBodiesUseSiblingDeclarationContracts(t *testing.T) {
+func TestPlainPythonBodiesAreNotCheckedWithSiblingDeclarations(t *testing.T) {
 	t.Parallel()
 
 	program := BuildProgram(newPythonChecker(t), []SourceInput{
@@ -89,15 +89,22 @@ class User:
 	}
 }
 
-func TestPlainPythonBodyViolatingSiblingDeclarationIsRejected(t *testing.T) {
+func TestPlainPythonBodyViolatingSiblingDeclarationIsIgnored(t *testing.T) {
 	t.Parallel()
 
 	program := BuildProgram(newPythonChecker(t), []SourceInput{
 		{FileName: "app.py", Text: "def greet(name):\n    return 1\n"},
 		{FileName: "app.d.ty", Text: "def greet(name: str) -> str: ...\n"},
 	})
-	if len(program.Diagnostics) == 0 || !strings.Contains(program.Diagnostics[0].Message, "returned type") {
-		t.Fatalf("diagnostics = %v, want declaration contract error", program.Diagnostics)
+	if len(program.Diagnostics) != 0 || program.Modules[0].Runtime != nil {
+		t.Fatalf("Python body was checked: %v", program.Diagnostics)
+	}
+}
+
+func TestBuildProgramIgnoresMalformedPythonSource(t *testing.T) {
+	program := BuildProgram(newPythonChecker(t), []SourceInput{{FileName: "app.py", Text: "class Broken:\n"}})
+	if len(program.Modules) != 0 || len(program.Diagnostics) != 0 {
+		t.Fatalf("Python source was enrolled: %#v", program)
 	}
 }
 
@@ -481,6 +488,8 @@ interface Node:
 
 class User<T>:
     value: T
+    def __init__(self, value: T):
+        self.value = value
 
 type Envelope = { "profile": Profile }
 type Mixed = { "id": int } & Profile
@@ -712,7 +721,7 @@ func TestObjectIsUniversalAndSuppliesCommonAttributes(t *testing.T) {
 	t.Parallel()
 
 	const typed = `class User:
-    name: str
+    name: str = ""
 
 integer_as_object: object = 1
 none_as_object: object = None
@@ -1060,7 +1069,7 @@ func TestTypedSourceChecksClassMethodReceiverSurface(t *testing.T) {
 	t.Parallel()
 
 	typed := `class User:
-    name: str
+    name: str = ""
 
     def display(self) -> str:
         return self.name
@@ -1476,7 +1485,7 @@ counter: Counter
 counter += 1
 
 class State:
-    value: int
+    value: int = 0
 
 state: State
 state.value += 1
@@ -1753,7 +1762,7 @@ user.identifier = 2
 `
 	program := BuildProgram(newPythonChecker(t), []SourceInput{
 		{FileName: "app.d.ty", Text: declaration},
-		{FileName: "app.py", Text: implementation},
+		{FileName: "app.ty", Text: implementation},
 	})
 	readonlyDiagnostics := 0
 	for _, diagnostic := range program.Diagnostics {
@@ -1820,8 +1829,8 @@ func TestTypedSourceChecksClassMatchArgsAndMappingRest(t *testing.T) {
 
 	typed := `class Point:
     __match_args__ = ("x", "y")
-    x: int
-    y: int
+    x: int = 0
+    y: int = 0
 
 def read(value: Point | { "x": int }) -> int:
     match value:
@@ -1840,7 +1849,7 @@ func TestTypedSourceChecksClassMappingAndSequencePatterns(t *testing.T) {
 	t.Parallel()
 
 	typed := `class User:
-    name: str
+    name: str = ""
 
 def display(value: User | None) -> str:
     match value:
@@ -1977,14 +1986,14 @@ value: int = dynamic.missing
 	}
 }
 
-func TestBuildProgramReportsPyTyCollision(t *testing.T) {
+func TestBuildProgramIgnoresPythonSibling(t *testing.T) {
 	t.Parallel()
 
 	program := BuildProgram(newPythonChecker(t), []SourceInput{
 		{FileName: "app.py", Text: "pass\n"},
 		{FileName: "app.ty", Text: "pass\n"},
 	})
-	if len(program.Diagnostics) != 1 || program.Diagnostics[0].Kind != ProgramDiagnosticModule {
+	if len(program.Diagnostics) != 0 || len(program.Modules) != 1 || program.Modules[0].Files.Implementation != "" {
 		t.Fatalf("diagnostics = %v", program.Diagnostics)
 	}
 }
@@ -1993,7 +2002,7 @@ func TestBuildProgramConnectsImportedTypesValuesAndModuleObjects(t *testing.T) {
 	t.Parallel()
 
 	program := BuildProgram(newPythonChecker(t), []SourceInput{
-		{FileName: "app.py", Text: "current = models.make_user(\"Ada\")\nprint(current.name)\n"},
+		{FileName: "app.ty", Text: "current = models.make_user(\"Ada\")\nprint(current.name)\n"},
 		{FileName: "app.d.ty", Text: "import models\nfrom models import User\ncurrent: User\n"},
 		{FileName: "models.d.ty", Text: "interface User:\n    name: str\n\ndeclare def make_user(name: str) -> User: ...\n"},
 	})

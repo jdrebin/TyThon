@@ -478,7 +478,15 @@ func (c *Checker) GetPythonIterationType(iterable *Type) (*Type, []ObjectCallDia
 		return c.getUnionType(results), nil
 	}
 	if c.IsPythonMappingType(iterable) {
-		return c.GetItemKeyType(iterable), nil
+		// Runtime mapping iteration yields indexed keys, not the attribute
+		// tokens which intentionally also participate in type-level keyof.
+		keys := make([]*Type, 0)
+		for _, info := range c.getIndexInfosOfType(iterable) {
+			if _, attribute := c.GetPythonAttributeNameType(info.keyType); !attribute {
+				keys = append(keys, info.keyType)
+			}
+		}
+		return c.getUnionType(keys), nil
 	}
 	if c.isTypeAssignableTo(iterable, c.stringType) {
 		return c.stringType, nil

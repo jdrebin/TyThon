@@ -21,6 +21,19 @@ The matching compiler and library are bundled. You do **not** need Go, Node,
 this repository, or another `tsgo` installation to use native `.ty` features.
 Use **Developer: Reload Window** after installing an updated VSIX.
 
+TyThon owns only `.ty` and `.d.ty` documents. Ordinary `.py` files are neither
+opened by its language client nor included in its checking graph; your Python
+extension remains responsible for those files. Python library contracts come
+from `.d.ty` declarations rather than checking library implementation bodies.
+
+String completions use the expected type for arguments, assignments, returns,
+defaults, and nested collection values. Quoted dictionary keys come from the
+expected shape and omit keys already written. Replacement edits preserve your
+quotes and replace the whole partial value, including text after the cursor.
+Strings and comments do not fall back to unrelated Python names. TyThon disables
+VS Code's untyped word suggestions by default and enables suggestions inside
+strings; user/workspace editor settings can override these defaults.
+
 Native navigation currently handles type declarations. Python function/value
 navigation uses the optional Jedi provider and goes to Python source; it does
 not yet navigate every value directly to its `.d.ty` declaration.

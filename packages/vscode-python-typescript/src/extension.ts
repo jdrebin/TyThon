@@ -25,7 +25,7 @@ let shuttingDown = false;
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
     shuttingDown = false;
-    const output = vscode.window.createOutputChannel("tython");
+    const output = vscode.window.createOutputChannel("TyThon");
     context.subscriptions.push(output);
 
     context.subscriptions.push(vscode.commands.registerCommand("pythonTypeScript.openPreview", async () => {
@@ -72,19 +72,20 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         options: { cwd: vscode.workspace.workspaceFolders?.[0]?.uri.fsPath, env: { ...process.env, GOMEMLIMIT: launch.softLimit } },
     };
     const documentSelector = [
-        { language: "typed-python", scheme: "file" },
-        { language: "python", scheme: "file" },
+        { language: "typed-python", scheme: "file", pattern: "**/*.ty" },
     ];
     let pythonTools: PythonTools | undefined;
     const clientOptions: LanguageClientOptions = {
         documentSelector,
-        outputChannelName: "tython Language Server",
+        outputChannelName: "TyThon Language Server",
         // The custom provider below carries VS Code's hover verbosity level to
         // the server, so suppress the language client's default provider.
         middleware: {
             provideHover: () => undefined,
             async provideCompletionItem(document, position, completionContext, token, next) {
+                const version = document.version;
                 const native = await next(document, position, completionContext, token);
+                if (token.isCancellationRequested || document.isClosed || document.version !== version) return undefined;
                 const items = Array.isArray(native) ? native : native?.items ?? [];
                 const importContext = /^\s*(from\s|import\s)/.test(document.lineAt(position.line).text);
                 // Native typed candidates win. Supplement imports or a missing
@@ -92,6 +93,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
                 const memberContext = /\.\w*$/.test(document.lineAt(position.line).text.slice(0, position.character));
                 if (!pythonTools || (!importContext && !memberContext && items.length)) return native;
                 const external = await pythonTools.completions(document, position, token, !importContext && items.length > 0);
+                if (token.isCancellationRequested || document.isClosed || document.version !== version) return undefined;
                 const labels = new Set(items.map(item => typeof item.label === "string" ? item.label : item.label.label));
                 return new vscode.CompletionList([...items, ...external.filter(item => !labels.has(String(item.label)))],
                     (!Array.isArray(native) && native?.isIncomplete) || false);
@@ -115,7 +117,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     };
     languageClient = new LanguageClient(
         "typed-python",
-        "tython",
+        "TyThon",
         serverOptions,
         clientOptions,
     );

@@ -19334,7 +19334,7 @@ func (c *Checker) getPropertyOfTypeEx(t *Type, name string, skipObjectFunctionPr
 			c.valueSymbolLinks.Get(symbol).resolvedType = info.valueType
 			return symbol
 		}
-		if skipObjectFunctionPropertyAugment {
+		if skipObjectFunctionPropertyAugment || resolved.separateAttributeAndItem {
 			return nil
 		}
 		var functionType *Type

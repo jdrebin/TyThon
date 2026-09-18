@@ -29,6 +29,13 @@ func GetFileKind(fileName string) FileKind {
 	}
 }
 
+// IsTypedSource is the checking boundary. Ordinary Python files may have
+// declaration siblings, but TyThon never parses or checks their bodies.
+func IsTypedSource(fileName string) bool {
+	kind := GetFileKind(fileName)
+	return kind == FileKindTypedImplementation || kind == FileKindDeclaration
+}
+
 // DeclarationFileName returns the sibling declaration file for a Python
 // implementation or typed implementation.
 func DeclarationFileName(fileName string) (string, bool) {

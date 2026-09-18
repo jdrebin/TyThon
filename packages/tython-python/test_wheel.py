@@ -172,14 +172,23 @@ def main():
         )
         run([cli, "check", "app.ty"], cwd=root, env=env)
         run([cli, "build", "app.ty"], cwd=root, env=env)
-        assert run([str(python), "dist/app.py"], cwd=root, env=env).strip() == "Ada"
-        assert (root / "dist/catalog.py").read_bytes() == (
-            root / "catalog.py"
-        ).read_bytes()
+        assert not (root / "dist/catalog.py").exists(), (
+            "Python bodies must not be collected or copied"
+        )
         assert not (root / "dist/catalog.d.ty").exists()
+        # The caller supplies ordinary Python runtime dependencies separately.
+        assert run(
+            [str(python), "dist/app.py"],
+            cwd=root,
+            env={**env, "PYTHONPATH": str(root)},
+        ).strip() == "Ada"
+        error = run([cli, "check", "catalog.py"], cwd=root, env=env, expected=2)
+        assert "only checks .ty and .d.ty" in error
+        (root / "catalog.py").write_text("class Broken:\n")
+        run([cli, "check", "app.ty"], cwd=root, env=env)
         # Real package execution from a different output root, with relative imports.
         (root / "src/pkg").mkdir(parents=True)
-        (root / "src/pkg/__init__.py").write_text('print("init")\n')
+        (root / "src/pkg/__init__.ty").write_text('print("init")\n')
         (root / "src/pkg/main.ty").write_text(
             'from .helper import greet\nprint(greet("Ada"))\n'
         )

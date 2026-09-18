@@ -1807,7 +1807,7 @@ func (s *Server) handleInitialize(ctx context.Context, params *lsproto.Initializ
 		pythonSignatureTriggers := []string{"(", ","}
 		pythonSignatureRetriggers := []string{","}
 		response.ServerInfo = &lsproto.ServerInfo{
-			Name:    "typed-python",
+			Name:    "TyThon",
 			Version: new(core.Version()),
 		}
 		response.Capabilities = &lsproto.ServerCapabilities{

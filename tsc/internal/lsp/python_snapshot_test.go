@@ -92,6 +92,7 @@ func TestPythonSnapshotTracksClosedImportsAndUnsavedOverlays(t *testing.T) {
 	disk := map[string]string{
 		"/app/main.ty":      "from library import value\nresult = value\n",
 		"/app/library.d.ty": "value: str\n",
+		"/app/library.py":   "class Broken:\n",
 	}
 	s := newPythonLanguageService(vfstest.FromMap(disk, true))
 	t.Cleanup(s.discardCachedProgram)
@@ -100,6 +101,9 @@ func TestPythonSnapshotTracksClosedImportsAndUnsavedOverlays(t *testing.T) {
 			sources, _, ok := s.sourceSnapshot(ctx, "/app/main.ty")
 			if !ok {
 				t.Fatal("missing source")
+			}
+			if _, included := sources["/app/library.py"]; included {
+				t.Fatal("Python library implementation included in checking snapshot")
 			}
 			p, done, err := s.buildPythonProgram(ctx, sources)
 			defer done()
@@ -131,6 +135,33 @@ func TestPythonSnapshotTracksClosedImportsAndUnsavedOverlays(t *testing.T) {
 	if text, _ := third.HoverAt("/app/main.ty", len("from library import value\n")); text != "(variable) result: bool" {
 		t.Fatalf("overlay hover = %s", text)
 	}
+}
+
+func TestPythonLanguageServiceIgnoresPlainPythonDocuments(t *testing.T) {
+	// A nil filesystem also verifies that rejected documents never reach disk.
+	s := newPythonLanguageService(nil)
+	t.Cleanup(s.discardCachedProgram)
+	uri := lsproto.DocumentUri("file:///app/plain.py")
+	s.open(uri, 1, "class Broken:\n")
+	if len(s.documents) != 0 {
+		t.Fatal("Python document was enrolled")
+	}
+	if err := s.change(uri, 2, nil); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, ok := s.sourceSnapshot(t.Context(), uri.FileName()); ok {
+		t.Fatal("Python document produced a snapshot")
+	}
+	result, err := s.computeDiagnostics(t.Context(), &lsproto.DocumentDiagnosticParams{
+		TextDocument: lsproto.TextDocumentIdentifier{Uri: uri},
+	}, lsproto.PositionEncodingKindUTF16)
+	if err != nil || result.FullDocumentDiagnosticReport == nil || len(result.FullDocumentDiagnosticReport.Items) != 0 {
+		t.Fatalf("Python diagnostics = %#v, %v", result, err)
+	}
+	if s.cachedProgram != nil {
+		t.Fatal("Python diagnostic request built a checker program")
+	}
+	s.close(uri)
 }
 
 func TestPythonSnapshotIsDiscardedAfterCancellation(t *testing.T) {

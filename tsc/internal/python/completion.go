@@ -42,6 +42,7 @@ type AttributeCompletionQuery struct {
 type ItemCompletionQuery struct {
 	Prefix         string
 	Quote          byte
+	Raw            bool
 	ReceiverOffset int
 	ReplaceFrom    int
 	ReplaceTo      int
@@ -89,7 +90,7 @@ type SignatureHelpResult struct {
 // checker then determine the receiver type; completion does not infer it in a
 // parallel editor-only model.
 func PrepareAttributeCompletion(source string, offset int) (string, AttributeCompletionQuery, bool) {
-	if offset < 0 || offset > len(source) {
+	if offset < 0 || offset > len(source) || completionInsideString(source, offset) || completionInsideComment(source, offset) {
 		return source, AttributeCompletionQuery{}, false
 	}
 	start := offset
@@ -132,19 +133,19 @@ func PrepareAttributeCompletion(source string, offset int) (string, AttributeCom
 	return recovered, query, true
 }
 
-// PrepareItemCompletion recovers an incomplete subscription by inserting a
-// valid sentinel key. The checked receiver still supplies the candidates; this
+// PrepareItemCompletion recovers an incomplete subscription. The checked
+// receiver still supplies the candidates; this
 // function is only the Python cursor-context adapter.
 func PrepareItemCompletion(source string, offset int) (string, ItemCompletionQuery, bool) {
-	if offset < 0 || offset > len(source) {
+	if offset < 0 || offset > len(source) || completionInsideComment(source, offset) {
 		return source, ItemCompletionQuery{}, false
 	}
-	lineStart := strings.LastIndexByte(source[:offset], '\n') + 1
-	bracketRelative := strings.LastIndexByte(source[lineStart:offset], '[')
-	if bracketRelative < 0 {
+	stack := scanOpenDelimiters(source[:offset])
+	if len(stack) == 0 || stack[len(stack)-1].char != '[' {
 		return source, ItemCompletionQuery{}, false
 	}
-	bracket := lineStart + bracketRelative
+	bracket := stack[len(stack)-1].pos
+	lineStart := strings.LastIndexByte(source[:bracket], '\n') + 1
 	receiverOffset := bracket - 1
 	for receiverOffset >= lineStart && (source[receiverOffset] == ' ' || source[receiverOffset] == '\t') {
 		receiverOffset--
@@ -152,33 +153,22 @@ func PrepareItemCompletion(source string, offset int) (string, ItemCompletionQue
 	if receiverOffset < lineStart || source[receiverOffset] == '=' || source[receiverOffset] == ',' || source[receiverOffset] == '(' || source[receiverOffset] == '[' || source[receiverOffset] == '{' {
 		return source, ItemCompletionQuery{}, false
 	}
+	start := receiverOffset
+	for start > lineStart && isIdentifierContinue(rune(source[start-1])) {
+		start--
+	}
+	switch source[start : receiverOffset+1] {
+	case "return", "yield", "in", "is", "not", "and", "or", "if", "else", "await":
+		return source, ItemCompletionQuery{}, false
+	}
 	contentStart := bracket + 1
-	for contentStart < offset && (source[contentStart] == ' ' || source[contentStart] == '\t') {
+	for contentStart < offset && strings.ContainsRune(" \t\r\n", rune(source[contentStart])) {
 		contentStart++
 	}
 	query := ItemCompletionQuery{ReceiverOffset: receiverOffset}
-	if contentStart < offset && (source[contentStart] == '\'' || source[contentStart] == '"') {
-		query.Quote = source[contentStart]
-		query.ReplaceFrom = contentStart + 1
-		if strings.IndexByte(source[query.ReplaceFrom:offset], query.Quote) >= 0 {
-			return source, ItemCompletionQuery{}, false
-		}
-		query.Prefix = source[query.ReplaceFrom:offset]
-		query.ReplaceTo = offset
-		for query.ReplaceTo < len(source) && source[query.ReplaceTo] != query.Quote && source[query.ReplaceTo] != ']' && source[query.ReplaceTo] != '\n' {
-			query.ReplaceTo++
-		}
-		recovered := source[:query.ReplaceFrom] + "__completion__" + source[query.ReplaceTo:]
-		insertAt := query.ReplaceFrom + len("__completion__")
-		if insertAt < len(recovered) && recovered[insertAt] == query.Quote {
-			insertAt++
-		} else {
-			recovered = recovered[:insertAt] + string(query.Quote) + recovered[insertAt:]
-			insertAt++
-		}
-		if !hasClosingItemBracket(recovered, insertAt) {
-			recovered = recovered[:insertAt] + "]" + recovered[insertAt:]
-		}
+	if recovered, literal, ok := PrepareStringCompletion(source, offset); ok && literal.Supported && literal.Offset == contentStart {
+		query.Quote, query.Raw = literal.Quote, literal.Raw
+		query.Prefix, query.ReplaceFrom, query.ReplaceTo = literal.Prefix, literal.ReplaceFrom, literal.ReplaceTo
 		return recovered, query, true
 	}
 	if strings.IndexAny(source[contentStart:offset], "'\"") >= 0 {
@@ -330,7 +320,7 @@ func isSimpleAnnotationLeft(left string) bool {
 }
 
 func completionIdentifierRange(source string, offset int) (start int, end int, ok bool) {
-	if offset < 0 || offset > len(source) {
+	if offset < 0 || offset > len(source) || completionInsideString(source, offset) || completionInsideComment(source, offset) {
 		return 0, 0, false
 	}
 	start = offset
@@ -363,11 +353,27 @@ type callDelimiter struct {
 	pos  int
 }
 
+// Use the runtime lexer so raw, prefixed, triple-quoted, escaped and unfinished
+// strings all follow the same rules as parsing. Item-key completion has its own
+// string-aware recovery and deliberately does not use this identifier guard.
+func completionInsideString(source string, offset int) bool {
+	tokens, _ := scanRuntimeTokens(source, 0)
+	for _, token := range tokens {
+		if token.kind != runtimeTokenString || offset <= token.start || offset > token.end {
+			continue
+		}
+		quote := token.start + strings.IndexAny(token.text, "\"'")
+		_, terminated := scanRuntimeStringEnd(source, quote)
+		return offset < token.end || !terminated
+	}
+	return false
+}
+
 // PrepareCallCompletion finds the innermost call argument list using only
 // delimiter/string recovery. Callable meaning, overloads, and parameter types
 // are queried from checker signatures after the source has been recovered.
 func PrepareCallCompletion(source string, offset int) (string, CallCompletionQuery, bool) {
-	if offset < 0 || offset > len(source) {
+	if offset < 0 || offset > len(source) || completionInsideString(source, offset) || completionInsideComment(source, offset) {
 		return source, CallCompletionQuery{}, false
 	}
 	stack := scanOpenDelimiters(source[:offset])
@@ -430,36 +436,13 @@ func PrepareCallCompletion(source string, offset int) (string, CallCompletionQue
 
 func scanOpenDelimiters(source string) []callDelimiter {
 	stack := make([]callDelimiter, 0)
-	var quote byte
-	escaped := false
-	inComment := false
-	for index := 0; index < len(source); index++ {
-		ch := source[index]
-		if inComment {
-			if ch == '\n' {
-				inComment = false
-			}
-			continue
-		}
-		if quote != 0 {
-			if escaped {
-				escaped = false
-			} else if ch == '\\' {
-				escaped = true
-			} else if ch == quote {
-				quote = 0
-			}
-			continue
-		}
-		switch ch {
-		case '#':
-			inComment = true
-		case '\'', '"':
-			quote = ch
-		case '(', '[', '{':
-			stack = append(stack, callDelimiter{char: ch, pos: index})
-		case ')', ']', '}':
-			if len(stack) != 0 && delimitersMatch(stack[len(stack)-1].char, ch) {
+	tokens, _ := scanRuntimeTokens(source, 0)
+	for _, token := range tokens {
+		switch token.kind {
+		case runtimeTokenLeftParen, runtimeTokenLeftBracket, runtimeTokenLeftBrace:
+			stack = append(stack, callDelimiter{char: token.text[0], pos: token.start})
+		case runtimeTokenRightParen, runtimeTokenRightBracket, runtimeTokenRightBrace:
+			if len(stack) != 0 && delimitersMatch(stack[len(stack)-1].char, token.text[0]) {
 				stack = stack[:len(stack)-1]
 			}
 		}
@@ -673,6 +656,15 @@ func (p *PythonProgram) ItemCompletionsAt(fileName string, query ItemCompletionQ
 				continue
 			}
 			label, insertText, filterText := formatItemCompletion(c, key, query.Quote)
+			if query.Raw {
+				if strings.ContainsAny(label, string(query.Quote)+"\r\n") || strings.HasSuffix(label, "\\") {
+					continue
+				}
+				insertText = label
+			}
+			if query.Quote != 0 {
+				filterText = insertText
+			}
 			if label == "" || query.Prefix != "" && !strings.HasPrefix(strings.ToLower(filterText), strings.ToLower(query.Prefix)) {
 				continue
 			}
@@ -1022,8 +1014,12 @@ func formatItemCompletion(c *checker.Checker, key *checker.Type, quote byte) (la
 	if key.Flags()&checker.TypeFlagsStringLiteral != 0 {
 		value := key.AsLiteralType().Value().(string)
 		if quote != 0 {
-			escaped := strings.ReplaceAll(value, "\\", "\\\\")
-			escaped = strings.ReplaceAll(escaped, string(quote), "\\"+string(quote))
+			escaped := strconv.Quote(value)
+			escaped = escaped[1 : len(escaped)-1]
+			if quote == '\'' {
+				escaped = strings.ReplaceAll(escaped, `\"`, `"`)
+				escaped = strings.ReplaceAll(escaped, "'", "\\'")
+			}
 			return value, escaped, value
 		}
 		quoted := strconv.Quote(value)

@@ -10,6 +10,9 @@ from adapter import BUILD, analyze, black, format_source, validate_output
 
 # These test actual source syntax, not Python-encoded approximations.
 CASES = {
+    "annotation_only_classes": 'class User:\n id:str\n\nclass Me(User):\n id:"Shloimy"\n',
+    "short_annotation_only_suite": "class A:\n x:T\n",
+    "nested_annotation_only_suite": "def f():\n if True:\n  value:str\n",
     "generic_lambda": "identity=lambda<T extends str> value:T:value\n",
     "callable_lambda_parameter": "invoke=lambda callback:()->str:callback()\n",
     "nested_typed_lambdas": "outer=lambda x:T:lambda y:U:y\n",

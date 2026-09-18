@@ -90,8 +90,8 @@ func TestItemCompletionRecoversAfterBracketAndQuote(t *testing.T) {
 		quote     byte
 	}{
 		{source: "value[]", offset: len("value["), recovered: `value["__completion__"]`},
-		{source: `value["`, offset: len(`value["`), recovered: `value["__completion__"]`, quote: '"'},
-		{source: `value['na`, offset: len(`value['na`), recovered: `value['__completion__']`, quote: '\''},
+		{source: `value["`, offset: len(`value["`), recovered: `value[""]`, quote: '"'},
+		{source: `value['na`, offset: len(`value['na`), recovered: `value['na']`, quote: '\''},
 	} {
 		recovered, query, ok := pythonfrontend.PrepareItemCompletion(test.source, test.offset)
 		if !ok || recovered != test.recovered || query.Quote != test.quote {

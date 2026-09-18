@@ -11,11 +11,17 @@ const python = process.env.TYPED_PYTHON_TOOLS ?? path.resolve(extension, "../../
 const helper = path.join(extension, "scripts/python-provider.py");
 const cachePath = await mkdtemp(path.join(tmpdir(), "ty-jedi-test-"));
 const compiled = await build({ entryPoints: [path.join(extension, "src/pythonToolProcess.ts")], bundle: true, platform: "node", format: "esm", write: false });
-const { safeRange, runPythonTool } = await import(`data:text/javascript;base64,${Buffer.from(compiled.outputFiles[0].text).toString("base64")}`);
+const { safeRange, runPythonTool, allowsPythonCompletion } = await import(`data:text/javascript;base64,${Buffer.from(compiled.outputFiles[0].text).toString("base64")}`);
 const projection = { text: "x      = '😀'", version: 1, erased: [[1, 7]], errors: [] };
 assert(safeRange(projection, 0, 1));
 assert(safeRange(projection, 7, projection.text.length));
 for (const range of [[1, 1], [7, 7], [0, 2], [5, 9], [-1, 0], [0, 100]]) assert(!safeRange(projection, ...range));
+const contextual = { ...projection, noCompletion: [[10, 12]] };
+assert(!allowsPythonCompletion(projection, 0), "older server without context must fail closed");
+assert(allowsPythonCompletion(contextual, 0));
+assert(!allowsPythonCompletion(contextual, 3), "erased type syntax is native-only");
+assert(!allowsPythonCompletion(contextual, 10), "string content is native-only");
+assert(!allowsPythonCompletion(contextual, 12), "unterminated string endpoint is native-only");
 
 async function request(method, source, extra = {}) {
     return runPythonTool(python, helper, { method, source, root, cachePath, path: path.join(root, "provider-smoke.py"), erased: false, ...extra }, new AbortController().signal);

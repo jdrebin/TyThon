@@ -69,6 +69,9 @@ func BuildProgram(c *checker.Checker, inputs []SourceInput) *PythonProgram {
 	texts := make(map[string]string, len(inputs))
 	fileNames := make([]string, 0, len(inputs))
 	for _, input := range inputs {
+		if !IsTypedSource(input.FileName) {
+			continue
+		}
 		texts[input.FileName] = input.Text
 		fileNames = append(fileNames, input.FileName)
 	}
@@ -153,19 +156,14 @@ func BuildProgram(c *checker.Checker, inputs []SourceInput) *PythonProgram {
 	for _, state := range states {
 		module := state.module
 		files := module.Files
-		implementationFile := files.Implementation
-		if implementationFile == "" {
-			implementationFile = files.TypedImplementation
-		}
+		implementationFile := files.TypedImplementation
 		if implementationFile != "" {
 			runtimeSource := texts[implementationFile]
-			if files.TypedImplementation != "" {
-				_, erasureErrors := EraseTypedPython(runtimeSource)
-				for _, erasureError := range erasureErrors {
-					program.Diagnostics = append(program.Diagnostics, ProgramDiagnostic{
-						Kind: ProgramDiagnosticErasure, FileName: implementationFile, Range: erasureError.Range, Message: erasureError.Message,
-					})
-				}
+			_, erasureErrors := EraseTypedPython(runtimeSource)
+			for _, erasureError := range erasureErrors {
+				program.Diagnostics = append(program.Diagnostics, ProgramDiagnostic{
+					Kind: ProgramDiagnosticErasure, FileName: implementationFile, Range: erasureError.Range, Message: erasureError.Message,
+				})
 			}
 			runtimeFile, parseErrors := ParseRuntimeFileWithOptions(implementationFile, runtimeSource, true)
 			for _, parseError := range parseErrors {

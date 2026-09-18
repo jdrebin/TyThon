@@ -5,6 +5,14 @@ export interface Projection {
     version: number;
     erased: [number, number][];
     errors: string[];
+    noCompletion?: [number, number][];
+}
+
+export function allowsPythonCompletion(projection: Projection, offset: number): boolean {
+    // Missing context from an older server is not permission to supplement an
+    // intentionally empty native result. Fail closed until versions match.
+    return projection.noCompletion !== undefined && safeRange(projection, offset, offset)
+        && !projection.noCompletion.some(([start, end]) => start <= offset && offset <= end);
 }
 
 export function safeRange(projection: Projection, start: number, end: number): boolean {

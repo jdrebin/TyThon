@@ -11,7 +11,7 @@ export class BundledFormatter implements vscode.Disposable {
 
     constructor(private readonly context: vscode.ExtensionContext,
         private readonly output: vscode.OutputChannel) {
-        const selector = { language: "typed-python", scheme: "file" };
+        const selector = { language: "typed-python", scheme: "file", pattern: "**/*.ty" };
         this.subscriptions = [
             vscode.languages.registerDocumentFormattingEditProvider(selector, {
                 provideDocumentFormattingEdits: (document, _options, token) => this.format(document, token),
@@ -42,7 +42,7 @@ export class BundledFormatter implements vscode.Disposable {
             if (current()) {
                 const message = error instanceof Error ? error.message : String(error);
                 this.output.appendLine(`Formatter: ${message}`);
-                void vscode.window.showWarningMessage(`tython formatter: ${message}`);
+                void vscode.window.showWarningMessage(`TyThon formatter: ${message}`);
             }
             return [];
         } finally {

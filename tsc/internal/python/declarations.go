@@ -99,6 +99,9 @@ type ClassDeclaration struct {
 	Metaclass      TypeExpr
 	Members        []ObjectMemberDeclaration
 	Ambient        bool
+	// Runtime-provided members (class-body values, methods, and descriptors).
+	// Bare annotations are not values in Python.
+	InitializedAttributes map[string]bool
 }
 
 func (*ClassDeclaration) DeclarationKind() DeclarationKind { return DeclarationClass }

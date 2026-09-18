@@ -12,19 +12,25 @@ func TestProjectDiscoverySharesOverlaysDeclarationsAndCycles(t *testing.T) {
 		"/app/package/values.d.ty":   "from ..main import result\nvalue: int\n",
 		"/app/package/values.py":     "value = 1\n",
 	}
-	read := func(name string) (string, bool) { value, ok := disk[name]; return value, ok }
+	read := func(name string) (string, bool) {
+		if !IsTypedSource(name) {
+			t.Fatalf("attempted to read non-TyThon source: %s", name)
+		}
+		value, ok := disk[name]
+		return value, ok
+	}
 	sources := CollectProjectSources(t.Context(), []string{"/app/main.ty"}, []string{"/app"},
 		map[string]string{"/app/package/values.d.ty": "value: str\n"}, read)
-	if len(sources) != 4 || sources["/app/package/values.d.ty"] != "value: str\n" {
+	if len(sources) != 3 || sources["/app/package/values.d.ty"] != "value: str\n" {
 		t.Fatalf("missing dependency or overwritten overlay: %v", sources)
 	}
 	sources = CollectProjectSources(t.Context(), []string{"/app/main.ty"}, []string{"/app"}, nil, read)
-	if len(sources) != 4 {
+	if len(sources) != 3 {
 		t.Fatalf("cyclic import discovery: %v", sources)
 	}
 	delete(disk, "/app/package/values.d.ty")
 	sources = CollectProjectSources(t.Context(), []string{"/app/main.ty"}, []string{"/app"}, nil, read)
-	if len(sources) != 3 {
+	if len(sources) != 2 {
 		t.Fatalf("deleted declaration retained: %v", sources)
 	}
 	ctx, cancel := context.WithCancel(t.Context())
@@ -32,5 +38,17 @@ func TestProjectDiscoverySharesOverlaysDeclarationsAndCycles(t *testing.T) {
 	sources = CollectProjectSources(ctx, []string{"/app/main.ty"}, []string{"/app"}, nil, read)
 	if len(sources) != 1 {
 		t.Fatalf("cancelled traversal loaded dependencies: %v", sources)
+	}
+}
+
+func TestProjectDiscoveryIgnoresPythonEntriesAndOverlays(t *testing.T) {
+	sources := CollectProjectSources(t.Context(), []string{"/app/main.py"}, []string{"/app"},
+		map[string]string{"/app/main.py": "from dependency import value\n"},
+		func(name string) (string, bool) {
+			t.Fatalf("Python input triggered a source read: %s", name)
+			return "", false
+		})
+	if len(sources) != 0 {
+		t.Fatalf("Python sources were enrolled: %v", sources)
 	}
 }

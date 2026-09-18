@@ -72,9 +72,11 @@ Optional Jedi/Ruff integrations still require separate Python packages.
 
 `build` preserves the source layout under `dist/` and overwrites generated
 outputs there, never sibling source files. Use `--out-dir PATH` to change the
-destination and `--root-dir PATH` to set the source/import root (default: current
-directory). Discovered local `.py` dependencies and package initializers are
-copied unchanged; data files and dynamically loaded modules are not bundled.
+destination and `--root-dir PATH` to override the inferred common source root.
+Python package directories are kept intact. TyThon checks only `.ty` and `.d.ty`
+files and emits typed implementations, including `__init__.ty`. Ordinary `.py`
+files are not read, checked, or copied into the output. Supply Python runtime
+dependencies separately; data files and dynamically loaded modules are not bundled.
 For a package entry point, run `python -m package.module` from the output root.
 Relative data-file paths still depend on the working directory. Use `check`
 when you only want diagnostics. To explore without writing your own
@@ -640,6 +642,19 @@ type Constructor = typeof User
 ```
 
 `User` in a type position means an instance; `typeof User` means the class value.
+
+Initializers infer a receiver assertion from required storage and check that it
+is initialized on every normal exit. Optional attributes stay optional. An
+explicit contract can use `def __init__(self, id: str) -> asserts self is { id: str }:`;
+the assertion erases, and the runtime result is still `None`.
+
+Cooperative `super().__init__` calls must satisfy the current initializer's
+parameters and every participating base initializer, accept `**kwargs`, and
+forward a keyword spread. Parent initializer signatures need not match. Their
+assertions form a union, so calling super guarantees only their common required
+attributes; explicit base calls can establish individual base guarantees.
+See [initializer contracts and the terminal-object guard](TYTHON_PLAN.md#initializer-assertions-and-cooperative-forwarding).
+
 Bound methods account for the receiver. Method declarations can also appear
 inside structural types; callable-valued properties use a colon:
 

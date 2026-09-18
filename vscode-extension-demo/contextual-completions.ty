@@ -1,0 +1,20 @@
+# Try Ctrl+Space inside the quoted values, including before the first character.
+type Mode = "read" | "write"
+type Options = { "mode": Mode, "encoding": "utf-8" | "ascii" }
+
+def select_mode(mode: Mode) -> Mode:
+    return mode
+
+def configure(options: Options) -> Mode:
+    return options["mode"]
+
+selected = select_mode("read")
+named = select_mode(mode="write")
+mode: Mode = "read"
+options: Options = {"mode": "read", "encoding": "utf-8"}
+nested = configure({"mode": "write", "encoding": "ascii"})
+modes: []Mode = ["read", "write"]
+
+# Within options["..."], suggest only its keys. An ordinary string stays quiet.
+encoding = options["encoding"]
+ordinary = "no unrelated variable suggestions here"

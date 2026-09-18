@@ -106,8 +106,8 @@ await writeFile(path.join(pending, "INSTALL.md"), `# Install this tython alpha\n
     `2. Activate your project's Python virtual environment and run:\n\n` +
     '```sh\n' + `python -m pip install ./${path.basename(wheel)}\ntython --version\ntython check app.ty\ntython build app.ty\npython dist/app.py\n` + '```\n\n' +
     `Replace app.ty with your file. build preserves the source layout in dist/ (override with --out-dir). ` +
-    `Use --root-dir to select a source/import root other than the current directory. Generated outputs are overwritten; source files are protected. ` +
-    `Discovered local .py modules and package initializers are copied; assets and dynamic imports are not bundled. ` +
+    `The source root is inferred from the common source directory, preserving Python packages; use --root-dir to override it. Generated outputs are overwritten; source files are protected. ` +
+    `Only .ty and .d.ty sources are checked; typed implementations and package initializers are emitted. Ordinary .py files are not read or copied. Supply Python runtime dependencies separately; assets and dynamic imports are not bundled. ` +
     `For a package entry point, run python -m package.module from the output root. Old output files are not automatically cleaned. ` +
     `check writes no output. No Go, Node, repository clone, or compilation is required.\n\n` +
     `To try bundled examples, use **tython: Open Preview Examples**. Formatting is supplied by the VSIX. ` +

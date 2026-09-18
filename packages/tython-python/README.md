@@ -22,12 +22,13 @@ Replace `VERSION` with the downloaded filename. `python -m tython_cli` is also
 available if your environment's scripts directory is not on PATH.
 
 `check` writes no output files. `build` checks first, then preserves the source
-layout under `dist/`, including typed imports and unchanged local `.py`
-dependencies collected by the compiler. **It overwrites generated outputs in
+layout under `dist/`, including typed imports. Ordinary `.py` files are not
+read, checked, or copied; supply those runtime dependencies separately.
+**It overwrites generated outputs in
 that directory**, never source files. Old outputs are not automatically deleted.
 Use `--out-dir PATH` to select a different destination, and `--root-dir PATH`
-(also accepted by `check`) to set the source/import root instead of the current
-directory. For example: `tython build --root-dir src --out-dir dist src/app.ty`.
+(also accepted by `check`) to override the inferred common source directory.
+Python package directories are kept intact. For example: `tython build --root-dir src --out-dir dist src/app.ty`.
 For packages with relative imports, run `python -m package.module` from the
 output root. Package initializers are preserved, including `__init__.ty` erasure.
 Non-code assets and dynamically loaded modules are not automatically copied;

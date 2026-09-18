@@ -425,6 +425,7 @@ func (p *runtimeFileParser) parseAssignment(line logicalLine) RuntimeStatement {
 	}
 	left := strings.TrimSpace(line.text[:equals])
 	right := strings.TrimSpace(line.text[equals+1:])
+	rightOffset := line.contentStart + equals + 1 + strings.Index(line.text[equals+1:], right)
 	name := left
 	var annotation TypeExpr
 	if colon := findTopLevel(left, ':'); colon >= 0 {
@@ -449,7 +450,7 @@ func (p *runtimeFileParser) parseAssignment(line logicalLine) RuntimeStatement {
 	if !isSimpleIdentifier(name) {
 		if (strings.HasPrefix(name, "(") || strings.HasPrefix(name, "[") || findTopLevel(name, ',') >= 0) && annotation == nil {
 			if binding, ok := parseRuntimeBindingTarget(name, logicalLineTextOffset(line, name)); ok {
-				expression, errors := ParseRuntimeExpression(right, logicalLineTextOffset(line, right))
+				expression, errors := ParseRuntimeExpression(right, rightOffset)
 				p.diagnostics = append(p.diagnostics, errors...)
 				if expression != nil {
 					return &RuntimeAssignment{Loc: lineRange(line), Binding: &binding, Value: expression}
@@ -459,14 +460,14 @@ func (p *runtimeFileParser) parseAssignment(line logicalLine) RuntimeStatement {
 		}
 		target, errors := ParseRuntimeExpression(left, logicalLineTextOffset(line, left))
 		p.diagnostics = append(p.diagnostics, errors...)
-		value, valueErrors := ParseRuntimeExpression(right, logicalLineTextOffset(line, right))
+		value, valueErrors := ParseRuntimeExpression(right, rightOffset)
 		p.diagnostics = append(p.diagnostics, valueErrors...)
 		if target == nil || value == nil {
 			return nil
 		}
 		return &RuntimeAssignment{Loc: lineRange(line), Target: target, Value: value}
 	}
-	expression, errors := ParseRuntimeExpression(right, logicalLineTextOffset(line, right))
+	expression, errors := ParseRuntimeExpression(right, rightOffset)
 	p.diagnostics = append(p.diagnostics, errors...)
 	if expression == nil {
 		return nil
@@ -832,6 +833,9 @@ func (p *runtimeFileParser) parseTry(start int, indent int) (*RuntimeTryStatemen
 			statement.ElseBody = body
 		case text == "finally:":
 			statement.Finally = body
+			if statement.Finally == nil {
+				statement.Finally = []RuntimeStatement{}
+			}
 		default:
 			return statement, index
 		}
@@ -840,7 +844,7 @@ func (p *runtimeFileParser) parseTry(start int, indent int) (*RuntimeTryStatemen
 		}
 		index = clauseEnd
 	}
-	if len(statement.Handlers) == 0 && len(statement.Finally) == 0 {
+	if len(statement.Handlers) == 0 && statement.Finally == nil {
 		p.diagnostics = append(p.diagnostics, RuntimeParseError{Range: statement.Loc, Message: "try statement requires except or finally"})
 	}
 	return statement, index
@@ -2028,6 +2032,12 @@ func scanRuntimeTokens(source string, offset int) ([]runtimeToken, []RuntimePars
 	var diagnostics []RuntimeParseError
 	for index := 0; index < len(source); {
 		r, width := utf8.DecodeRuneInString(source[index:])
+		if r == '#' {
+			for index < len(source) && source[index] != '\n' {
+				index++
+			}
+			continue
+		}
 		if unicode.IsSpace(r) {
 			index += width
 			continue

@@ -21,13 +21,14 @@ func isPythonInput(fileName string) bool {
 
 func runPython(args []string) int {
 	if len(args) == 0 || len(args) == 1 && (args[0] == "-h" || args[0] == "--help") {
-		fmt.Fprintln(os.Stderr, "usage: tsgo --python [--emit] [--out-dir=dist] [--root-dir=.] [--type-at=BYTE_OFFSET] [--stdin-file=PATH] <module.py|module.ty|module.d.ty> [...]")
+		fmt.Fprintln(os.Stderr, "usage: tsgo --python [--emit] [--out-dir=dist] [--root-dir=PATH] [--type-at=BYTE_OFFSET] [--stdin-file=PATH] <module.ty|module.d.ty> [...]")
 		return 2
 	}
 	emit := false
 	typeAt := -1
 	stdinFile := ""
 	rootDir, outDir := ".", "dist"
+	explicitRoot := false
 	files := make([]string, 0, len(args))
 	for _, argument := range args {
 		if argument == "--emit" {
@@ -39,6 +40,7 @@ func runPython(args []string) int {
 			continue
 		}
 		if strings.HasPrefix(argument, "--root-dir=") {
+			explicitRoot = true
 			rootDir = strings.TrimPrefix(argument, "--root-dir=")
 			continue
 		}
@@ -74,6 +76,9 @@ func runPython(args []string) int {
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return 2
+	}
+	if !explicitRoot {
+		rootDir = inferredPythonSourceRoot(inputs, rootDir)
 	}
 	if stdinFile != "" {
 		absolute, err := filepath.Abs(stdinFile)
@@ -139,6 +144,34 @@ func collectPythonInputs(args []string) ([]pythonfrontend.SourceInput, error) {
 	return collectPythonInputsAtRoot(args, "")
 }
 
+func inferredPythonSourceRoot(inputs []pythonfrontend.SourceInput, cwd string) string {
+	var emitted []string
+	for _, input := range inputs {
+		if pythonfrontend.GetFileKind(input.FileName) != pythonfrontend.FileKindDeclaration {
+			emitted = append(emitted, filepath.ToSlash(input.FileName))
+		}
+	}
+	if len(emitted) == 0 {
+		return cwd
+	}
+	root := filepath.Clean(outputpaths.GetComputedCommonSourceDirectory(emitted, filepath.ToSlash(cwd), true))
+	// Unlike a JS directory, a Python package's directory is part of its
+	// runtime identity. Keep packages intact so relative imports still work.
+	for {
+		packageRoot := false
+		for _, extension := range []string{".py", ".ty"} {
+			if _, err := os.Stat(filepath.Join(root, "__init__"+extension)); err == nil {
+				packageRoot = true
+			}
+		}
+		parent := filepath.Dir(root)
+		if !packageRoot || parent == root {
+			return root
+		}
+		root = parent
+	}
+}
+
 func collectPythonInputsAtRoot(args []string, rootDir string) ([]pythonfrontend.SourceInput, error) {
 	entries := []string{}
 	roots := []string{}
@@ -150,8 +183,8 @@ func collectPythonInputsAtRoot(args []string, rootDir string) ([]pythonfrontend.
 		if err != nil {
 			return nil, err
 		}
-		if pythonfrontend.GetFileKind(absolute) == pythonfrontend.FileKindUnknown {
-			return nil, fmt.Errorf("unsupported Python input extension: %s", argument)
+		if !pythonfrontend.IsTypedSource(absolute) {
+			return nil, fmt.Errorf("TyThon only checks .ty and .d.ty files: %s", argument)
 		}
 		if _, err := os.Stat(absolute); err != nil {
 			return nil, err
@@ -186,8 +219,8 @@ func collectPythonInputsAtRoot(args []string, rootDir string) ([]pythonfrontend.
 }
 
 // Keep Python erasure in the frontend and path relocation in the existing TS
-// output mapper. Only filesystem validation and copying ordinary .py modules
-// belong here; neither import expressions nor runtime behavior are rewritten.
+// output mapper. Only filesystem validation belongs here; neither import
+// expressions nor runtime behavior are rewritten. Ordinary .py files are not inputs.
 func emitPythonProgram(program *pythonfrontend.PythonProgram, inputs []pythonfrontend.SourceInput, rootDir, outDir string) error {
 	root, err := filepath.Abs(rootDir)
 	if err != nil {
@@ -221,22 +254,16 @@ func emitPythonProgram(program *pythonfrontend.PythonProgram, inputs []pythonfro
 	type outputFile struct{ name, text string }
 	outputs := []outputFile{}
 	for _, module := range program.Modules {
-		source, text := module.Files.Implementation, module.Implementation
-		if module.Files.TypedImplementation != "" {
-			source = module.Files.TypedImplementation
-			erased, diagnostics := pythonfrontend.EraseTypedPython(module.TypedSource)
-			if len(diagnostics) != 0 {
-				return fmt.Errorf("cannot emit %s: %s", source, diagnostics[0].Message)
-			}
-			text = erased
-		}
+		source := module.Files.TypedImplementation
 		if source == "" { // Declaration-only modules have no runtime output.
 			continue
 		}
-		name := filepath.FromSlash(outputpaths.GetSourceFilePathInNewDir(filepath.ToSlash(source), filepath.ToSlash(out), filepath.ToSlash(root), tspath.EnsureTrailingDirectorySeparator(filepath.ToSlash(root)), true))
-		if module.Files.TypedImplementation != "" {
-			name, _ = pythonfrontend.OutputFileName(name)
+		text, diagnostics := pythonfrontend.EraseTypedPython(module.TypedSource)
+		if len(diagnostics) != 0 {
+			return fmt.Errorf("cannot emit %s: %s", source, diagnostics[0].Message)
 		}
+		name := filepath.FromSlash(outputpaths.GetSourceFilePathInNewDir(filepath.ToSlash(source), filepath.ToSlash(out), filepath.ToSlash(root), tspath.EnsureTrailingDirectorySeparator(filepath.ToSlash(root)), true))
+		name, _ = pythonfrontend.OutputFileName(name)
 		if !inside(out, name) {
 			return fmt.Errorf("output %s escapes the output directory", name)
 		}

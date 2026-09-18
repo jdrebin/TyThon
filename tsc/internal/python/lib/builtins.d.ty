@@ -189,7 +189,13 @@ def range(start: int, stop: int, step: int) -> Iterator<int>: ...
 declare def enumerate<T>(values: Iterable<T>, start: int = ...) -> Iterator<(int, T)>: ...
 declare def next<T>(iterator: Iterator<T>) -> T: ...
 
-declare def object() -> object: ...
+# The terminal initializer is also an ordinary descriptor. Binding it is useful
+# for distinguishing object.__init__ from a cooperative sibling initializer.
+object: (() -> object) & {
+    __init__: ((self: object) -> None) & {
+        __get__: (instance: object, owner: any = ...) -> () -> None
+    }
+}
 
 declare class bytes(Some):
     (bytes_type): unknown

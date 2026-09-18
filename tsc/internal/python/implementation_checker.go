@@ -3,6 +3,7 @@ package python
 import (
 	"fmt"
 	"math/big"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -17,12 +18,23 @@ type ImplementationDiagnostic struct {
 }
 
 type ImplementationCheckResult struct {
-	File        *RuntimeSourceFile
-	Values      map[string]*checker.Type
-	Expressions []TypedRuntimeExpression
-	Scopes      []RuntimeScopeSnapshot
-	Calls       []CheckedRuntimeCall
-	Diagnostics []ImplementationDiagnostic
+	File           *RuntimeSourceFile
+	Values         map[string]*checker.Type
+	Expressions    []TypedRuntimeExpression
+	Scopes         []RuntimeScopeSnapshot
+	Calls          []CheckedRuntimeCall
+	StringContexts []RuntimeStringContext
+	Diagnostics    []ImplementationDiagnostic
+}
+
+// Completion metadata only: contextual types still come from ordinary checking
+// and the native call binder/inference. Keep speculative overload contexts as
+// well as the selected one, just as TS's string completion queries candidates.
+type RuntimeStringContext struct {
+	Range    TextRange
+	Type     *checker.Type
+	Keys     bool
+	UsedKeys []TypedRuntimeExpression
 }
 
 type TypedRuntimeExpression struct {
@@ -65,7 +77,11 @@ func checkImplementation(file *RuntimeSourceFile, environment *CheckerTypeEnviro
 	}
 	state := implementationChecker{types: environment, result: result, scope: result.Values, imports: imports}
 	state.presenceReferences = runtimePresenceReferences(file)
+	diagnosticStart := len(environment.diagnostics)
 	state.checkStatements(file.Statements, nil)
+	for _, diagnostic := range environment.diagnostics[diagnosticStart:] {
+		result.Diagnostics = append(result.Diagnostics, ImplementationDiagnostic{Range: diagnostic.Range, Message: diagnostic.Message})
+	}
 	result.Values = visibleRuntimeScope(result.Values)
 	return result
 }
@@ -127,6 +143,9 @@ func (s *implementationChecker) checkStatements(statements []RuntimeStatement, r
 			}
 			if returnType != nil && !s.types.checker.IsTypeAssignableTo(actual, returnType) {
 				s.report(statement.Range(), fmt.Sprintf("returned type %s is not assignable to %s", FormatType(s.types.checker, actual), FormatType(s.types.checker, returnType)))
+			}
+			if s.initialization != nil && !isRuntimeNever(actual) {
+				s.initialization.returns = append(s.initialization.returns, copyRuntimeScope(s.scope))
 			}
 			return true
 		case *RuntimeYieldStatement:
@@ -373,6 +392,11 @@ func (s *implementationChecker) checkAssignmentTarget(target RuntimeExpr, value 
 			s.report(loc, err.Error())
 		} else {
 			s.setMemberPresence(target, true)
+			if state := s.initialization; state != nil {
+				if name, ok := target.Target.(*RuntimeNameExpr); ok && name.Name == state.receiver {
+					s.scope[initializationValuePrefix+state.receiver+"."+target.Name] = value
+				}
+			}
 		}
 	case *RuntimeItemExpr:
 		receiver := s.typeOf(target.Target)
@@ -391,6 +415,9 @@ func (s *implementationChecker) checkAssignmentTarget(target RuntimeExpr, value 
 }
 
 func (s *implementationChecker) typeOfWithContext(expression RuntimeExpr, expected *checker.Type) *checker.Type {
+	if literal, ok := expression.(*RuntimeLiteralExpr); ok && literal.Kind == RuntimeLiteralString && expected != nil {
+		s.result.StringContexts = append(s.result.StringContexts, RuntimeStringContext{Range: literal.Range(), Type: expected})
+	}
 	previousConst := s.constContext
 	s.constContext = s.constContext || s.types.checker.IsConstTypeVariable(expected)
 	defer func() { s.constContext = previousConst }()
@@ -701,6 +728,10 @@ func (s *implementationChecker) checkWith(statement *RuntimeWithStatement, retur
 func (s *implementationChecker) checkTry(statement *RuntimeTryStatement, returnType *checker.Type) bool {
 	base := copyRuntimeScope(s.scope)
 	previous := s.scope
+	returnStart := 0
+	if s.initialization != nil {
+		returnStart = len(s.initialization.returns)
+	}
 
 	tryScope := copyRuntimeScope(base)
 	s.scope = tryScope
@@ -753,6 +784,12 @@ func (s *implementationChecker) checkTry(statement *RuntimeTryStatement, returnT
 		}
 	}
 
+	var pendingConstructorReturns []map[string]*checker.Type
+	if s.initialization != nil && statement.Finally != nil {
+		pendingConstructorReturns = s.initialization.returns[returnStart:]
+		s.initialization.returns = s.initialization.returns[:returnStart]
+		continuing = append(continuing, pendingConstructorReturns...)
+	}
 	if len(continuing) == 0 {
 		continuing = append(continuing, base)
 	}
@@ -761,6 +798,9 @@ func (s *implementationChecker) checkTry(statement *RuntimeTryStatement, returnT
 		finallyReturns := s.checkStatements(statement.Finally, returnType)
 		if finallyReturns {
 			return true
+		}
+		if len(pendingConstructorReturns) != 0 {
+			s.initialization.returns = append(s.initialization.returns, copyRuntimeScope(s.scope))
 		}
 	}
 	return successReturns && (len(statement.Handlers) == 0 || allHandlersReturn)
@@ -1037,6 +1077,7 @@ type runtimeBindingFrame struct {
 }
 
 type implementationChecker struct {
+	initialization                 *constructorInitialization
 	constContext                   bool
 	presenceReferences             []string
 	assertedPresence               RuntimeExpr
@@ -1060,8 +1101,12 @@ type implementationChecker struct {
 	imports                        runtimeImportResolver
 }
 
-func (s *implementationChecker) checkFunction(statement *RuntimeFunctionStatement, receiver *checker.Type, declaredCallable *checker.Type, constructorWritable map[string]bool, declarationKind QuickInfoKind) *checker.Type {
-	runtimeCallable := s.types.resolveCheckerCallable(statement.Signature, nil, false, nil)
+func (s *implementationChecker) checkFunction(statement *RuntimeFunctionStatement, receiver *checker.Type, declaredCallable *checker.Type, constructorWritable map[string]bool, declarationKind QuickInfoKind, required ...*classInitializationContract) *checker.Type {
+	previousInitialization := s.initialization
+	previousSuperType := s.currentSuperType
+	s.initialization = nil
+	defer func() { s.initialization = previousInitialization; s.currentSuperType = previousSuperType }()
+	runtimeCallable := s.types.resolveCheckerCallable(statement.Signature, s.typeScope, false, nil)
 	runtimeSignatures := s.types.checker.GetSignaturesOfType(runtimeCallable, checker.SignatureKindCall)
 	if len(runtimeSignatures) == 0 {
 		return nil
@@ -1122,7 +1167,8 @@ func (s *implementationChecker) checkFunction(statement *RuntimeFunctionStatemen
 	}
 	s.typeScope = previousDefaultTypeScope
 	if len(parameterTypes) != 0 {
-		runtimeCallable = s.types.resolveCheckerCallableWithParameterTypes(statement.Signature, nil, false, nil, parameterTypes)
+		initializerPredicate := s.types.checker.GetTypePredicateOfSignature(contractSignature)
+		runtimeCallable = s.types.resolveCheckerCallableWithParameterTypes(statement.Signature, s.typeScope, false, nil, parameterTypes)
 		runtimeSignatures = s.types.checker.GetSignaturesOfType(runtimeCallable, checker.SignatureKindCall)
 		if len(runtimeSignatures) == 0 {
 			return nil
@@ -1131,7 +1177,12 @@ func (s *implementationChecker) checkFunction(statement *RuntimeFunctionStatemen
 		if typedImplementation && !hasOverloads {
 			inferredCallable := runtimeCallable
 			if receiver != nil {
-				inferredCallable = s.types.resolveCheckerCallableWithParameterTypes(statement.Signature, nil, true, nil, parameterTypes)
+				inferredCallable = s.types.resolveCheckerCallableWithParameterTypes(statement.Signature, s.typeScope, true, nil, parameterTypes)
+			}
+			if statement.Name == "__init__" && receiver != nil && initializerPredicate != nil {
+				boundSignatures := s.types.checker.GetSignaturesOfType(inferredCallable, checker.SignatureKindCall)
+				inferredCallable = s.types.checker.NewObjectTypeFromCallSignatures([]*checker.Signature{s.types.checker.SignatureWithInitializationAssertion(boundSignatures[0], initializerPredicate.Type(), statement.Signature.Parameters[0].Name, true)})
+				runtimeCallable = s.types.checker.NewObjectTypeFromCallSignatures([]*checker.Signature{s.types.checker.SignatureWithInitializationAssertion(runtimeSignature, initializerPredicate.Type(), statement.Signature.Parameters[0].Name, false)})
 			}
 			if signatures := s.types.checker.GetSignaturesOfType(inferredCallable, checker.SignatureKindCall); len(signatures) != 0 {
 				contractSignature = signatures[0]
@@ -1226,6 +1277,20 @@ func (s *implementationChecker) checkFunction(statement *RuntimeFunctionStatemen
 	s.bindings = append(s.bindings, runtimeBindingFrame{parameters: parameterNames, locals: bindingInfo.locals, globals: bindingInfo.globals, nonlocals: bindingInfo.nonlocals, declared: make(map[string]*checker.Type)})
 	returnType := s.types.checker.GetReturnTypeOfSignature(contractSignature)
 	inferReturn := !statement.ReturnAnnotated && (typedImplementation || declaredCallable == nil)
+	initializer := statement.Name == "__init__" && receiver != nil
+	if initializer {
+		inferReturn = false
+		returnType = s.types.checker.GetNullType()
+		if len(statement.Signature.Parameters) == 0 {
+			s.report(statement.NameLoc, "an instance initializer requires a receiver parameter")
+		}
+		if statement.ReturnAnnotated && statement.Signature.Predicate == nil && !s.types.checker.IsTypeIdenticalTo(s.types.checker.GetReturnTypeOfSignature(runtimeSignature), returnType) {
+			s.report(statement.Signature.ReturnType.Range(), "an initializer return annotation must be None or an assertion on its receiver")
+		}
+		if statement.Signature.Predicate != nil && (!statement.Signature.Predicate.Asserts || len(statement.Signature.Parameters) == 0 || statement.Signature.Predicate.ParameterName != statement.Signature.Parameters[0].Name) {
+			s.report(statement.Signature.Predicate.NameLoc, "an initializer must assert its receiver")
+		}
+	}
 	hasYield := runtimeStatementsContainYield(statement.Body)
 	if inferReturn {
 		s.inferringReturn = true
@@ -1278,8 +1343,15 @@ func (s *implementationChecker) checkFunction(statement *RuntimeFunctionStatemen
 		s.readonlyAssignmentReceiverName = statement.Signature.Parameters[0].Name
 		s.readonlyAssignmentReceiver = receiver
 		s.constructorWritableAttributes = constructorWritable
+		if len(required) != 0 {
+			s.startConstructorInitialization(statement.Signature.Parameters[0].Name, required[0])
+			s.configureInitializer(statement, contractSignature)
+		}
 	}
 	returns := s.checkStatements(statement.Body, returnType)
+	if s.initialization != nil {
+		s.finishConstructorInitialization(statement.Signature.Parameters[0].Name, returns)
+	}
 	var inferredExposedReturn *checker.Type
 	implementationSignature := runtimeSignature
 	if inferReturn {
@@ -1479,6 +1551,12 @@ func (s *implementationChecker) checkClass(statement *RuntimeClassStatement) {
 		}
 		s.typeScope[statement.Name] = instance
 	}
+	previousTypeScope := s.typeScope
+	s.typeScope = copyCheckerScope(previousTypeScope)
+	for name, t := range classScope {
+		s.typeScope[name] = t
+	}
+	defer func() { s.typeScope = previousTypeScope }()
 	var baseTypes []*checker.Type
 	for _, base := range declaration.Bases {
 		baseExpression := base.Runtime
@@ -1491,10 +1569,7 @@ func (s *implementationChecker) checkClass(statement *RuntimeClassStatement) {
 		baseTypes = append(baseTypes, s.types.resolveCheckerType(baseExpression, classScope))
 	}
 	if len(baseTypes) != 0 {
-		parts := make([]*checker.Type, 0, len(baseTypes)+1)
-		parts = append(parts, baseTypes...)
-		parts = append(parts, instance)
-		if refreshed, err := s.types.checker.MergeObjectFacetTypes(parts); err == nil {
+		if refreshed, err := s.types.checker.ExtendPythonClassFacetTypes(baseTypes, instance); err == nil {
 			// A base class may have gained inferred class-body attributes when its
 			// implementation was checked. Refresh the already-declared subclass
 			// instance before checking its own body, while retaining its identity.
@@ -1505,9 +1580,30 @@ func (s *implementationChecker) checkClass(statement *RuntimeClassStatement) {
 			s.report(statement.Range(), err.Error())
 		}
 	}
-	instance, constructor := s.inferImplementationInstance(statement, instance)
+	instance, constructor, inferredFields := s.inferImplementationInstance(statement, instance)
 	if GetFileKind(s.result.File.FileName) == FileKindTypedImplementation {
 		instance, classValue = s.inferClassValueAttributes(statement, instance, classValue)
+	}
+	ownInitializer := false
+	for _, member := range declaration.Members {
+		ownInitializer = ownInitializer || member.Kind == ObjectMemberMethod && member.Name == "__init__"
+	}
+	if !ownInitializer {
+		var initializers []*checker.Type
+		for _, base := range baseTypes {
+			if initializer := s.types.checker.GetAttributeType(base, s.types.checker.GetStringLiteralType("__init__")); initializer != nil {
+				initializers = append(initializers, initializer)
+			}
+		}
+		if len(initializers) != 0 {
+			initializer := s.types.checker.GetUnionType(initializers)
+			s.types.checker.SetObjectAttributeType(instance, "__init__", initializer)
+			s.types.checker.SetObjectAttributeType(classValue, "__init__", s.types.checker.UnboundPythonInitializer(initializer, instance))
+		}
+	}
+	s.types.initializeClassAssertions(declaration, instance, classValue, inferredFields...)
+	if ok && symbol.Instance != instance && instance.Flags()&checker.TypeFlagsIntersection == 0 && s.types.checker.PopulateObjectTypeFromType(symbol.Instance, instance) {
+		instance = symbol.Instance
 	}
 	if ok && symbol.Class != nil && instance.Flags()&checker.TypeFlagsIntersection != 0 {
 		symbol.Instance = instance
@@ -1530,11 +1626,13 @@ func (s *implementationChecker) checkClass(statement *RuntimeClassStatement) {
 	s.currentClassValue = classValue
 	s.currentSuperType = nil
 	if len(baseTypes) != 0 {
-		if superType, err := s.types.checker.MergeObjectFacetTypes(baseTypes); err == nil {
+		if superType, err := s.types.checker.ExtendPythonClassFacetTypes(baseTypes, s.types.checker.NewObjectTypeFromFacets(checker.ObjectFacets{})); err == nil {
 			s.currentSuperType = superType
 		}
 	}
 	constructorWritable := make(map[string]bool)
+	required := s.requiredClassAttributes(statement, declaration, instance, inferredFields...)
+	hasConstructor := false
 	for _, member := range declaration.Members {
 		if member.ConstructorWritable && !member.Static && member.Name != "" {
 			constructorWritable[member.Name] = true
@@ -1548,6 +1646,9 @@ func (s *implementationChecker) checkClass(statement *RuntimeClassStatement) {
 		function, ok := child.(*RuntimeFunctionStatement)
 		if !ok {
 			continue
+		}
+		if function.Name == "__init__" {
+			hasConstructor = true
 		}
 		var receiver *checker.Type
 		var declaredCallable *checker.Type
@@ -1569,7 +1670,7 @@ func (s *implementationChecker) checkClass(statement *RuntimeClassStatement) {
 			direct := s.declaredClassCallable(declaration, function.Name, classScope)
 			declaredCallable = direct
 		}
-		inferredReturn := s.checkFunction(function, receiver, declaredCallable, constructorWritable, QuickInfoMethod)
+		inferredReturn := s.checkFunction(function, receiver, declaredCallable, constructorWritable, QuickInfoMethod, required)
 		if inferredReturn != nil && containsString(function.Decorators, "property") {
 			s.types.checker.SetObjectAttributeType(instance, function.Name, inferredReturn)
 			for _, constructor := range s.types.checker.GetSignaturesOfType(classValue, checker.SignatureKindCall) {
@@ -1581,6 +1682,14 @@ func (s *implementationChecker) checkClass(statement *RuntimeClassStatement) {
 			if signatures := s.types.checker.GetSignaturesOfType(unbound, checker.SignatureKindCall); len(signatures) != 0 {
 				s.types.checker.PopulateObjectTypeFromType(unbound, s.types.callableWithReturnType(signatures[0], inferredReturn))
 			}
+		}
+	}
+	if !hasConstructor {
+		for name, loc := range required.required {
+			if required.inherited[name] {
+				continue
+			}
+			s.report(loc, fmt.Sprintf("attribute %q has no initializer and is not definitely assigned in __init__", name))
 		}
 	}
 }
@@ -1665,7 +1774,7 @@ func (s *implementationChecker) declaredClassCallable(declaration *ClassDeclarat
 	return result
 }
 
-func (s *implementationChecker) inferImplementationInstance(statement *RuntimeClassStatement, instance *checker.Type) (*checker.Type, *checker.ObjectFacetCall) {
+func (s *implementationChecker) inferImplementationInstance(statement *RuntimeClassStatement, instance *checker.Type) (*checker.Type, *checker.ObjectFacetCall, []string) {
 	known := map[string]struct{}{}
 	for _, name := range s.types.checker.SortedAttributeNames(instance) {
 		known[name] = struct{}{}
@@ -1679,7 +1788,7 @@ func (s *implementationChecker) inferImplementationInstance(statement *RuntimeCl
 			continue
 		}
 		declared := s.types.checker.GetAttributeType(instance, s.types.checker.GetStringLiteralType("__init__"))
-		runtimeCallable := s.types.resolveCheckerCallable(function.Signature, nil, false, nil)
+		runtimeCallable := s.types.resolveCheckerCallable(function.Signature, s.typeScope, false, nil)
 		runtimeSignatures := s.types.checker.GetSignaturesOfType(runtimeCallable, checker.SignatureKindCall)
 		if len(runtimeSignatures) == 0 {
 			continue
@@ -1748,7 +1857,13 @@ func (s *implementationChecker) inferImplementationInstance(statement *RuntimeCl
 		constructor = &call
 		s.scope = previous
 	}
-	return current, constructor
+	fields := make([]string, 0, len(inferred))
+	for name := range inferred {
+		if _, declared := known[name]; !declared {
+			fields = append(fields, name)
+		}
+	}
+	return current, constructor, fields
 }
 
 func (s *implementationChecker) checkIf(statement *RuntimeIfStatement, returnType *checker.Type) bool {
@@ -1849,6 +1964,17 @@ func (s *implementationChecker) narrowCondition(condition RuntimeExpr, truthy bo
 
 func (s *implementationChecker) narrowConditionType(condition RuntimeExpr, reference string, source *checker.Type, truthy bool) *checker.Type {
 	c := s.types.checker
+	if positive, ok := s.initializerObjectGuard(condition); ok {
+		if reference == initializerObjectReference {
+			return c.NarrowTypeByEquality(source, c.GetBooleanLiteralType(true), truthy == positive)
+		}
+		if s.initialization != nil && source == s.initialization.superCallable {
+			// Callable structural equality cannot identify a Python descriptor.
+			// Keep its contract; the separate native flow fact selects the
+			// zero-argument terminal signature at the call site.
+			return source
+		}
+	}
 	if strings.HasPrefix(reference, presencePrefix) {
 		if path, positive := runtimePresenceGuard(condition); path != "" && reference == presencePrefix+path {
 			return c.NarrowTypeByEquality(source, c.GetBooleanLiteralType(true), truthy == positive)
@@ -1985,6 +2111,14 @@ func (s *implementationChecker) checkedPredicateCall(call *RuntimeCallExpr) (*ch
 		return nil, "", false, false
 	}
 	asserts := predicate.Kind() == checker.TypePredicateKindAssertsIdentifier || predicate.Kind() == checker.TypePredicateKindAssertsThis
+	if predicate.Kind() == checker.TypePredicateKindThis || predicate.Kind() == checker.TypePredicateKindAssertsThis {
+		if attribute, ok := call.Target.(*RuntimeAttributeExpr); ok {
+			if receiver, ok := attribute.Target.(*RuntimeNameExpr); ok {
+				return signature, receiver.Name, asserts, true
+			}
+		}
+		return nil, "", false, false
+	}
 	arguments := runtimeObjectCallArguments(call, s.types.checker.GetAnyType())
 	argumentIndex, _, ok := s.types.checker.GetObjectCallPredicateArgument(signature, arguments)
 	if !ok || argumentIndex < 0 || argumentIndex >= len(call.Arguments) {
@@ -2504,7 +2638,40 @@ func (s *implementationChecker) typeOfCallWithContext(expression *RuntimeCallExp
 			}
 		}
 	}
+	// Editing an argument can leave later required arguments missing or select
+	// an early overload before other candidates are checked. Expose the binder's
+	// parameter contexts as well; constraint/literal extraction stays in TS.
+	if slices.ContainsFunc(expression.Arguments, func(argument RuntimeCallArgument) bool {
+		literal, ok := argument.Value.(*RuntimeLiteralExpr)
+		return ok && literal.Kind == RuntimeLiteralString
+	}) {
+		for _, signature := range c.GetSignaturesOfType(callable, checker.SignatureKindCall) {
+			contexts := c.GetObjectCallArgumentCompletionTypes(signature, arguments)
+			for index, argument := range expression.Arguments {
+				if literal, ok := argument.Value.(*RuntimeLiteralExpr); ok && literal.Kind == RuntimeLiteralString && index < len(contexts) && contexts[index] != nil {
+					s.result.StringContexts = append(s.result.StringContexts, RuntimeStringContext{Range: literal.Range(), Type: contexts[index]})
+				}
+			}
+		}
+	}
+	forwardingValid := s.checkSuperForwarding(expression, callable)
+	cooperative := s.initialization != nil && callable == s.initialization.superCallable
+	objectBranch := false
+	if cooperative && s.initialization.terminal {
+		fact := s.scope[initializerObjectReference]
+		objectBranch = fact != nil && c.IsTypeAssignableTo(fact, c.GetBooleanLiteralType(true))
+		if objectBranch {
+			callable = c.NewObjectTypeFromFacets(checker.ObjectFacets{Calls: []checker.ObjectFacetCall{{ReturnType: c.GetNullType()}}})
+		}
+	}
 	resolution, diagnostics := c.ResolveObjectCallWithContext(callable, arguments, typeArguments, expected)
+	if cooperative && !objectBranch && resolution.Signature != nil {
+		assertion := s.initialization.contract.superAssertion
+		if assertion == nil {
+			assertion = c.NewObjectTypeFromFacets(checker.ObjectFacets{})
+		}
+		resolution.Signature = c.SignatureWithInitializationAssertion(resolution.Signature, assertion, s.initialization.receiver, true)
+	}
 	var contextualTypes []*checker.Type
 	var constContexts []bool
 	if resolution.Signature != nil {
@@ -2533,6 +2700,9 @@ func (s *implementationChecker) typeOfCallWithContext(expression *RuntimeCallExp
 		s.report(expression.Range(), diagnostic.Message)
 	}
 	if resolution.Signature != nil {
+		if len(diagnostics) == 0 && forwardingValid && !isRuntimeNever(resolution.ReturnType) {
+			s.applyBaseInitialization(expression, resolution.Signature, cooperative && !objectBranch)
+		}
 		s.replaceExpressionType(expression.Target.Range(), s.types.callableWithReturnType(resolution.Signature, resolution.ReturnType))
 		for _, argument := range expression.Arguments {
 			if argument.Kind == RuntimeCallKeyword {
@@ -2662,6 +2832,7 @@ func (s *implementationChecker) typeOfDictionary(expression *RuntimeCollectionEx
 	c := s.types.checker
 	items := make([]checker.ObjectFacetIndex, 0, len(expression.Entries))
 	var explicitKeys []*checker.Type
+	var completionKeys []TypedRuntimeExpression
 	setItem := func(key *checker.Type, value *checker.Type, readonly, optional bool) {
 		for index := range items {
 			if c.IsTypeIdenticalTo(items[index].Key, key) {
@@ -2690,6 +2861,9 @@ func (s *implementationChecker) typeOfDictionary(expression *RuntimeCollectionEx
 		}
 		key := s.typeOf(entry.Key)
 		explicitKeys = append(explicitKeys, key)
+		if entry.Key != nil && expected != nil {
+			completionKeys = append(completionKeys, TypedRuntimeExpression{Range: entry.Key.Range(), Type: key})
+		}
 		var context *checker.Type
 		if expected != nil {
 			context = c.GetItemType(expected, key)
@@ -2701,6 +2875,15 @@ func (s *implementationChecker) typeOfDictionary(expression *RuntimeCollectionEx
 			s.recordNamedType(entry.Key.Range(), value, QuickInfoItem, FormatType(c, key))
 		}
 		setItem(key, value, s.constContext, false)
+	}
+	if expected != nil {
+		for _, entry := range expression.Entries {
+			if entry.Key != nil {
+				s.result.StringContexts = append(s.result.StringContexts, RuntimeStringContext{
+					Range: entry.Key.Range(), Type: expected, Keys: true, UsedKeys: completionKeys,
+				})
+			}
+		}
 	}
 	return c.MarkPythonFreshLiteral(s.types.newMappingType(items), explicitKeys)
 }

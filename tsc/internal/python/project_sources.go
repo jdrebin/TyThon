@@ -12,14 +12,19 @@ import (
 // The host supplies its filesystem and unsaved overlays; binding and dependency
 // semantics remain in BuildProgram. This is not an installed-package resolver.
 func CollectProjectSources(ctx context.Context, entries, roots []string, overlays map[string]string, read func(string) (string, bool)) map[string]string {
-	files := maps.Clone(overlays)
-	if files == nil {
-		files = map[string]string{}
+	files := map[string]string{}
+	for name, text := range overlays {
+		if IsTypedSource(name) {
+			files[filepath.Clean(name)] = text
+		}
 	}
 	queue := []string{}
 	queued := map[string]bool{}
 	load := func(name string) bool {
 		name = filepath.Clean(name)
+		if !IsTypedSource(name) {
+			return false
+		}
 		if _, ok := files[name]; ok {
 			return true
 		}
@@ -30,11 +35,14 @@ func CollectProjectSources(ctx context.Context, entries, roots []string, overlay
 		return false
 	}
 	addModule := func(name string) {
+		if !IsTypedSource(name) {
+			return
+		}
 		stem, ok := ModuleStem(name)
 		if !ok {
 			return
 		}
-		for _, sibling := range []string{stem + ".d.ty", stem + ".ty", stem + ".py"} {
+		for _, sibling := range []string{stem + ".d.ty", stem + ".ty"} {
 			if !queued[sibling] && load(sibling) {
 				queued[sibling] = true
 				queue = append(queue, sibling)
@@ -65,7 +73,7 @@ func CollectProjectSources(ctx context.Context, entries, roots []string, overlay
 			if !withinRoot {
 				break
 			}
-			addModule(filepath.Join(directory, "__init__.py"))
+			addModule(filepath.Join(directory, "__init__.ty"))
 		}
 		for _, request := range ScanImportRequests(files[name]) {
 			if imported := resolveProjectImport(name, request, roots, load); imported != "" {
@@ -88,8 +96,8 @@ func resolveProjectImport(importer string, request ImportRequest, roots []string
 	for _, root := range roots {
 		base := filepath.Join(root, modulePath)
 		for _, candidate := range []string{
-			base + ".d.ty", base + ".ty", base + ".py",
-			filepath.Join(base, "__init__.d.ty"), filepath.Join(base, "__init__.ty"), filepath.Join(base, "__init__.py"),
+			base + ".d.ty", base + ".ty",
+			filepath.Join(base, "__init__.d.ty"), filepath.Join(base, "__init__.ty"),
 		} {
 			if exists(candidate) {
 				return candidate

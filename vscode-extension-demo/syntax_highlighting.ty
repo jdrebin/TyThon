@@ -16,7 +16,7 @@ interface Named<T>(Valued<T>):
     "name": bytes
     (str): bytes
     (*<"">): int
-    whenever: (t: str) -> str
+    def whenever(t: str) -> str
 
 declare class Box<T>:
     static empty: bool

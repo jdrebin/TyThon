@@ -106,6 +106,9 @@ func newPythonLanguageService(fs vfs.FS) *pythonLanguageService {
 }
 
 func (s *pythonLanguageService) open(uri lsproto.DocumentUri, version int32, text string) {
+	if !pythonfrontend.IsTypedSource(uri.FileName()) {
+		return
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.documents[filepath.Clean(uri.FileName())] = pythonDocument{text: text, version: version}
@@ -113,6 +116,9 @@ func (s *pythonLanguageService) open(uri lsproto.DocumentUri, version int32, tex
 }
 
 func (s *pythonLanguageService) change(uri lsproto.DocumentUri, version int32, changes []lsproto.TextDocumentContentChangePartialOrWholeDocument) error {
+	if !pythonfrontend.IsTypedSource(uri.FileName()) {
+		return nil
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	fileName := filepath.Clean(uri.FileName())
@@ -133,6 +139,9 @@ func (s *pythonLanguageService) change(uri lsproto.DocumentUri, version int32, c
 }
 
 func (s *pythonLanguageService) close(uri lsproto.DocumentUri) {
+	if !pythonfrontend.IsTypedSource(uri.FileName()) {
+		return
+	}
 	s.mu.Lock()
 	delete(s.documents, filepath.Clean(uri.FileName()))
 	s.invalidateRequests()
@@ -165,11 +174,19 @@ func (s *pythonLanguageService) computeCompletion(ctx context.Context, params *l
 	var typeQuery pythonfrontend.TypeCompletionQuery
 	var callQuery pythonfrontend.CallCompletionQuery
 	var visibleQuery pythonfrontend.VisibleNameCompletionQuery
+	var stringQuery pythonfrontend.StringCompletionQuery
+	stringOK := false
 	itemOK, typeOK, callOK, visibleOK := false, false, false, false
 	if !attributeOK {
 		recovered, itemQuery, itemOK = pythonfrontend.PrepareItemCompletion(source, offset)
 	}
 	if !attributeOK && !itemOK {
+		recovered, stringQuery, stringOK = pythonfrontend.PrepareStringCompletion(source, offset)
+	}
+	if stringOK && !stringQuery.Supported {
+		return lsproto.CompletionItemsOrListOrNull{List: &lsproto.CompletionList{Items: []*lsproto.CompletionItem{}}}, nil
+	}
+	if !attributeOK && !itemOK && !stringOK {
 		typeQuery, typeOK = pythonfrontend.PrepareTypeCompletion(source, offset)
 		if typeOK {
 			recovered = source
@@ -202,6 +219,8 @@ func (s *pythonLanguageService) computeCompletion(ctx context.Context, params *l
 		entries = program.ItemCompletionsAt(fileName, itemQuery)
 	case typeOK:
 		entries = program.TypeCompletionsAt(fileName, typeQuery)
+	case stringOK:
+		entries = program.StringCompletionsAt(fileName, stringQuery)
 	default:
 		if callOK {
 			entries = append(entries, program.KeywordArgumentCompletionsAt(fileName, callQuery)...)
@@ -243,14 +262,21 @@ func (s *pythonLanguageService) computeCompletion(ctx context.Context, params *l
 			// them to outrank ordinary members in clients that re-sort results.
 			sortText = string(ls.SortTextOptionalMember)
 		}
+		var filterText *string
+		if entry.Kind == pythonfrontend.CompletionKindItem {
+			// Quoted/escaped insertions can differ from their readable label.
+			filterText = &entry.InsertText
+		}
 		items = append(items, &lsproto.CompletionItem{
-			Label: entry.Label, Kind: &kind, Detail: &entry.Detail, SortText: &sortText,
+			Label: entry.Label, Kind: &kind, Detail: &entry.Detail, SortText: &sortText, FilterText: filterText,
 			TextEdit: &lsproto.TextEditOrInsertReplaceEdit{TextEdit: &lsproto.TextEdit{
 				Range: lsproto.Range{Start: rangeStart, End: rangeEnd}, NewText: entry.InsertText,
 			}},
 		})
 	}
-	return lsproto.CompletionItemsOrListOrNull{List: &lsproto.CompletionList{Items: items}}, nil
+	// Prefix-filtered lists must be refreshed when the user changes the prefix.
+	incomplete := stringOK && stringQuery.Prefix != "" || itemOK && itemQuery.Prefix != ""
+	return lsproto.CompletionItemsOrListOrNull{List: &lsproto.CompletionList{Items: items, IsIncomplete: incomplete}}, nil
 }
 
 func (s *pythonLanguageService) computeHover(ctx context.Context, params *lsproto.HoverParams, encoding lsproto.PositionEncodingKind) (lsproto.HoverResponse, error) {
@@ -392,7 +418,7 @@ func pythonDiagnostic(source string, diagnostic pythonfrontend.ProgramDiagnostic
 		return nil, false
 	}
 	severity := lsproto.DiagnosticSeverityError
-	sourceName := "typed-python"
+	sourceName := "TyThon"
 	message := pythonfrontend.FormatDiagnosticMessage(diagnostic.Message)
 	return &lsproto.Diagnostic{
 		Range: lsproto.Range{Start: start, End: end}, Severity: &severity, Source: &sourceName,
@@ -525,10 +551,13 @@ func (s *pythonLanguageService) computeSignatureHelp(ctx context.Context, params
 }
 
 func (s *pythonLanguageService) sourceSnapshot(ctx context.Context, fileName string) (map[string]string, string, bool) {
+	if !pythonfrontend.IsTypedSource(fileName) {
+		return nil, "", false
+	}
 	s.mu.RLock()
 	sources := make(map[string]string)
 	for openFile, document := range s.documents {
-		if pythonfrontend.GetFileKind(openFile) != pythonfrontend.FileKindUnknown {
+		if pythonfrontend.IsTypedSource(openFile) {
 			sources[openFile] = document.text
 		}
 	}

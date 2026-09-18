@@ -1,3 +1,5 @@
+// Modified for tython: expose existing literal-completion candidates to the Python frontend.
+
 package ls
 
 import (
@@ -1917,6 +1919,12 @@ func walkUpParentheses(node *ast.Node) *ast.Node {
 	default:
 		return node
 	}
+}
+
+// GetStringLiteralCompletionTypes exposes the same candidate extraction to
+// frontends whose contextual types do not originate in a JavaScript AST.
+func GetStringLiteralCompletionTypes(t *checker.Type, typeChecker *checker.Checker) []*checker.StringLiteralType {
+	return getStringLiteralTypes(t, nil, typeChecker)
 }
 
 func getStringLiteralTypes(t *checker.Type, uniques *collections.Set[string], typeChecker *checker.Checker) []*checker.StringLiteralType {

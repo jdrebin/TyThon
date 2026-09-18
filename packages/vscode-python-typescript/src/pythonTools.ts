@@ -3,7 +3,7 @@ import { existsSync } from "node:fs";
 import * as vscode from "vscode";
 import { PythonExtension } from "@vscode/python-extension";
 import { LanguageClient } from "vscode-languageclient/node";
-import { Projection, runPythonTool, safeRange } from "./pythonToolProcess";
+import { Projection, runPythonTool, safeRange, allowsPythonCompletion } from "./pythonToolProcess";
 import { DocumentationCache } from "./documentationCache";
 import { resolvePythonStub } from "./pythonTypeServer";
 
@@ -28,7 +28,7 @@ export class PythonTools implements vscode.Disposable {
 
     constructor(private readonly context: vscode.ExtensionContext, private readonly client: LanguageClient,
         private readonly output: vscode.OutputChannel) {
-        const selector = { language: "typed-python", scheme: "file" };
+        const selector = { language: "typed-python", scheme: "file", pattern: "**/*.ty" };
         this.subscriptions.push(this.diagnostics,
             vscode.commands.registerCommand("pythonTypeScript.importDeclarations", () => this.importDeclarations()),
             vscode.workspace.onDidOpenTextDocument(document => this.schedule(document)),
@@ -59,7 +59,7 @@ export class PythonTools implements vscode.Disposable {
 
     private enabled(document: vscode.TextDocument): boolean {
         return !this.disposed && vscode.workspace.isTrusted && document.languageId === "typed-python"
-            && document.uri.scheme === "file" && !document.fileName.endsWith(".d.ty")
+            && document.uri.scheme === "file" && document.fileName.endsWith(".ty") && !document.fileName.endsWith(".d.ty")
             && vscode.workspace.getConfiguration("pythonTypeScript", document.uri).get<boolean>("tools.enabled", true);
     }
 
@@ -115,6 +115,7 @@ export class PythonTools implements vscode.Disposable {
             const projection = await this.projection(document);
             if (projection.version !== version || projection.errors.length || controller.signal.aborted) return;
             if (position && !safeRange(projection, document.offsetAt(position), document.offsetAt(position))) return;
+            if (method === "complete" && position && !allowsPythonCompletion(projection, document.offsetAt(position))) return;
             const { python, interpreter } = await this.pythonEnvironment(document);
             const value = await runPythonTool<T>(python, this.context.asAbsolutePath("scripts/python-provider.py"), {
                 method, source: projection.text, erased: projection.erased.length > 0,

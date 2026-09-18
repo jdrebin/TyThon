@@ -84,6 +84,7 @@ type CheckerTypeEnvironment struct {
 	aliases            []*checkerAliasResolution
 	installingBuiltins bool
 	inferParameters    map[*checker.Type]bool
+	builtinObjectValue *checker.Type
 }
 
 func NewCheckerTypeEnvironment(c *checker.Checker) *CheckerTypeEnvironment {
@@ -133,6 +134,7 @@ func (e *CheckerTypeEnvironment) installBuiltinDeclarations() {
 }
 
 func (e *CheckerTypeEnvironment) installBuiltinTypeSurfaces() {
+	e.builtinObjectValue = e.values["object"]
 	// Editable declarations may be incomplete. Keep their ordinary diagnostics
 	// instead of dereferencing a missing bootstrap declaration during a request.
 	for _, name := range []string{"*", "Some", "Object", "bytes", "complex", "NotImplementedType", "EllipsisType", "StringProtocol", "IntProtocol", "FloatProtocol", "BoolProtocol"} {
@@ -512,6 +514,10 @@ func (e *CheckerTypeEnvironment) resolveCheckerTypeWorker(expression TypeExpr, s
 				return target
 			}
 		}
+		if e.symbols[expression.Name] == nil && e.intrinsicType(expression.Name) == nil {
+			e.reportChecker(expression.Range(), fmt.Sprintf("unknown type %q", expression.Name))
+			return e.checker.GetUnknownType()
+		}
 		return e.resolveCheckerSymbol(expression.Name)
 	case *LiteralTypeExpr:
 		return e.resolveCheckerLiteral(expression, scope)
@@ -561,6 +567,17 @@ func (e *CheckerTypeEnvironment) resolveCheckerTypeWorker(expression TypeExpr, s
 }
 
 func (e *CheckerTypeEnvironment) resolveTypeAttribute(target *checker.Type, name string, loc TextRange) *checker.Type {
+	declared := false
+	for _, property := range e.checker.GetPropertiesOfType(target) {
+		if property.Name == name {
+			declared = true
+			break
+		}
+	}
+	if target.Flags()&checker.TypeFlagsAny == 0 && !declared {
+		e.reportChecker(loc, fmt.Sprintf("type has no declared attribute %q", name))
+		return e.checker.GetUnknownType()
+	}
 	key := e.checker.NewPythonAttributeKeyType(e.checker.GetStringLiteralType(name))
 	result := e.checker.GetPythonIndexedAccessType(target, key)
 	if result == nil {
@@ -1237,6 +1254,7 @@ func (e *CheckerTypeEnvironment) resolveCheckerCallableWithParameterTypes(expres
 			ParameterName: expression.Predicate.ParameterName,
 			Type:          predicateType,
 			Asserts:       expression.Predicate.Asserts,
+			Receiver:      dropReceiver && len(expression.Parameters) != 0 && expression.Predicate.ParameterName == expression.Parameters[0].Name,
 		}
 	}
 	callable := e.checker.NewObjectTypeFromFacets(checker.ObjectFacets{Calls: []checker.ObjectFacetCall{{
@@ -1271,8 +1289,7 @@ func (e *CheckerTypeEnvironment) resolveCheckerInterface(declaration *InterfaceD
 		types = append(types, resolved)
 	}
 	instance, _ := e.resolveCheckerMembers(declaration.Members, scope)
-	types = append(types, instance)
-	result, err := e.checker.MergeObjectFacetTypes(types)
+	result, err := e.checker.ExtendObjectFacetTypes(types, instance)
 	if err != nil {
 		e.reportChecker(declaration.Range(), err.Error())
 		return e.checker.GetUnknownType()
@@ -1313,8 +1330,7 @@ func (e *CheckerTypeEnvironment) resolveCheckerClass(declaration *ClassDeclarati
 		bases = append(bases, e.resolveCheckerSymbol("Object"))
 	}
 	own, classValue := e.resolveCheckerMembers(declaration.Members, scope)
-	bases = append(bases, own)
-	instance, err := e.checker.MergeObjectFacetTypes(bases)
+	instance, err := e.checker.ExtendPythonClassFacetTypes(bases, own)
 	if err != nil {
 		e.reportChecker(declaration.Range(), err.Error())
 		instance = e.checker.GetUnknownType()
@@ -1324,6 +1340,7 @@ func (e *CheckerTypeEnvironment) resolveCheckerClass(declaration *ClassDeclarati
 	}
 	e.checkIndexConstraints(instance, declaration.Range())
 	e.checkIndexConstraints(classValue, declaration.Range())
+	e.initializeClassAssertions(declaration, instance, classValue)
 
 	constructor := checker.ObjectFacetCall{ReturnType: instance}
 	for _, parameter := range declaration.TypeParameters {
@@ -1331,8 +1348,10 @@ func (e *CheckerTypeEnvironment) resolveCheckerClass(declaration *ClassDeclarati
 			constructor.TypeParameters = append(constructor.TypeParameters, typeParameter)
 		}
 	}
+	hasInitializer := false
 	for _, member := range declaration.Members {
 		if member.Kind == ObjectMemberMethod && member.Name == "__init__" && member.Signature != nil {
+			hasInitializer = true
 			callable := e.resolveCheckerCallable(member.Signature, scope, true, instance)
 			signature := e.checker.GetSignaturesOfType(callable, checker.SignatureKindCall)[0]
 			constructor.TypeParameters = append(constructor.TypeParameters, signature.TypeParameters()...)
@@ -1345,6 +1364,21 @@ func (e *CheckerTypeEnvironment) resolveCheckerClass(declaration *ClassDeclarati
 		}
 	}
 	classValueWithCall := e.checker.NewObjectTypeFromFacets(checker.ObjectFacets{Calls: []checker.ObjectFacetCall{constructor}})
+	if !hasInitializer {
+		if initializer := e.checker.GetAttributeType(instance, e.checker.GetStringLiteralType("__init__")); initializer != nil {
+			inherited := e.checker.NewObjectTypeFromFacets(checker.ObjectFacets{Attributes: []checker.ObjectFacetMember{{Name: "__init__", Type: e.checker.UnboundPythonInitializer(initializer, instance)}}})
+			if merged, err := e.checker.MergeObjectFacetTypes([]*checker.Type{classValue, inherited}); err == nil {
+				classValue = merged
+			}
+			var signatures []*checker.Signature
+			for _, signature := range e.checker.GetSignaturesOfType(initializer, checker.SignatureKindCall) {
+				signatures = append(signatures, e.checker.SignatureForPythonConstruction(signature, instance, constructor.TypeParameters...))
+			}
+			if len(signatures) != 0 {
+				classValueWithCall = e.checker.NewObjectTypeFromCallSignatures(signatures)
+			}
+		}
+	}
 	valueParts := []*checker.Type{classValue, classValueWithCall}
 	if declaration.Metaclass != nil {
 		valueParts = append([]*checker.Type{e.resolveCheckerType(declaration.Metaclass, scope)}, valueParts...)

@@ -43,6 +43,25 @@ type PythonSequenceElement struct {
 // conflict rule as multiple TypeScript interface inheritance: a duplicate
 // member must have an identical type.
 func (c *Checker) MergeObjectFacetTypes(types []*Type) (*Type, error) {
+	return c.mergeObjectFacetTypes(types, nil, false)
+}
+
+// ExtendObjectFacetTypes checks base/base conflicts separately from an own
+// declaration overriding a base member. Overrides use the native assignability
+// relation, just as an interface or class may specialize an inherited member.
+func (c *Checker) ExtendObjectFacetTypes(bases []*Type, own *Type) (*Type, error) {
+	return c.mergeObjectFacetTypes(append(slices.Clone(bases), own), own, false)
+}
+
+// Initializers are construction contracts, not substitutable instance methods.
+// Keep ordinary interface/member conflict checking unchanged. A union of base
+// initializers requires a call to be valid for every possible initializer;
+// unlike an overload intersection it cannot select just one convenient base.
+func (c *Checker) ExtendPythonClassFacetTypes(bases []*Type, own *Type) (*Type, error) {
+	return c.mergeObjectFacetTypes(append(slices.Clone(bases), own), own, true)
+}
+
+func (c *Checker) mergeObjectFacetTypes(types []*Type, own *Type, initializers bool) (*Type, error) {
 	members := make(ast.SymbolTable)
 	var primitiveBases []*Type
 	var indexInfos []*IndexInfo
@@ -86,6 +105,24 @@ func (c *Checker) MergeObjectFacetTypes(types []*Type) (*Type, error) {
 				explicitProperties[property.Name] = true
 			}
 			if existing := members[property.Name]; existing != nil {
+				if initializers && property.Name == "__init__" {
+					if t == own {
+						members[property.Name] = property
+					} else {
+						member := c.newSymbolEx(property.Flags, property.Name, ast.CheckFlagsNone)
+						c.valueSymbolLinks.Get(member).resolvedType = c.getUnionType([]*Type{c.getTypeOfSymbol(existing), c.getTypeOfSymbol(property)})
+						members[property.Name] = member
+					}
+					continue
+				}
+				if t == own {
+					if property.Flags&ast.SymbolFlagsOptional != 0 && existing.Flags&ast.SymbolFlagsOptional == 0 ||
+						!c.isTypeAssignableTo(c.getTypeOfSymbol(property), c.getTypeOfSymbol(existing)) {
+						return nil, fmt.Errorf("incompatible attribute override for %q", property.Name)
+					}
+					members[property.Name] = property
+					continue
+				}
 				if !c.isPropertyIdenticalTo(existing, property) {
 					return nil, fmt.Errorf("conflicting attribute declaration for %q", property.Name)
 				}
@@ -221,6 +258,7 @@ type ObjectFacetTypePredicate struct {
 	ParameterName string
 	Type          *Type
 	Asserts       bool
+	Receiver      bool
 }
 
 // ObjectFacets is the language-neutral boundary between a frontend and the
@@ -504,7 +542,59 @@ func (c *Checker) NewObjectTypeFromCallSignatures(signatures []*Signature) *Type
 func (c *Checker) SignatureWithReturnType(signature *Signature, returnType *Type) *Signature {
 	result := c.cloneSignature(signature)
 	result.resolvedReturnType = returnType
+	result.resolvedTypePredicate = c.getTypePredicateOfSignature(signature)
 	return result
+}
+
+// SignatureWithInitializationAssertion uses the existing TS assertion kind.
+// The Python initializer still returns None; only its receiver is asserted.
+func (c *Checker) SignatureWithInitializationAssertion(signature *Signature, asserted *Type, receiver string, bound bool) *Signature {
+	result := c.cloneSignature(signature)
+	kind, index := TypePredicateKindAssertsIdentifier, int32(0)
+	if bound {
+		kind, index = TypePredicateKindAssertsThis, -1
+	}
+	result.resolvedTypePredicate = c.newTypePredicate(kind, receiver, index, asserted)
+	result.resolvedReturnType = c.nullType
+	return result
+}
+
+// Construction returns an instance, rather than asserting the receiver of
+// __init__. Retain native generics and Python parameter binding metadata.
+func (c *Checker) SignatureForPythonConstruction(signature *Signature, instance *Type, typeParameters ...*Type) *Signature {
+	result := c.SignatureWithReturnType(signature, instance)
+	result.resolvedTypePredicate = c.noTypePredicate
+	result.typeParameters = append(slices.Clone(typeParameters), result.typeParameters...)
+	if signature.composite != nil {
+		parts := make([]*Signature, len(signature.composite.signatures))
+		for index, part := range signature.composite.signatures {
+			parts[index] = c.SignatureForPythonConstruction(part, instance, typeParameters...)
+		}
+		result.composite = &CompositeSignature{isUnion: signature.composite.isUnion, signatures: parts}
+	}
+	return result
+}
+
+// Python exposes an inherited method on the class value as an unbound method.
+// Adapt only receiver binding; keep native generic and assertion types intact.
+func (c *Checker) UnboundPythonInitializer(callable *Type, receiver *Type) *Type {
+	if callable.flags&TypeFlagsUnion != 0 {
+		return c.getUnionType(core.Map(callable.Types(), func(part *Type) *Type { return c.UnboundPythonInitializer(part, receiver) }))
+	}
+	var signatures []*Signature
+	for _, signature := range c.getSignaturesOfType(callable, SignatureKindCall) {
+		result := c.SignatureWithReturnType(signature, c.getReturnTypeOfSignature(signature))
+		self := c.newSymbolEx(ast.SymbolFlagsFunctionScopedVariable, "self", ast.CheckFlagsNone)
+		c.valueSymbolLinks.Get(self).resolvedType = receiver
+		result.parameters = append([]*ast.Symbol{self}, result.parameters...)
+		result.parameterKinds = append([]CallParameterKind{CallParameterPositionalOrKeyword}, objectCallParameterKinds(signature)...)
+		result.minArgumentCount++
+		if predicate := c.getTypePredicateOfSignature(signature); predicate != nil && predicate.kind == TypePredicateKindAssertsThis {
+			result.resolvedTypePredicate = c.newTypePredicate(TypePredicateKindAssertsIdentifier, "self", 0, predicate.t)
+		}
+		signatures = append(signatures, result)
+	}
+	return c.NewObjectTypeFromCallSignatures(signatures)
 }
 
 // SetObjectCallReturnType updates the call signatures of a frontend-owned
@@ -705,6 +795,13 @@ func (c *Checker) SetObjectTypeFacets(t *Type, facets ObjectFacets) {
 			kind := TypePredicateKindIdentifier
 			if call.Predicate.Asserts {
 				kind = TypePredicateKindAssertsIdentifier
+			}
+			if call.Predicate.Receiver {
+				kind = TypePredicateKindThis
+				if call.Predicate.Asserts {
+					kind = TypePredicateKindAssertsThis
+				}
+				parameterIndex = -1
 			}
 			predicate = c.newTypePredicate(kind, call.Predicate.ParameterName, int32(parameterIndex), call.Predicate.Type)
 		}
@@ -1021,9 +1118,7 @@ func (c *Checker) GetAttributeType(t *Type, key *Type) *Type {
 		nameType = name
 	}
 	if t.flags&TypeFlagsTypeVariable != 0 || nameType.flags&TypeFlagsTypeVariable != 0 {
-		result := c.newIndexedAccessType(t, key, AccessFlagsNone)
-		result.AsIndexedAccessType().pythonKeys = true
-		return result
+		return c.GetPythonIndexedAccessType(t, c.NewPythonAttributeKeyType(nameType))
 	}
 	if nameType.flags&TypeFlagsUnion != 0 {
 		return c.unionLookup(nameType.Types(), func(part *Type) *Type {

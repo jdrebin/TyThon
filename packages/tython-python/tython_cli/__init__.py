@@ -28,8 +28,7 @@ def main():
         command = commands.add_parser(name, help=help_text, description=help_text)
         command.add_argument(
             "--root-dir",
-            default=".",
-            help="Source/import root (default: current directory)",
+            help="Source/import root (default: inferred common source directory)",
         )
         if name == "build":
             command.add_argument(
@@ -38,14 +37,14 @@ def main():
                 help="Separate output directory (default: dist)",
             )
         command.add_argument(
-            "files", nargs="+", metavar="FILE", help=".ty, .d.ty, or .py input file"
+            "files", nargs="+", metavar="FILE", help=".ty or .d.ty input file"
         )
     args = parser.parse_args()
     executable = package / "bin/typed-python"
     # Absolute paths also prevent a filename beginning with '-' from being
     # interpreted as a compiler flag. Keep cwd intact for import resolution.
     files = [str(Path(file).absolute()) for file in args.files]
-    options = [f"--root-dir={Path(args.root_dir).absolute()}"]
+    options = [f"--root-dir={Path(args.root_dir).absolute()}"] if args.root_dir else []
     if args.command == "build":
         options.extend(["--emit", f"--out-dir={Path(args.out_dir).absolute()}"])
     try:
