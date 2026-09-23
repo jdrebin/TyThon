@@ -174,9 +174,10 @@ func (s *pythonLanguageService) computeCompletion(ctx context.Context, params *l
 	var typeQuery pythonfrontend.TypeCompletionQuery
 	var callQuery pythonfrontend.CallCompletionQuery
 	var visibleQuery pythonfrontend.VisibleNameCompletionQuery
+	var definitionQuery pythonfrontend.DefinitionCompletionQuery
 	var stringQuery pythonfrontend.StringCompletionQuery
 	stringOK := false
-	itemOK, typeOK, callOK, visibleOK := false, false, false, false
+	itemOK, typeOK, callOK, visibleOK, definitionOK := false, false, false, false, false
 	if !attributeOK {
 		recovered, itemQuery, itemOK = pythonfrontend.PrepareItemCompletion(source, offset)
 	}
@@ -188,7 +189,10 @@ func (s *pythonLanguageService) computeCompletion(ctx context.Context, params *l
 	}
 	if !attributeOK && !itemOK && !stringOK {
 		typeQuery, typeOK = pythonfrontend.PrepareTypeCompletion(source, offset)
+		definitionQuery, definitionOK = pythonfrontend.PrepareDefinitionCompletion(source, offset)
 		if typeOK {
+			recovered = source
+		} else if definitionOK {
 			recovered = source
 		} else {
 			callRecovered, preparedCall, preparedCallOK := pythonfrontend.PrepareCallCompletion(source, offset)
@@ -219,6 +223,8 @@ func (s *pythonLanguageService) computeCompletion(ctx context.Context, params *l
 		entries = program.ItemCompletionsAt(fileName, itemQuery)
 	case typeOK:
 		entries = program.TypeCompletionsAt(fileName, typeQuery)
+	case definitionOK:
+		entries = pythonfrontend.DefinitionCompletions(definitionQuery)
 	case stringOK:
 		entries = program.StringCompletionsAt(fileName, stringQuery)
 	default:
@@ -257,22 +263,29 @@ func (s *pythonLanguageService) computeCompletion(ctx context.Context, params *l
 			// Use the language service's existing local-declaration tier so named
 			// parameters sort before ordinary visible names inside a call.
 			sortText = string(ls.SortTextLocalDeclarationPriority)
-		} else if len(entry.Label) >= 2 && entry.Label[:2] == "__" {
+		} else if len(entry.Label) >= 2 && entry.Label[:2] == "__" && !definitionOK {
 			// Keep Python's common object dunders discoverable without allowing
 			// them to outrank ordinary members in clients that re-sort results.
 			sortText = string(ls.SortTextOptionalMember)
+		} else if definitionOK && entry.Label == "__init__" {
+			sortText = string(ls.SortTextLocalDeclarationPriority)
 		}
 		var filterText *string
 		if entry.Kind == pythonfrontend.CompletionKindItem {
 			// Quoted/escaped insertions can differ from their readable label.
 			filterText = &entry.InsertText
 		}
-		items = append(items, &lsproto.CompletionItem{
+		item := &lsproto.CompletionItem{
 			Label: entry.Label, Kind: &kind, Detail: &entry.Detail, SortText: &sortText, FilterText: filterText,
 			TextEdit: &lsproto.TextEditOrInsertReplaceEdit{TextEdit: &lsproto.TextEdit{
 				Range: lsproto.Range{Start: rangeStart, End: rangeEnd}, NewText: entry.InsertText,
 			}},
-		})
+		}
+		if entry.Snippet {
+			item.InsertTextFormat = new(lsproto.InsertTextFormatSnippet)
+			item.CommitCharacters = &[]string{}
+		}
+		items = append(items, item)
 	}
 	// Prefix-filtered lists must be refreshed when the user changes the prefix.
 	incomplete := stringOK && stringQuery.Prefix != "" || itemOK && itemQuery.Prefix != ""

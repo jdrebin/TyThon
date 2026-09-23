@@ -141,17 +141,20 @@ type ImportBinding struct {
 	Alias    string
 	TypeOnly bool
 	Star     bool
+	NameLoc  TextRange
+	AliasLoc TextRange
 }
 
 // ImportDeclaration represents both `import module` and
 // `from module import name`. Level counts leading dots for relative imports.
 type ImportDeclaration struct {
 	declarationBase
-	Module   string
-	Level    int
-	From     bool
-	TypeOnly bool
-	Bindings []ImportBinding
+	Module    string
+	ModuleLoc TextRange
+	Level     int
+	From      bool
+	TypeOnly  bool
+	Bindings  []ImportBinding
 }
 
 func (*ImportDeclaration) DeclarationKind() DeclarationKind { return DeclarationImport }

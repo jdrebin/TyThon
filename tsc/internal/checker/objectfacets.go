@@ -2,11 +2,9 @@ package checker
 
 import (
 	"fmt"
-	"os"
 	"slices"
 	"sort"
 	"strconv"
-	"time"
 
 	"github.com/microsoft/TypeScript/tsc/internal/ast"
 	"github.com/microsoft/TypeScript/tsc/internal/core"
@@ -789,14 +787,6 @@ func (c *Checker) SetObjectTypeFacets(t *Type, facets ObjectFacets) {
 				parameterType = c.unknownType
 			}
 			c.valueSymbolLinks.Get(symbol).resolvedType = parameterType
-			// #region agent log
-			if parameter.Type == nil {
-				if f, err := os.OpenFile("/home/user/projects/TypeScript/.cursor/debug-e531f3.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err == nil {
-					fmt.Fprintf(f, `{"sessionId":"e531f3","hypothesisId":"A","location":"objectfacets.go:isUnitType","message":"nil parameter.Type before isUnitType","data":{"name":%q,"kind":%d},"timestamp":%d}`+"\n", parameter.Name, parameter.Kind, time.Now().UnixMilli())
-					f.Close()
-				}
-			}
-			// #endregion
 			if isUnitType(parameterType) {
 				signatureFlags |= SignatureFlagsHasLiteralTypes
 			}
@@ -1180,9 +1170,17 @@ func (c *Checker) GetPythonIndexedAccessType(t *Type, key *Type) *Type {
 	if t.flags&TypeFlagsAny != 0 {
 		return c.anyType
 	}
-	if t.flags&TypeFlagsTypeVariable != 0 || key.flags&TypeFlagsTypeVariable != 0 || c.shouldDeferIndexType(t, IndexFlagsNone) {
-		result := c.newIndexedAccessType(t, key, AccessFlagsNone)
-		result.AsIndexedAccessType().pythonKeys = true
+	t = c.getReducedType(t)
+	// Same deferral predicate as TypeScript T[K]: generic objects, generic
+	// indices, and reducible generic unions stay as IndexedAccessType until
+	// instantiation, then resolve through the item facet.
+	if t.flags&TypeFlagsTypeVariable != 0 || key.flags&TypeFlagsTypeVariable != 0 || c.shouldDeferIndexedAccessType(t, key, nil) {
+		cacheKey := getIndexedAccessKey(t, key, AccessFlagsPythonKeys, nil)
+		if cached := c.indexedAccessTypes[cacheKey]; cached != nil {
+			return cached
+		}
+		result := c.newIndexedAccessType(t, key, AccessFlagsPythonKeys)
+		c.indexedAccessTypes[cacheKey] = result
 		return result
 	}
 	return c.GetItemType(t, key)
@@ -1193,6 +1191,11 @@ func (c *Checker) GetPythonIndexedAccessType(t *Type, key *Type) *Type {
 func (c *Checker) GetItemType(t *Type, key *Type) *Type {
 	if t.flags&TypeFlagsAny != 0 {
 		return c.anyType
+	}
+	if t.flags&TypeFlagsUnion != 0 {
+		return c.unionLookup(t.Types(), func(part *Type) *Type {
+			return c.GetItemType(part, key)
+		})
 	}
 	if key.flags&TypeFlagsUnion != 0 {
 		return c.unionLookup(key.Types(), func(part *Type) *Type {

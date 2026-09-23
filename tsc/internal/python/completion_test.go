@@ -193,3 +193,29 @@ result = identity("hello")
 		t.Fatalf("signature help = %#v, want instantiated literal signature", help)
 	}
 }
+
+func TestDefinitionCompletionExpandsDunderInit(t *testing.T) {
+	source := "class User:\n    def __in"
+	offset := len(source)
+	query, ok := pythonfrontend.PrepareDefinitionCompletion(source, offset)
+	if !ok || query.Prefix != "__in" || !query.InClass || query.HasCall {
+		t.Fatalf("definition query = %#v, %v", query, ok)
+	}
+	if _, _, visible := pythonfrontend.PrepareVisibleNameCompletion(source, offset); visible {
+		t.Fatal("def headers must not use visible-name completion")
+	}
+	entries := pythonfrontend.DefinitionCompletions(query)
+	found := false
+	for _, entry := range entries {
+		if entry.Label != "__init__" {
+			continue
+		}
+		found = true
+		if !entry.Snippet || !strings.Contains(entry.InsertText, "(self):") || !strings.Contains(entry.InsertText, "$0") {
+			t.Fatalf("init snippet = %#v", entry)
+		}
+	}
+	if !found {
+		t.Fatalf("missing __init__: %#v", entries)
+	}
+}

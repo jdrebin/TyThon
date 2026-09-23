@@ -172,7 +172,7 @@ func BuildProgram(c *checker.Checker, inputs []SourceInput) *PythonProgram {
 				})
 			}
 			if len(parseErrors) == 0 {
-				module.Runtime = checkImplementation(runtimeFile, module.Types, func(declaration *ImportDeclaration) (map[string]*checker.Type, []TypeDiagnostic) {
+				module.Runtime = checkImplementation(runtimeFile, module.Types, func(declaration *ImportDeclaration) runtimeImportResolution {
 					return resolveRuntimeImportValues(c, states, state, declaration)
 				})
 				for _, diagnostic := range module.Runtime.Diagnostics {

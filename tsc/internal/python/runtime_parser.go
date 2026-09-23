@@ -2006,16 +2006,21 @@ func parseRuntimeBindingTarget(source string, offset int) (RuntimeBindingTarget,
 		sequence = true
 	}
 	if sequence {
+		searchFrom := 0
 		for _, part := range parts {
 			part = strings.TrimSpace(part)
 			if part == "" {
 				continue
 			}
-			partOffset := offset + strings.Index(trimmed, part)
-			element, ok := parseRuntimeBindingTarget(part, partOffset)
+			relative := indexInSource(trimmed, part, searchFrom)
+			if relative < 0 {
+				relative = searchFrom
+			}
+			element, ok := parseRuntimeBindingTarget(part, offset+relative)
 			if !ok {
 				return RuntimeBindingTarget{}, false
 			}
+			searchFrom = relative + len(part)
 			target.Elements = append(target.Elements, element)
 		}
 		return target, len(target.Elements) != 0

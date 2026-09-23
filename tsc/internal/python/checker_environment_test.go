@@ -170,6 +170,52 @@ value: Value(Row, "name")
 	}
 }
 
+func TestTypeFunctionDefaultsInstantiateLikeGenericAliases(t *testing.T) {
+	c := newPythonChecker(t)
+	file := parseCheckerDeclarations(t, `
+type Defaulted(T = str) = T
+type WithFallback(T extends object, U = None) = T | U
+bare: Defaulted
+called: Defaulted()
+partial: WithFallback({ id: str })
+`)
+	environment := NewCheckerTypeEnvironment(c)
+	if diagnostics := environment.Bind(file); len(diagnostics) != 0 {
+		t.Fatalf("bind diagnostics: %v", diagnostics)
+	}
+	if got := environment.values["bare"]; got != c.GetStringType() {
+		t.Fatalf("Defaulted = %v, want string", got)
+	}
+	if got := environment.values["called"]; got != c.GetStringType() {
+		t.Fatalf("Defaulted() = %v, want string", got)
+	}
+	partial := environment.values["partial"]
+	if partial == nil || !c.IsTypeAssignableTo(c.GetNullType(), partial) {
+		t.Fatalf("WithFallback default None missing: %v", partial)
+	}
+}
+
+func TestItemAccessDistributesOverUnions(t *testing.T) {
+	c := newPythonChecker(t)
+	file := parseCheckerDeclarations(t, `
+type Mixed = { "id": int } | { (str): int }
+type Both = { "id": int } | { "id": str }
+id: Mixed["id"]
+either: Both["id"]
+`)
+	environment := NewCheckerTypeEnvironment(c)
+	if diagnostics := environment.Bind(file); len(diagnostics) != 0 {
+		t.Fatalf("bind diagnostics: %v", diagnostics)
+	}
+	if got := environment.values["id"]; got != c.GetBigIntType() {
+		t.Fatalf("Mixed[\"id\"] = %v, want int", got)
+	}
+	either := environment.values["either"]
+	if either == nil || !c.IsTypeAssignableTo(c.GetBigIntType(), either) || !c.IsTypeAssignableTo(c.GetStringType(), either) {
+		t.Fatalf("Both[\"id\"] = %v, want int | str", either)
+	}
+}
+
 func TestRecursiveObjectTypeFunctionUsesCheckerReferenceInstantiation(t *testing.T) {
 	c := newPythonChecker(t)
 	file := parseCheckerDeclarations(t, `

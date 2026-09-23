@@ -164,3 +164,10 @@ function assertNotScope(lines, lineNumber, fragment, scope) {
     const token = tokenFor(lines, lineNumber, fragment);
     assert(!token.scopes.includes(scope), `${JSON.stringify(fragment)} on line ${lineNumber + 1} unexpectedly has scope ${scope}`);
 }
+
+const languageConfiguration = JSON.parse(await readFile(path.join(extensionDirectory, "language-configuration.json"), "utf8"));
+assert(languageConfiguration.onEnterRules?.some(rule => /def\|class/.test(rule.beforeText)), "def/class Enter should indent");
+assert(languageConfiguration.indentationRules?.increaseIndentPattern, "missing indentationRules");
+assert.equal(languageConfiguration.wordPattern.includes("[A-Za-z_]"), true, "wordPattern must be identifier-bounded");
+console.log("Language configuration: indent-on-enter and identifier word pattern are present.");
+

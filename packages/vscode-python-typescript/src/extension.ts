@@ -87,12 +87,16 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
                 const native = await next(document, position, completionContext, token);
                 if (token.isCancellationRequested || document.isClosed || document.version !== version) return undefined;
                 const items = Array.isArray(native) ? native : native?.items ?? [];
+                const linePrefix = document.lineAt(position.line).text.slice(0, position.character);
                 const importContext = /^\s*(from\s|import\s)/.test(document.lineAt(position.line).text);
-                // Native typed candidates win. Supplement imports or a missing
-                // native result, never replace a typed local member signature.
-                const memberContext = /\.\w*$/.test(document.lineAt(position.line).text.slice(0, position.character));
-                if (!pythonTools || (!importContext && !memberContext && items.length)) return native;
-                const external = await pythonTools.completions(document, position, token, !importContext && items.length > 0);
+                const defContext = /^\s*(async\s+)?def\s+\w*$/.test(linePrefix);
+                const classContext = /^\s*class\s+\w*$/.test(linePrefix);
+                // Native typed candidates win. Supplement imports, definition
+                // headers, or a missing native result, never replace a typed
+                // local member signature.
+                const memberContext = /\.\w*$/.test(linePrefix);
+                if (!pythonTools || (!importContext && !memberContext && !defContext && !classContext && items.length)) return native;
+                const external = await pythonTools.completions(document, position, token, !importContext && !defContext && !classContext && items.length > 0);
                 if (token.isCancellationRequested || document.isClosed || document.version !== version) return undefined;
                 const labels = new Set(items.map(item => typeof item.label === "string" ? item.label : item.label.label));
                 return new vscode.CompletionList([...items, ...external.filter(item => !labels.has(String(item.label)))],

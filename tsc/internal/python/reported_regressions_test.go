@@ -252,3 +252,118 @@ func TestBareTypeFunctionDoesNotPoisonLaterCalls(t *testing.T) {
 		t.Fatalf("Identity(str) = %#v, %v", alias, ok)
 	}
 }
+
+func TestTypeFunctionDefaultsUseNativeArityRules(t *testing.T) {
+	source := "type Defaulted(T = str) = T\nbare: Defaulted\ncalled: Defaulted()\npartial: WithFallback({ id: str })\ntype WithFallback(T extends object, U = None) = T | U\n"
+	program := BuildProgram(newPythonChecker(t), []SourceInput{{FileName: "app.ty", Text: source}})
+	for _, diagnostic := range program.Diagnostics {
+		if strings.Contains(diagnostic.Message, "must be called with parentheses") || strings.Contains(diagnostic.Message, "expects") {
+			t.Fatalf("defaulted type function rejected: %v", program.Diagnostics)
+		}
+	}
+	c := program.Modules[0].Types.Checker()
+	for _, name := range []string{"bare", "called"} {
+		value, ok := program.Modules[0].Types.Value(name)
+		if !ok || value == nil || value.Flags()&checker.TypeFlagsString == 0 {
+			t.Errorf("%s = %#v, %v", name, value, ok)
+		}
+	}
+	partial, ok := program.Modules[0].Types.Value("partial")
+	if !ok || partial == nil || !c.IsTypeAssignableTo(c.GetNullType(), partial) {
+		t.Fatalf("WithFallback should include default None: %#v, %v", partial, ok)
+	}
+}
+
+func TestUnionItemAccessDistributesLikeIndexedAccess(t *testing.T) {
+	source := "type A = { \"id\": int } | { (str): int }\ntype V = A[\"id\"]\nvalue: V = 1\n"
+	program := BuildProgram(newPythonChecker(t), []SourceInput{{FileName: "app.ty", Text: source}})
+	if len(program.Diagnostics) != 0 {
+		t.Fatal(program.Diagnostics)
+	}
+	value, ok := program.Modules[0].Types.Value("value")
+	if !ok || value == nil || value.Flags()&checker.TypeFlagsNumber == 0 && value.Flags()&checker.TypeFlagsBigInt == 0 {
+		t.Fatalf("A[\"id\"] = %#v, %v", value, ok)
+	}
+}
+
+func TestSubclassNameIsNotAPrefixOfItsBase(t *testing.T) {
+	source := "class User:\n    id: str = \"\"\nclass UserE(User):\n    pass\n"
+	program := BuildProgram(newPythonChecker(t), []SourceInput{{FileName: "main.ty", Text: source}})
+	if len(program.Diagnostics) != 0 {
+		t.Fatal(program.Diagnostics)
+	}
+	classOffset := strings.Index(source, "UserE")
+	info, _, ok := program.QuickInfoAt("main.ty", classOffset)
+	if !ok || info.Name != "UserE" || info.Kind != QuickInfoClass {
+		t.Fatalf("UserE hover = %+v, found=%v", info, ok)
+	}
+	baseOffset := strings.LastIndex(source, "User")
+	base, _, ok := program.QuickInfoAt("main.ty", baseOffset)
+	if !ok || base.Name != "User" {
+		t.Fatalf("base hover = %+v, found=%v", base, ok)
+	}
+	for _, token := range program.SemanticIdentifiers("main.ty", source) {
+		if token.Range.Start == classOffset && token.Name != "UserE" {
+			t.Fatalf("UserE token captured %q", token.Name)
+		}
+		if source[token.Range.Start:token.Range.End] == "E(User)" {
+			t.Fatalf("suffix of UserE was tokenized: %+v", token)
+		}
+	}
+}
+
+func TestUnpackingTargetsKeepIndependentRanges(t *testing.T) {
+	source := "identity,id = \"ab\"\n"
+	program := BuildProgram(newPythonChecker(t), []SourceInput{{FileName: "main.ty", Text: source}})
+	idOffset := strings.LastIndex(source, "id")
+	info, _, ok := program.QuickInfoAt("main.ty", idOffset)
+	if !ok || info.Name != "id" || info.Kind != QuickInfoVariable {
+		t.Fatalf("id hover = %+v, found=%v", info, ok)
+	}
+	found := false
+	for _, token := range program.SemanticIdentifiers("main.ty", source) {
+		if token.Range.Start == idOffset && token.Name == "id" {
+			found = true
+		}
+		if token.Name == "id" && source[token.Range.Start:token.Range.End] != "id" {
+			t.Fatalf("id token span = %q", source[token.Range.Start:token.Range.End])
+		}
+	}
+	if !found {
+		t.Fatal("id has no semantic token")
+	}
+}
+
+func TestImportedNamesAreHoverable(t *testing.T) {
+	program := BuildProgram(newPythonChecker(t), []SourceInput{
+		{FileName: "catalog.d.ty", Text: "declare def load_user(user_id: int) -> str: ...\n"},
+		{FileName: "main.ty", Text: "from catalog import load_user\nvalue = load_user(1)\n"},
+	})
+	source := "from catalog import load_user\nvalue = load_user(1)\n"
+	info, _, ok := program.QuickInfoAt("main.ty", strings.Index(source, "load_user"))
+	if !ok || info.Name != "load_user" || info.Kind != QuickInfoFunction {
+		t.Fatalf("import hover = %+v, found=%v, diagnostics=%v", info, ok, program.Diagnostics)
+	}
+	found := false
+	for _, token := range program.SemanticIdentifiers("main.ty", source) {
+		if token.Name == "load_user" && token.Range.Start == strings.Index(source, "load_user") {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatal("imported name has no semantic token")
+	}
+	module, _, ok := program.QuickInfoAt("main.ty", strings.Index(source, "catalog"))
+	if !ok || module.Name != "catalog" {
+		t.Fatalf("module hover = %+v, found=%v", module, ok)
+	}
+}
+
+func TestGenericWithoutArgumentsIsErrorType(t *testing.T) {
+	source := "class Box<T>:\n    value: T\nitem: Box\n"
+	program := BuildProgram(newPythonChecker(t), []SourceInput{{FileName: "main.ty", Text: source}})
+	info, c, ok := program.QuickInfoAt("main.ty", strings.LastIndex(source, "Box"))
+	if !ok || c == nil || info.Type != c.GetErrorType() {
+		t.Fatalf("bare generic hover = %+v, found=%v, want error type", info, ok)
+	}
+}

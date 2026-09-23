@@ -247,6 +247,14 @@ export class PythonTools implements vscode.Disposable {
             item.detail = "Python library (Jedi)";
             item.sortText = `zz_python_${value.label.startsWith("__") ? "z" : "a"}_${value.label}`;
             item.range = new vscode.Range(position.translate(0, -value.prefixLength), position);
+            const line = document.lineAt(position.line).text;
+            const prefix = line.slice(0, position.character);
+            if (/^\s*(async\s+)?def\s+\w*$/.test(prefix) && /^__\w+__$/.test(value.label) && !line.includes("(")) {
+                const indent = /^\s*/.exec(line)?.[0] ?? "";
+                const params = indent.length ? "self" : "";
+                item.insertText = new vscode.SnippetString(`${value.label}(${params}):\n${indent}    $0`);
+                item.filterText = value.label;
+            }
             return item;
         });
     }

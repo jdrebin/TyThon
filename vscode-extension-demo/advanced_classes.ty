@@ -1,12 +1,12 @@
 class Named:
-    name: str
+    name: str = ""
 
     def display(self) -> str:
         return self.name
 
 
 class Timestamped:
-    created_at: int
+    created_at: int = 0
 
 
 class User(Named, Timestamped):
@@ -43,13 +43,13 @@ class NumericValue:
 
 
 type NumericWithoutValue = {
-    (K): NumericValue[K]
-    for K in Exclude(keyof NumericValue, *<"value">)
+    (K): NumericValue[K] for K in Exclude(keyof NumericValue, *<"value">)
 }
+
 
 # The projection resolves the conflicting attribute without claiming that
 # ResolvedValue remains structurally compatible with all of NumericValue.
-class ResolvedValue(TextValue, NumericValue as NumericWithoutValue):
+class ResolvedValue(TextValue, NumericValue):
     marker: bool
 
 

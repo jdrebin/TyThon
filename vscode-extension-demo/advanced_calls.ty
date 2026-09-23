@@ -1,6 +1,7 @@
 # Python parameter categories feed the same generic inference and overload
 # selection machinery used by TypeScript signatures.
 
+
 @overload
 def normalize(value: str) -> str: ...
 
@@ -46,7 +47,7 @@ configured = configure(
     enabled=True,
     tags=configured_tags,
     owner="compiler",
-    idk="who"
+    idk="who",
 )
 transformed = transform("Ada", lambda value: value)
 collected_metadata = collect_metadata(owner="compiler", priority=1)

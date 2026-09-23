@@ -348,3 +348,7 @@ def format_source(source, width=88, *, magic_trailing_comma=True):
 
 if __name__ == "__main__":
     print(format_source(sys.stdin.read()), end="")
+
+class User:
+    def __init__(self) -> None:
+        pass

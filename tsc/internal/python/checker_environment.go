@@ -3,11 +3,9 @@ package python
 import (
 	_ "embed"
 	"fmt"
-	"os"
 	"sort"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/microsoft/TypeScript/tsc/internal/ast"
 	"github.com/microsoft/TypeScript/tsc/internal/checker"
@@ -401,8 +399,10 @@ func (e *CheckerTypeEnvironment) resolveCheckerSymbol(name string) *checker.Type
 		return symbol.owner.resolveCheckerSymbol(symbol.Name)
 	}
 	if symbol.Kind == TypeSymbolFunction {
-		e.resolveCheckerTypeFunctionSymbol(symbol)
-		return e.checker.GetUnknownType()
+		// Same rule as a TypeScript generic alias reference: instantiate with
+		// defaults when the native arity check allows it; otherwise the use
+		// site reports, and we return the checker's error type.
+		return e.instantiateCheckerTypeFunction(symbol, nil, TextRange{})
 	}
 	if symbol.Kind == TypeSymbolGeneric && symbol.BuiltinArity == 0 {
 		e.resolveCheckerGenericSymbol(symbol)
@@ -413,17 +413,9 @@ func (e *CheckerTypeEnvironment) resolveCheckerSymbol(name string) *checker.Type
 			}
 		}
 		e.reportChecker(TextRange{}, fmt.Sprintf("generic %q requires type arguments", name))
-		return e.checker.GetUnknownType()
+		return e.checker.GetErrorType()
 	}
 	if symbol.resolved {
-		// #region agent log
-		if symbol.Instance == nil || symbol.Kind == TypeSymbolFunction {
-			if f, err := os.OpenFile("/home/user/projects/TypeScript/.cursor/debug-e531f3.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err == nil {
-				fmt.Fprintf(f, `{"sessionId":"e531f3","hypothesisId":"A","location":"checker_environment.go:resolved-return","message":"resolveCheckerSymbol resolved return","data":{"name":%q,"kind":%d,"instanceNil":%t,"declaredNil":%t},"timestamp":%d}`+"\n", name, symbol.Kind, symbol.Instance == nil, symbol.Declared == nil, time.Now().UnixMilli())
-				f.Close()
-			}
-		}
-		// #endregion
 		return symbol.Instance
 	}
 	if symbol.resolving {
@@ -454,12 +446,6 @@ func (e *CheckerTypeEnvironment) resolveCheckerSymbol(name string) *checker.Type
 		e.resolveCheckerClassInto(symbol, symbol.Class, nil)
 	default:
 		symbol.Instance = e.checker.GetUnknownType()
-		// #region agent log
-		if f, err := os.OpenFile("/home/user/projects/TypeScript/.cursor/debug-e531f3.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err == nil {
-			fmt.Fprintf(f, `{"sessionId":"e531f3","hypothesisId":"A","location":"checker_environment.go:default-resolve","message":"resolveCheckerSymbol default branch","data":{"name":%q,"kind":%d,"hasAlias":%t},"timestamp":%d}`+"\n", name, symbol.Kind, symbol.Alias != nil, time.Now().UnixMilli())
-			f.Close()
-		}
-		// #endregion
 	}
 	symbol.resolving = false
 	symbol.resolved = true
@@ -539,8 +525,7 @@ func (e *CheckerTypeEnvironment) resolveCheckerTypeWorker(expression TypeExpr, s
 			return e.checker.GetUnknownType()
 		}
 		if symbol := e.symbols[expression.Name]; symbol != nil && symbol.Kind == TypeSymbolFunction {
-			e.reportChecker(expression.Range(), fmt.Sprintf("type function %q must be called with parentheses", expression.Name))
-			return e.checker.GetUnknownType()
+			return e.instantiateCheckerTypeFunction(symbol, nil, expression.Range())
 		}
 		return e.resolveCheckerSymbol(expression.Name)
 	case *LiteralTypeExpr:
@@ -731,7 +716,7 @@ func (e *CheckerTypeEnvironment) resolveCheckerGenericImmediate(expression *Gene
 	if symbol.BuiltinArity != 0 {
 		if symbol.BuiltinArity >= 0 && len(arguments) != symbol.BuiltinArity {
 			e.reportChecker(expression.Range(), fmt.Sprintf("generic %q expects %d type argument(s)", name.Name, symbol.BuiltinArity))
-			return e.checker.GetUnknownType()
+			return e.checker.GetErrorType()
 		}
 		result := e.resolveCheckerBuiltinGeneric(name.Name, arguments)
 		e.recordNamedHover(name.Range(), result, QuickInfoType, name.Name, nil)
@@ -755,13 +740,13 @@ func (e *CheckerTypeEnvironment) resolveCheckerGenericImmediate(expression *Gene
 	minimum := resolver.checker.GetMinTypeArgumentCount(parameters)
 	if len(arguments) < minimum || len(arguments) > len(parameters) {
 		e.reportChecker(expression.Range(), fmt.Sprintf("generic %q expects %d to %d type argument(s)", name.Name, minimum, len(parameters)))
-		return e.checker.GetUnknownType()
+		return e.checker.GetErrorType()
 	}
 	filled, invalidIndex, ok := resolver.checker.PrepareTypeArguments(parameters, arguments)
 	if !ok {
 		parameterName := checkerSymbolTypeParameters(symbol)[invalidIndex].Name
 		e.reportChecker(expression.Arguments[invalidIndex].Range(), fmt.Sprintf("type argument does not satisfy constraint for %q", parameterName))
-		return e.checker.GetUnknownType()
+		return e.checker.GetErrorType()
 	}
 	return resolver.checker.InstantiateTypeWithArguments(symbol.Instance, parameters, filled)
 }
@@ -883,7 +868,7 @@ func (e *CheckerTypeEnvironment) resolveCheckerBuiltinGeneric(name string, argum
 	case "Generator":
 		return e.newIteratorType(arguments[0], false, arguments[1], arguments[2])
 	}
-	return e.checker.GetUnknownType()
+	return e.checker.GetErrorType()
 }
 
 func (e *CheckerTypeEnvironment) resolveCheckerTypeFunction(expression *TypeFunctionCallExpr, scope map[string]*checker.Type) *checker.Type {
@@ -896,8 +881,6 @@ func (e *CheckerTypeEnvironment) resolveCheckerTypeFunction(expression *TypeFunc
 	for index, argument := range expression.Arguments {
 		arguments[index] = e.resolveCheckerType(argument, scope)
 	}
-	switch name.Name {
-	}
 	symbol := e.symbols[name.Name]
 	if symbol == nil || symbol.Kind != TypeSymbolFunction {
 		if symbol != nil && symbol.Kind == TypeSymbolGeneric {
@@ -905,7 +888,7 @@ func (e *CheckerTypeEnvironment) resolveCheckerTypeFunction(expression *TypeFunc
 		} else {
 			e.reportChecker(expression.Range(), fmt.Sprintf("%q is not a type function", name.Name))
 		}
-		return e.checker.GetUnknownType()
+		return e.checker.GetErrorType()
 	}
 	resolver := e
 	if symbol.owner != nil {
@@ -915,21 +898,52 @@ func (e *CheckerTypeEnvironment) resolveCheckerTypeFunction(expression *TypeFunc
 	names := checkerSymbolTypeParameterNames(symbol)
 	displayType := symbol.Declared
 	if displayType == nil {
-		displayType = e.checker.GetUnknownType()
+		displayType = e.checker.GetErrorType()
 	}
 	e.recordNamedHover(name.Range(), displayType, QuickInfoTypeFunction, name.Name, names)
+	argumentRanges := make([]TextRange, len(expression.Arguments))
+	for index, argument := range expression.Arguments {
+		argumentRanges[index] = argument.Range()
+	}
+	return e.instantiateCheckerTypeFunctionAt(symbol, arguments, expression.Range(), argumentRanges)
+}
+
+// instantiateCheckerTypeFunction is the Python-syntax front of
+// getTypeFromTypeAliasReference: native arity/default/constraint checking,
+// then mapper instantiation (or the synthetic generic object cache).
+func (e *CheckerTypeEnvironment) instantiateCheckerTypeFunction(symbol *CheckerTypeSymbol, arguments []*checker.Type, loc TextRange) *checker.Type {
+	return e.instantiateCheckerTypeFunctionAt(symbol, arguments, loc, nil)
+}
+
+func (e *CheckerTypeEnvironment) instantiateCheckerTypeFunctionAt(symbol *CheckerTypeSymbol, arguments []*checker.Type, loc TextRange, argumentRanges []TextRange) *checker.Type {
+	resolver := e
+	if symbol.owner != nil {
+		resolver = symbol.owner
+	}
+	resolver.resolveCheckerTypeFunctionSymbol(symbol)
 	filled, invalidIndex, ok := resolver.checker.PrepareTypeArguments(symbol.TypeParameters, arguments)
 	if !ok {
-		if invalidIndex >= 0 && invalidIndex < len(symbol.Alias.Parameters) {
-			e.reportChecker(expression.Range(), fmt.Sprintf("type argument does not satisfy constraint for %q", symbol.Alias.Parameters[invalidIndex].Name))
-		} else {
-			minimum := resolver.checker.GetMinTypeArgumentCount(symbol.TypeParameters)
-			e.reportChecker(expression.Range(), fmt.Sprintf("type function %q expects %d to %d argument(s)", name.Name, minimum, len(symbol.TypeParameters)))
+		reportAt := loc
+		if invalidIndex >= 0 && invalidIndex < len(argumentRanges) {
+			reportAt = argumentRanges[invalidIndex]
 		}
-		return e.checker.GetUnknownType()
+		if reportAt.End > reportAt.Start {
+			if invalidIndex >= 0 && symbol.Alias != nil && invalidIndex < len(symbol.Alias.Parameters) {
+				e.reportChecker(reportAt, fmt.Sprintf("type argument does not satisfy constraint for %q", symbol.Alias.Parameters[invalidIndex].Name))
+			} else if len(arguments) == 0 && argumentRanges == nil {
+				e.reportChecker(reportAt, fmt.Sprintf("type function %q must be called with parentheses", symbol.Name))
+			} else {
+				minimum := resolver.checker.GetMinTypeArgumentCount(symbol.TypeParameters)
+				e.reportChecker(reportAt, fmt.Sprintf("type function %q expects %d to %d argument(s)", symbol.Name, minimum, len(symbol.TypeParameters)))
+			}
+		}
+		return e.checker.GetErrorType()
 	}
 	if symbol.Instance != nil {
 		return resolver.checker.InstantiateSyntheticGenericObject(symbol.Instance, filled)
+	}
+	if symbol.Declared == nil {
+		return e.checker.GetErrorType()
 	}
 	return resolver.checker.InstantiateTypeWithArguments(symbol.Declared, symbol.TypeParameters, filled)
 }
@@ -1254,19 +1268,6 @@ func (e *CheckerTypeEnvironment) resolveCheckerCallableWithParameterTypes(expres
 		if inferred := parameterTypes[index]; inferred != nil {
 			parameterType = inferred
 		}
-		// #region agent log
-		if parameterType == nil || parameter.Kind == ParameterVarKeyword || parameter.Name == "kwargs" {
-			exprNil := parameter.Type == nil
-			exprKind := -1
-			if parameter.Type != nil {
-				exprKind = int(parameter.Type.Kind())
-			}
-			if f, err := os.OpenFile("/home/user/projects/TypeScript/.cursor/debug-e531f3.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err == nil {
-				fmt.Fprintf(f, `{"sessionId":"e531f3","hypothesisId":"B","location":"checker_environment.go:callable-param","message":"callable parameter type","data":{"name":%q,"kind":%d,"typeNil":%t,"exprNil":%t,"exprKind":%d,"dropReceiver":%t},"timestamp":%d}`+"\n", parameter.Name, parameter.Kind, parameterType == nil, exprNil, exprKind, dropReceiver, time.Now().UnixMilli())
-				f.Close()
-			}
-		}
-		// #endregion
 		if parameterType == nil {
 			parameterType = e.checker.GetUnknownType()
 		}

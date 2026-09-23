@@ -13786,7 +13786,11 @@ func (c *Checker) getUnionIndexInfos(types []*Type) []*IndexInfo {
 				return c.getIndexTypeOfType(t, indexType)
 			}))
 			isReadonly := core.Some(types, func(t *Type) bool { return c.getIndexInfoOfType(t, indexType).isReadonly })
-			result = append(result, c.newIndexInfo(indexType, valueType, isReadonly, nil, nil))
+			indexInfo := c.newIndexInfo(indexType, valueType, isReadonly, nil, nil)
+			indexInfo.pythonOptional = core.Some(types, func(t *Type) bool {
+				return c.getIndexInfoOfType(t, indexType).pythonOptional
+			})
+			result = append(result, indexInfo)
 		}
 	}
 	return result
@@ -25876,6 +25880,7 @@ func (c *Checker) newIndexedAccessType(objectType *Type, indexType *Type, access
 	data.objectType = objectType
 	data.indexType = indexType
 	data.accessFlags = accessFlags
+	data.pythonKeys = accessFlags&AccessFlagsPythonKeys != 0
 	return c.newType(TypeFlagsIndexedAccess, ObjectFlagsNone, data)
 }
 

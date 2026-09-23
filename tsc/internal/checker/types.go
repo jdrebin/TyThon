@@ -348,7 +348,8 @@ const (
 	AccessFlagsReportDeprecated           AccessFlags = 1 << 6
 	AccessFlagsSuppressNoImplicitAnyError AccessFlags = 1 << 7
 	AccessFlagsContextual                 AccessFlags = 1 << 8
-	AccessFlagsPersistent                             = AccessFlagsIncludeUndefined
+	AccessFlagsPythonKeys                 AccessFlags = 1 << 9
+	AccessFlagsPersistent                             = AccessFlagsIncludeUndefined | AccessFlagsPythonKeys
 )
 
 type NodeCheckFlags uint32

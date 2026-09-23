@@ -30,6 +30,7 @@ type CompletionEntry struct {
 	InsertText  string
 	ReplaceFrom int
 	ReplaceTo   int
+	Snippet     bool
 }
 
 type AttributeCompletionQuery struct {
@@ -53,6 +54,16 @@ type VisibleNameCompletionQuery struct {
 	ScopeOffset int
 	ReplaceFrom int
 	ReplaceTo   int
+}
+
+type DefinitionCompletionQuery struct {
+	Prefix      string
+	ReplaceFrom int
+	ReplaceTo   int
+	Kind        string
+	InClass     bool
+	HasCall     bool
+	BodyIndent  string
 }
 
 type TypeCompletionQuery struct {
@@ -211,10 +222,136 @@ func PrepareVisibleNameCompletion(source string, offset int) (string, VisibleNam
 	if before >= 0 && source[before] == '.' {
 		return source, VisibleNameCompletionQuery{}, false
 	}
+	if definitionHeaderKind(strings.TrimSpace(source[strings.LastIndexByte(source[:start], '\n')+1:start])) != "" {
+		return source, VisibleNameCompletionQuery{}, false
+	}
 	query := VisibleNameCompletionQuery{
 		Prefix: source[start:offset], ScopeOffset: start, ReplaceFrom: start, ReplaceTo: end,
 	}
 	return source[:start] + "__completion__" + source[end:], query, true
+}
+
+func definitionHeaderKind(before string) string {
+	switch strings.TrimSpace(before) {
+	case "def", "async def":
+		return "def"
+	case "class":
+		return "class"
+	}
+	return ""
+}
+
+func definitionInsideClass(source string, lineStart int) bool {
+	indent := 0
+	for lineStart+indent < len(source) && (source[lineStart+indent] == ' ' || source[lineStart+indent] == '\t') {
+		indent++
+	}
+	search := lineStart
+	for search > 0 {
+		previousEnd := search - 1
+		previousStart := strings.LastIndexByte(source[:previousEnd], '\n') + 1
+		line := source[previousStart:previousEnd]
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" || strings.HasPrefix(trimmed, "#") {
+			search = previousStart
+			continue
+		}
+		content := 0
+		for content < len(line) && (line[content] == ' ' || line[content] == '\t') {
+			content++
+		}
+		if content < indent {
+			return strings.HasPrefix(trimmed, "class ")
+		}
+		search = previousStart
+	}
+	return false
+}
+
+func continuationIndent(source string, lineStart int) string {
+	indent := ""
+	for index := lineStart; index < len(source) && (source[index] == ' ' || source[index] == '\t'); index++ {
+		indent += string(source[index])
+	}
+	if strings.Contains(indent, "\t") {
+		return indent + "\t"
+	}
+	return indent + "    "
+}
+
+// PrepareDefinitionCompletion recovers `def`/`class` name positions so dunder
+// snippets can expand the way Python editors complete `__init__`.
+func PrepareDefinitionCompletion(source string, offset int) (DefinitionCompletionQuery, bool) {
+	start, end, ok := completionIdentifierRange(source, offset)
+	if !ok {
+		return DefinitionCompletionQuery{}, false
+	}
+	lineStart := strings.LastIndexByte(source[:start], '\n') + 1
+	kind := definitionHeaderKind(source[lineStart:start])
+	if kind == "" {
+		return DefinitionCompletionQuery{}, false
+	}
+	lineEnd := end
+	for lineEnd < len(source) && source[lineEnd] != '\n' && source[lineEnd] != '\r' {
+		lineEnd++
+	}
+	return DefinitionCompletionQuery{
+		Prefix:      source[start:offset],
+		ReplaceFrom: start,
+		ReplaceTo:   end,
+		Kind:        kind,
+		InClass:     definitionInsideClass(source, lineStart),
+		HasCall:     strings.Contains(source[end:lineEnd], "("),
+		BodyIndent:  continuationIndent(source, lineStart),
+	}, true
+}
+
+var pythonDunderMethods = []string{
+	"__init__", "__new__", "__del__",
+	"__repr__", "__str__", "__bytes__", "__format__",
+	"__lt__", "__le__", "__eq__", "__ne__", "__gt__", "__ge__",
+	"__hash__", "__bool__",
+	"__getattr__", "__getattribute__", "__setattr__", "__delattr__", "__dir__",
+	"__call__",
+	"__len__", "__getitem__", "__setitem__", "__delitem__", "__missing__",
+	"__iter__", "__next__", "__reversed__", "__contains__",
+	"__add__", "__sub__", "__mul__", "__matmul__", "__truediv__", "__floordiv__", "__mod__", "__divmod__", "__pow__",
+	"__lshift__", "__rshift__", "__and__", "__xor__", "__or__",
+	"__iadd__", "__isub__", "__imul__",
+	"__neg__", "__pos__", "__abs__", "__invert__",
+	"__int__", "__float__", "__index__", "__complex__",
+	"__enter__", "__exit__",
+	"__await__", "__aiter__", "__anext__", "__aenter__", "__aexit__",
+	"__init_subclass__", "__class_getitem__", "__mro_entries__",
+	"__set_name__", "__get__", "__set__", "__delete__",
+}
+
+func DefinitionCompletions(query DefinitionCompletionQuery) []CompletionEntry {
+	if query.Kind != "def" || query.Prefix != "" && !strings.HasPrefix(query.Prefix, "_") {
+		return nil
+	}
+	entries := make([]CompletionEntry, 0)
+	for _, name := range pythonDunderMethods {
+		if query.Prefix != "" && !strings.HasPrefix(strings.ToLower(name), strings.ToLower(query.Prefix)) {
+			continue
+		}
+		insert := name
+		snippet := false
+		if !query.HasCall {
+			params := ""
+			if query.InClass {
+				params = "self"
+			}
+			insert = name + "(" + params + "):\n" + query.BodyIndent + "$0"
+			snippet = true
+		}
+		entries = append(entries, CompletionEntry{
+			Label: name, Detail: "method", Kind: CompletionKindMethod, InsertText: insert,
+			ReplaceFrom: query.ReplaceFrom, ReplaceTo: query.ReplaceTo, Snippet: snippet,
+		})
+	}
+	sortCompletionEntries(entries)
+	return entries
 }
 
 // PrepareTypeCompletion identifies the Python positions in which a name is a

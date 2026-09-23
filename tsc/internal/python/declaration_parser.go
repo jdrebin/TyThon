@@ -156,7 +156,58 @@ func parseImportDeclaration(line logicalLine) (*ImportDeclaration, []TypeParseEr
 	if len(declaration.Bindings) == 0 {
 		return nil, []TypeParseError{errorForLine(line, "import declaration has no bindings")}
 	}
+	attachImportLocations(line, declaration)
 	return declaration, nil
+}
+
+func attachImportLocations(line logicalLine, declaration *ImportDeclaration) {
+	searchFrom := 0
+	if declaration.From {
+		if from := indexBoundedFrom(line.text, "from", 0); from >= 0 {
+			searchFrom = from + len("from")
+		}
+		if declaration.Module != "" {
+			declaration.ModuleLoc = lineTextRangeFrom(line, declaration.Module, searchFrom)
+			if declaration.ModuleLoc.Start >= line.contentStart {
+				searchFrom = declaration.ModuleLoc.End - line.contentStart
+			}
+		}
+		if imp := indexBoundedFrom(line.text, "import", searchFrom); imp >= 0 {
+			searchFrom = imp + len("import")
+		}
+	} else if imp := indexBoundedFrom(line.text, "import", 0); imp >= 0 {
+		searchFrom = imp + len("import")
+	}
+	if declaration.TypeOnly {
+		if typeKw := indexBoundedFrom(line.text, "type", searchFrom); typeKw >= 0 {
+			searchFrom = typeKw + len("type")
+		}
+	}
+	for index := range declaration.Bindings {
+		binding := &declaration.Bindings[index]
+		if binding.Star {
+			if star := strings.Index(line.text[searchFrom:], "*"); star >= 0 {
+				start := line.contentStart + searchFrom + star
+				binding.NameLoc = TextRange{Start: start, End: start + 1}
+				searchFrom += star + 1
+			}
+			continue
+		}
+		binding.NameLoc = lineTextRangeFrom(line, binding.Name, searchFrom)
+		if binding.NameLoc.Start >= line.contentStart {
+			searchFrom = binding.NameLoc.End - line.contentStart
+		}
+		if binding.Alias == "" {
+			continue
+		}
+		if as := indexBoundedFrom(line.text, "as", searchFrom); as >= 0 {
+			searchFrom = as + len("as")
+		}
+		binding.AliasLoc = lineTextRangeFrom(line, binding.Alias, searchFrom)
+		if binding.AliasLoc.Start >= line.contentStart {
+			searchFrom = binding.AliasLoc.End - line.contentStart
+		}
+	}
 }
 
 type logicalLine struct {
@@ -521,6 +572,10 @@ func parseObjectHeader(text string, line logicalLine) (string, []TypeParameterEx
 		if end < 0 {
 			return name, typeParameters, nil, append(errors, errorForLine(line, "unterminated base list"))
 		}
+		baseFrom := strings.IndexByte(line.text, '(')
+		if baseFrom < 0 {
+			baseFrom = 0
+		}
 		for _, baseText := range splitTopLevel(rest[1:end], ',') {
 			baseText = strings.TrimSpace(baseText)
 			if baseText == "" || strings.HasPrefix(baseText, "metaclass=") {
@@ -530,7 +585,7 @@ func parseObjectHeader(text string, line logicalLine) (string, []TypeParameterEx
 				baseText = strings.TrimSpace(baseText[:projection])
 			}
 			base, parseErrors := ParseTypeExpression(baseText)
-			baseOffset := logicalLineTextOffset(line, baseText)
+			baseOffset := logicalLineTextOffsetFrom(line, baseText, baseFrom)
 			relocateTypeExpression(base, baseOffset)
 			errors = append(errors, relocateErrors(parseErrors, baseOffset)...)
 			bases = append(bases, base)
@@ -557,6 +612,10 @@ func parseClassBaseDeclarations(text string, line logicalLine) ([]BaseDeclaratio
 	if close < 0 {
 		return nil, nil, []TypeParseError{errorForLine(line, "unterminated base list")}
 	}
+	baseFrom := strings.IndexByte(line.text, '(')
+	if baseFrom < 0 {
+		baseFrom = 0
+	}
 	var bases []BaseDeclaration
 	var metaclass TypeExpr
 	var errors []TypeParseError
@@ -568,7 +627,7 @@ func parseClassBaseDeclarations(text string, line logicalLine) ([]BaseDeclaratio
 		if strings.HasPrefix(part, "metaclass=") {
 			metaclassText := strings.TrimSpace(strings.TrimPrefix(part, "metaclass="))
 			parsed, parseErrors := ParseTypeExpression(metaclassText)
-			metaclassOffset := logicalLineTextOffset(line, metaclassText)
+			metaclassOffset := logicalLineTextOffsetFrom(line, metaclassText, baseFrom)
 			relocateTypeExpression(parsed, metaclassOffset)
 			errors = append(errors, relocateErrors(parseErrors, metaclassOffset)...)
 			metaclass = parsed
@@ -581,13 +640,13 @@ func parseClassBaseDeclarations(text string, line logicalLine) ([]BaseDeclaratio
 			projectionText = strings.TrimSpace(part[as+len("as"):])
 		}
 		runtimeType, parseErrors := ParseTypeExpression(runtimeText)
-		runtimeOffset := logicalLineTextOffset(line, runtimeText)
+		runtimeOffset := logicalLineTextOffsetFrom(line, runtimeText, baseFrom)
 		relocateTypeExpression(runtimeType, runtimeOffset)
 		errors = append(errors, relocateErrors(parseErrors, runtimeOffset)...)
 		base := BaseDeclaration{Runtime: runtimeType}
 		if projectionText != "" {
 			base.Projection, parseErrors = ParseTypeExpression(projectionText)
-			projectionOffset := logicalLineTextOffset(line, projectionText)
+			projectionOffset := logicalLineTextOffsetFrom(line, projectionText, baseFrom)
 			relocateTypeExpression(base.Projection, projectionOffset)
 			errors = append(errors, relocateErrors(parseErrors, projectionOffset)...)
 		}
@@ -1132,16 +1191,94 @@ func isIdentifierByte(value byte) bool {
 	return value == '_' || value >= 'a' && value <= 'z' || value >= 'A' && value <= 'Z' || value >= '0' && value <= '9'
 }
 
-func logicalLineTextOffset(line logicalLine, text string) int {
-	index := strings.Index(line.text, text)
+func identifierBoundary(source string, start, end int) bool {
+	if start < 0 || end < start || end > len(source) {
+		return false
+	}
+	if start > 0 {
+		r, _ := utf8.DecodeLastRuneInString(source[:start])
+		if isIdentifierContinue(r) {
+			return false
+		}
+	}
+	if end < len(source) {
+		r, _ := utf8.DecodeRuneInString(source[end:])
+		if isIdentifierContinue(r) {
+			return false
+		}
+	}
+	return true
+}
+
+func indexBoundedFrom(source, needle string, from int) int {
+	if needle == "" || from < 0 {
+		return -1
+	}
+	if from > len(source) {
+		return -1
+	}
+	start := from
+	for start <= len(source) {
+		index := strings.Index(source[start:], needle)
+		if index < 0 {
+			return -1
+		}
+		index += start
+		if identifierBoundary(source, index, index+len(needle)) {
+			return index
+		}
+		start = index + 1
+	}
+	return -1
+}
+
+func indexInSource(source, needle string, from int) int {
+	if needle == "" {
+		return -1
+	}
+	if isSimpleIdentifier(needle) {
+		return indexBoundedFrom(source, needle, from)
+	}
+	if from < 0 {
+		from = 0
+	}
+	if from > len(source) {
+		return -1
+	}
+	index := strings.Index(source[from:], needle)
 	if index < 0 {
-		return line.contentStart
+		return -1
+	}
+	return from + index
+}
+
+func lastIndexInSource(source, needle string) int {
+	found := -1
+	start := 0
+	for {
+		index := indexInSource(source, needle, start)
+		if index < 0 {
+			return found
+		}
+		found = index
+		start = index + 1
+	}
+}
+
+func logicalLineTextOffset(line logicalLine, text string) int {
+	return logicalLineTextOffsetFrom(line, text, 0)
+}
+
+func logicalLineTextOffsetFrom(line logicalLine, text string, from int) int {
+	index := indexInSource(line.text, text, from)
+	if index < 0 {
+		return line.contentStart + from
 	}
 	return line.contentStart + index
 }
 
 func logicalLineLastTextOffset(line logicalLine, text string) int {
-	index := strings.LastIndex(line.text, text)
+	index := lastIndexInSource(line.text, text)
 	if index < 0 {
 		return line.contentStart
 	}
@@ -1151,6 +1288,11 @@ func logicalLineLastTextOffset(line logicalLine, text string) int {
 func declarationNameRange(line logicalLine, name string) TextRange {
 	start := logicalLineTextOffset(line, name)
 	return TextRange{Start: start, End: start + len(name)}
+}
+
+func lineTextRangeFrom(line logicalLine, text string, from int) TextRange {
+	start := logicalLineTextOffsetFrom(line, text, from)
+	return TextRange{Start: start, End: start + len(text)}
 }
 
 func startsWithDigit(text string) bool {

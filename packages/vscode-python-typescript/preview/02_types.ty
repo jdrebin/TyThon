@@ -14,7 +14,12 @@ number = identity(12)
 text = identity("Kate")
 
 
+class G:
+    number = '5454'
+
+
 def apply<T>(value: T, transform: (value: T) -> str) -> str:
+
     return transform(value)
 
 

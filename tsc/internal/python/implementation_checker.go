@@ -68,7 +68,14 @@ func CheckImplementation(file *RuntimeSourceFile, environment *CheckerTypeEnviro
 	return checkImplementation(file, environment, nil)
 }
 
-type runtimeImportResolver func(*ImportDeclaration) (map[string]*checker.Type, []TypeDiagnostic)
+type runtimeImportResolution struct {
+	Values      map[string]*checker.Type
+	Kinds       map[string]QuickInfoKind
+	Namespace   *checker.Type
+	Diagnostics []TypeDiagnostic
+}
+
+type runtimeImportResolver func(*ImportDeclaration) runtimeImportResolution
 
 func checkImplementation(file *RuntimeSourceFile, environment *CheckerTypeEnvironment, imports runtimeImportResolver) *ImplementationCheckResult {
 	result := &ImplementationCheckResult{File: file, Values: make(map[string]*checker.Type)}
@@ -219,23 +226,26 @@ func (s *implementationChecker) checkStatements(statements []RuntimeStatement, r
 				s.report(statement.Range(), "import * is only allowed at module level")
 				break
 			}
+			resolution := runtimeImportResolution{Values: make(map[string]*checker.Type), Kinds: make(map[string]QuickInfoKind)}
 			if s.imports != nil {
-				values, diagnostics := s.imports(statement.Declaration)
-				for _, diagnostic := range diagnostics {
+				resolution = s.imports(statement.Declaration)
+				for _, diagnostic := range resolution.Diagnostics {
 					s.report(diagnostic.Range, diagnostic.Message)
 				}
-				for name, value := range values {
+				for name, value := range resolution.Values {
 					s.scope[name] = value
 				}
-				break
-			}
-			for _, name := range runtimeImportBindingNames(statement.Declaration) {
-				value := s.scope[name]
-				if value == nil || value.Flags()&checker.TypeFlagsUndefined != 0 {
-					value = s.types.checker.GetAnyType()
-					s.scope[name] = value
+			} else {
+				for _, name := range runtimeImportBindingNames(statement.Declaration) {
+					value := s.scope[name]
+					if value == nil || value.Flags()&checker.TypeFlagsUndefined != 0 {
+						value = s.types.checker.GetAnyType()
+						s.scope[name] = value
+					}
+					resolution.Values[name] = value
 				}
 			}
+			s.recordImportHovers(statement.Declaration, resolution)
 		case *RuntimeTryStatement:
 			if s.checkTry(statement, returnType) {
 				return true
@@ -2253,6 +2263,52 @@ func (s *implementationChecker) recordNamedType(loc TextRange, t *checker.Type, 
 	}
 }
 
+func (s *implementationChecker) recordImportHovers(declaration *ImportDeclaration, resolution runtimeImportResolution) {
+	if declaration == nil {
+		return
+	}
+	unknown := s.types.checker.GetUnknownType()
+	if declaration.ModuleLoc.End > declaration.ModuleLoc.Start {
+		namespace := resolution.Namespace
+		if namespace == nil {
+			namespace = unknown
+		}
+		s.recordNamedType(declaration.ModuleLoc, namespace, QuickInfoVariable, declaration.Module)
+	}
+	for _, binding := range declaration.Bindings {
+		if binding.Star {
+			continue
+		}
+		local := binding.Alias
+		loc := binding.AliasLoc
+		exported := binding.Name
+		if local == "" {
+			local = binding.Name
+			loc = binding.NameLoc
+			if !declaration.From {
+				if dot := strings.IndexByte(local, '.'); dot >= 0 {
+					local = local[:dot]
+					if loc.End > loc.Start {
+						loc.End = loc.Start + len(local)
+					}
+				}
+			}
+		}
+		value := resolution.Values[local]
+		if value == nil {
+			value = unknown
+		}
+		kind := resolution.Kinds[local]
+		if kind == QuickInfoUnknown {
+			kind = QuickInfoVariable
+		}
+		s.recordNamedType(loc, value, kind, local)
+		if binding.Alias != "" && binding.NameLoc.End > binding.NameLoc.Start {
+			s.recordNamedType(binding.NameLoc, value, kind, exported)
+		}
+	}
+}
+
 func (s *implementationChecker) typeOfWorker(expression RuntimeExpr) *checker.Type {
 	c := s.types.checker
 	if expression == nil {
@@ -2967,6 +3023,9 @@ func (s *implementationChecker) bindRuntimeTargetInto(target RuntimeBindingTarge
 	c := s.types.checker
 	if len(target.Elements) == 0 {
 		if target.Name != "" {
+			if value == nil {
+				value = c.GetUnknownType()
+			}
 			if target.Starred {
 				value = s.types.newHomogeneousSequence(value, false)
 			}

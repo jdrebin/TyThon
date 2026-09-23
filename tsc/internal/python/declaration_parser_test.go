@@ -148,9 +148,18 @@ from ..shared import *
 	if first.From || first.Bindings[0].Name != "package.models" || first.Bindings[0].Alias != "models" {
 		t.Fatalf("absolute import = %#v", first)
 	}
+	if source[first.Bindings[0].NameLoc.Start:first.Bindings[0].NameLoc.End] != "package.models" {
+		t.Fatalf("import name loc = %+v", first.Bindings[0].NameLoc)
+	}
+	if source[first.Bindings[0].AliasLoc.Start:first.Bindings[0].AliasLoc.End] != "models" {
+		t.Fatalf("import alias loc = %+v", first.Bindings[0].AliasLoc)
+	}
 	third := file.Declarations[2].(*ImportDeclaration)
 	if !third.From || third.Level != 1 || third.Module != "support" || third.Bindings[0].TypeOnly || !third.Bindings[1].TypeOnly {
 		t.Fatalf("mixed relative import = %#v", third)
+	}
+	if source[third.ModuleLoc.Start:third.ModuleLoc.End] != "support" {
+		t.Fatalf("from-module loc = %+v", third.ModuleLoc)
 	}
 	fourth := file.Declarations[3].(*ImportDeclaration)
 	if fourth.Level != 2 || !fourth.Bindings[0].Star {

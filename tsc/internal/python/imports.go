@@ -195,12 +195,11 @@ func connectModuleImports(c *checker.Checker, states []*moduleState, state *modu
 // graph for imports that execute inside a function or conditional suite. It
 // does not mutate declaration namespaces; it only supplies the value bindings
 // selected by Python import syntax to the implementation binder.
-func resolveRuntimeImportValues(c *checker.Checker, states []*moduleState, state *moduleState, declaration *ImportDeclaration) (map[string]*checker.Type, []TypeDiagnostic) {
-	values := make(map[string]*checker.Type)
+func resolveRuntimeImportValues(c *checker.Checker, states []*moduleState, state *moduleState, declaration *ImportDeclaration) runtimeImportResolution {
+	result := runtimeImportResolution{Values: make(map[string]*checker.Type), Kinds: make(map[string]QuickInfoKind)}
 	if declaration == nil || declaration.TypeOnly {
-		return values, nil
+		return result
 	}
-	var diagnostics []TypeDiagnostic
 	if !declaration.From {
 		for _, binding := range declaration.Bindings {
 			if binding.TypeOnly {
@@ -208,7 +207,7 @@ func resolveRuntimeImportValues(c *checker.Checker, states []*moduleState, state
 			}
 			target, err := resolveImportedModule(states, state, binding.Name, declaration.Level)
 			if err != nil {
-				diagnostics = append(diagnostics, TypeDiagnostic{Range: declaration.Range(), Message: err.Error()})
+				result.Diagnostics = append(result.Diagnostics, TypeDiagnostic{Range: declaration.Range(), Message: err.Error()})
 				continue
 			}
 			local := binding.Alias
@@ -218,23 +217,29 @@ func resolveRuntimeImportValues(c *checker.Checker, states []*moduleState, state
 				local = parts[0]
 				value = nestedModuleNamespace(c, parts[1:], value)
 			}
-			values[local] = value
+			result.Values[local] = value
+			result.Kinds[local] = QuickInfoVariable
+			if result.Namespace == nil {
+				result.Namespace = target.namespace
+			}
 		}
-		return values, diagnostics
+		return result
 	}
 
 	target, err := resolveImportedModule(states, state, declaration.Module, declaration.Level)
 	if err != nil {
-		diagnostics = append(diagnostics, TypeDiagnostic{Range: declaration.Range(), Message: err.Error()})
-		return values, diagnostics
+		result.Diagnostics = append(result.Diagnostics, TypeDiagnostic{Range: declaration.Range(), Message: err.Error()})
+		return result
 	}
+	result.Namespace = target.namespace
 	for _, binding := range declaration.Bindings {
 		if binding.TypeOnly {
 			continue
 		}
 		if binding.Star {
 			for name, value := range target.module.Types.exportedValues() {
-				values[name] = value
+				result.Values[name] = value
+				result.Kinds[name] = importedValueKind(target.module.Types, name, value)
 			}
 			continue
 		}
@@ -243,7 +248,8 @@ func resolveRuntimeImportValues(c *checker.Checker, states []*moduleState, state
 			local = binding.Name
 		}
 		if value := target.module.Types.exportedValues()[binding.Name]; value != nil {
-			values[local] = value
+			result.Values[local] = value
+			result.Kinds[local] = importedValueKind(target.module.Types, binding.Name, value)
 			continue
 		}
 		submodule := binding.Name
@@ -251,12 +257,28 @@ func resolveRuntimeImportValues(c *checker.Checker, states []*moduleState, state
 			submodule = declaration.Module + "." + binding.Name
 		}
 		if nested, nestedErr := resolveImportedModule(states, state, submodule, declaration.Level); nestedErr == nil {
-			values[local] = nested.namespace
+			result.Values[local] = nested.namespace
+			result.Kinds[local] = QuickInfoVariable
 			continue
 		}
-		diagnostics = append(diagnostics, TypeDiagnostic{Range: declaration.Range(), Message: fmt.Sprintf("module %q has no exported runtime name %q", declaration.Module, binding.Name)})
+		result.Diagnostics = append(result.Diagnostics, TypeDiagnostic{Range: declaration.Range(), Message: fmt.Sprintf("module %q has no exported runtime name %q", declaration.Module, binding.Name)})
 	}
-	return values, diagnostics
+	return result
+}
+
+func importedValueKind(env *CheckerTypeEnvironment, name string, value *checker.Type) QuickInfoKind {
+	if env != nil {
+		if kind := env.valueKinds[name]; kind != QuickInfoUnknown {
+			return kind
+		}
+		if symbol := env.symbols[name]; symbol != nil && symbol.Class != nil {
+			return QuickInfoClass
+		}
+		if value != nil && len(env.checker.GetSignaturesOfType(value, checker.SignatureKindCall)) != 0 {
+			return QuickInfoFunction
+		}
+	}
+	return QuickInfoVariable
 }
 
 func nestedModuleNamespace(c *checker.Checker, parts []string, leaf *checker.Type) *checker.Type {

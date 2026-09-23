@@ -3,30 +3,3 @@ from catalog import load_user
 
 loaded = load_user(12)
 name = loaded["name"]
-
-class User:
-    id: str
-
-    def __init__(self, id: str, **kwargs: {}):
-        super().__init__(id=id, **kwargs)
-        self.id = id
-
-def set_id(obj: { id: str }, id: str) -> asserts obj is { id: str }:
-    obj.id = id
-
-def set_name(obj: { name: str }, name: str) -> asserts obj is { name: str }:
-    obj.name = name
-
-class User_(User):
-    name: str
-
-    def __init__(self, **kwargs: {"id": str}):
-      self.id = ''
-      self.name = ''
-
-
-
-a = {"ok": 32, "never": 2323} as const
-
-
-type AS = () if int | str extends int else never
