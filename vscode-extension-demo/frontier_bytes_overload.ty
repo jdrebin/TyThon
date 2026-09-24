@@ -1,6 +1,7 @@
 # Intended behavior: overload selection should recognize the bytes literal and
 # select the bytes signature. The str overload works in advanced_calls.ty.
 
+
 @overload
 def normalize(value: str) -> str: ...
 
@@ -15,6 +16,8 @@ def normalize(value):
 
 normalized_bytes = normalize(b"Ada")
 
-name = lambda s: str,f = "", *args: []int: s.trimLeft()  # Error: bytes is not assignable to str
+name = (
+    lambda s: str, f="", *args: []int: s.trimLeft()
+)  # Error: bytes is not assignable to str
 
 name(f="er", s='hello')

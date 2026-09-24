@@ -2,6 +2,7 @@
 # verify diagnostic ranges, Python-facing type names, and recovery after an
 # error without making the clean showcase files noisy.
 
+
 def identity<T>(value: T) -> T:
     return value
 
@@ -17,10 +18,10 @@ type SplitSurface = {
 
 
 split: SplitSurface
-wrong_attribute: int = split.name                 # expected error
-wrong_item: str = split["name"]                   # expected error
-missing_item = split["missing"]                   # expected error
-missing_attribute = split.missing                 # expected error
+wrong_attribute: int = split.name  # expected error
+wrong_item: str = split["name"]  # expected error
+missing_item = split["missing"]  # expected error
+missing_attribute = split.missing  # expected error
 
 
 def positional_only(value: str, /, *, enabled: bool) -> str:
@@ -28,12 +29,12 @@ def positional_only(value: str, /, *, enabled: bool) -> str:
 
 
 bad_keyword = positional_only(value="Ada", enabled=True)  # expected error
-missing_keyword = positional_only("Ada")                   # expected error
+missing_keyword = positional_only("Ada")  # expected error
 
 
 def promised_text() -> str:
-    return 42                                       # expected error
+    return 42  # expected error
 
 
 def wrong_generator() -> Generator<int, str, None>:
-    yield "not an int"                             # expected error
+    yield "not an int"  # expected error

@@ -327,7 +327,7 @@ var pythonDunderMethods = []string{
 }
 
 func DefinitionCompletions(query DefinitionCompletionQuery) []CompletionEntry {
-	if query.Kind != "def" || query.Prefix != "" && !strings.HasPrefix(query.Prefix, "_") {
+	if query.Kind != "def" || !strings.HasPrefix(query.Prefix, "__") {
 		return nil
 	}
 	entries := make([]CompletionEntry, 0)
@@ -1133,13 +1133,10 @@ func includeDunderCompletion(name string, prefix string) bool {
 	if name == "__call__" || name == "__class__" {
 		return false
 	}
-	if len(name) <= 4 || !strings.HasPrefix(name, "__") || !strings.HasSuffix(name, "__") {
-		return true
+	if len(name) > 4 && strings.HasPrefix(name, "__") && strings.HasSuffix(name, "__") {
+		return strings.HasPrefix(prefix, "__")
 	}
-	if checker.IsPythonExposedDunder(name) {
-		return true
-	}
-	return strings.HasPrefix(prefix, "__")
+	return true
 }
 
 func compareDunderCompletionPriority(left string, right string) int {

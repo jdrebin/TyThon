@@ -93,6 +93,8 @@ func formatType(c *checker.Checker, t *checker.Type, state *typeFormatState) str
 		return "Awaitable<" + formatType(c, awaited, state) + ">"
 	}
 	switch {
+	case t.Flags()&checker.TypeFlagsTypeParameter != 0 && t.AsTypeParameter().IsThisType():
+		return "this"
 	case t.Flags()&checker.TypeFlagsString != 0:
 		return "str"
 	case t.Flags()&checker.TypeFlagsNumber != 0:

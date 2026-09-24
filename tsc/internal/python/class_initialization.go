@@ -41,7 +41,7 @@ func (s *implementationChecker) configureInitializer(statement *RuntimeFunctionS
 	if state.assertion != nil {
 		for _, name := range c.SortedAttributeNames(state.assertion) {
 			key := c.GetStringLiteralType(name)
-			value := c.GetAttributeType(state.assertion, key)
+			value := c.GetAttributeType(c.PythonThisConstraint(state.assertion), key)
 			if value == nil {
 				continue
 			}
@@ -57,8 +57,9 @@ func (s *implementationChecker) configureInitializer(statement *RuntimeFunctionS
 				valueRef := initializationValuePrefix + state.receiver + "." + name
 				state.initial[valueRef] = c.GetUnknownType()
 				if state.contract.provided[name] {
-					if value := c.GetAttributeType(s.scope[state.receiver], key); value != nil {
-						state.initial[valueRef] = value
+					receiver := s.scope[state.receiver]
+					if value := c.GetAttributeType(c.PythonThisConstraint(receiver), key); value != nil {
+						state.initial[valueRef] = c.SubstitutePythonThis(value, receiver)
 					}
 				}
 				s.scope[valueRef] = state.initial[valueRef]
@@ -432,7 +433,8 @@ func (s *implementationChecker) applyBaseInitialization(call *RuntimeCallExpr, s
 		}
 		if _, required := state.required[name]; required {
 			s.scope[presencePrefix+state.receiver+"."+name] = s.types.checker.GetBooleanLiteralType(true)
-			s.scope[initializationValuePrefix+state.receiver+"."+name] = s.types.checker.GetAttributeType(assertion, s.types.checker.GetStringLiteralType(name))
+			attribute := s.types.checker.GetAttributeType(s.types.checker.PythonThisConstraint(assertion), s.types.checker.GetStringLiteralType(name))
+			s.scope[initializationValuePrefix+state.receiver+"."+name] = s.types.checker.SubstitutePythonThis(attribute, assertion)
 		}
 	}
 }
@@ -451,6 +453,9 @@ func (s *implementationChecker) finishConstructorInitialization(receiver string,
 	joined := copyRuntimeScope(state.initial)
 	mergeRuntimeScopesWithGraph(s.types.checker, joined, state.initial, state.returns)
 	for name, loc := range state.required {
+		if s.types.checker.IsPythonKeyExcludedDunder(name) {
+			continue
+		}
 		fact := joined[presencePrefix+receiver+"."+name]
 		if fact == nil || !s.types.checker.IsTypeAssignableTo(fact, s.types.checker.GetBooleanLiteralType(true)) {
 			s.report(loc, fmt.Sprintf("attribute %q has no initializer and is not definitely assigned in __init__", name))
@@ -462,11 +467,15 @@ func (s *implementationChecker) finishConstructorInitialization(receiver string,
 		// Validate the entire asserted shape using native structural comparison,
 		// not just the common attributes (important for union assertions).
 		var attributes []checker.ObjectFacetMember
-		instance := s.scope[receiver]
+		instance := s.types.checker.PythonThisConstraint(s.scope[receiver])
 		for _, name := range s.types.checker.SortedAttributeNames(instance) {
 			key := s.types.checker.GetStringLiteralType(name)
-			value := s.types.checker.GetAttributeType(instance, key)
+			value := s.types.checker.SubstitutePythonThis(s.types.checker.GetAttributeType(instance, key), s.scope[receiver])
 			if value == nil {
+				continue
+			}
+			if s.types.checker.IsPythonKeyExcludedDunder(name) || s.types.checker.IsPythonProtocolProperty(instance, name) {
+				attributes = append(attributes, checker.ObjectFacetMember{Name: name, Type: value})
 				continue
 			}
 			fact := joined[presencePrefix+receiver+"."+name]

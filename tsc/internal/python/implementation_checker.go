@@ -396,7 +396,7 @@ func (s *implementationChecker) checkAssignmentTarget(target RuntimeExpr, value 
 		receiver := s.typeOf(target.Target)
 		allowReadonly := false
 		if receiverName, ok := target.Target.(*RuntimeNameExpr); ok && receiverName.Name == s.readonlyAssignmentReceiverName && s.readonlyAssignmentReceiver != nil {
-			allowReadonly = s.types.checker.IsTypeIdenticalTo(receiver, s.readonlyAssignmentReceiver) && s.constructorWritableAttributes[target.Name]
+			allowReadonly = (s.types.checker.IsTypeIdenticalTo(receiver, s.readonlyAssignmentReceiver) || s.types.checker.IsTypeIdenticalTo(s.types.checker.PythonThisConstraint(receiver), s.readonlyAssignmentReceiver)) && s.constructorWritableAttributes[target.Name]
 		}
 		if err := c.CheckPythonAttributeAssignment(receiver, target.Name, value, allowReadonly); err != nil {
 			s.report(loc, err.Error())
@@ -1255,6 +1255,9 @@ func (s *implementationChecker) checkFunction(statement *RuntimeFunctionStatemen
 		contractIndex := index
 		if index == 0 && receiver != nil {
 			local[parameter.Name] = receiver
+			if thisType := s.types.checker.PythonThisType(receiver); thisType != nil {
+				local[parameter.Name] = thisType
+			}
 			continue
 		}
 		if receiver != nil {
@@ -1579,6 +1582,9 @@ func (s *implementationChecker) checkClass(statement *RuntimeClassStatement) {
 	for name, t := range classScope {
 		s.typeScope[name] = t
 	}
+	if thisType := s.types.checker.PythonThisType(instance); thisType != nil {
+		s.typeScope["this"] = thisType
+	}
 	defer func() { s.typeScope = previousTypeScope }()
 	var baseTypes []*checker.Type
 	for _, base := range declaration.Bases {
@@ -1716,7 +1722,7 @@ func (s *implementationChecker) checkClass(statement *RuntimeClassStatement) {
 	}
 	if !hasConstructor {
 		for name, loc := range required.required {
-			if required.inherited[name] {
+			if required.inherited[name] || s.types.checker.IsPythonKeyExcludedDunder(name) {
 				continue
 			}
 			s.report(loc, fmt.Sprintf("attribute %q has no initializer and is not definitely assigned in __init__", name))
@@ -2386,7 +2392,9 @@ func (s *implementationChecker) typeOfWorker(expression RuntimeExpr) *checker.Ty
 	case *RuntimeAttributeExpr:
 		target := s.typeOf(expression.Target)
 		s.checkMemberPresence(expression, target, c.GetStringLiteralType(expression.Name), true)
-		if result := c.GetAttributeType(target, c.GetStringLiteralType(expression.Name)); result != nil {
+		lookup := c.PythonThisConstraint(target)
+		if result := c.GetAttributeType(lookup, c.GetStringLiteralType(expression.Name)); result != nil {
+			result = c.SubstitutePythonThis(result, target)
 			kind := QuickInfoProperty
 			if symbol := c.GetPropertyOfType(target, expression.Name); symbol != nil && symbol.Flags&ast.SymbolFlagsMethod != 0 {
 				kind = QuickInfoMethod

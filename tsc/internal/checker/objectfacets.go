@@ -124,7 +124,7 @@ func (c *Checker) mergeObjectFacetTypes(types []*Type, own *Type, initializers b
 				}
 				if t == own {
 					if property.Flags&ast.SymbolFlagsOptional != 0 && existing.Flags&ast.SymbolFlagsOptional == 0 ||
-						!c.isTypeAssignableTo(c.getTypeOfSymbol(property), c.getTypeOfSymbol(existing)) {
+						!c.pythonMemberOverrideCompatible(property.Name, c.getTypeOfSymbol(property), c.getTypeOfSymbol(existing)) {
 						return nil, fmt.Errorf("incompatible attribute override for %q", property.Name)
 					}
 					members[property.Name] = property
@@ -232,6 +232,65 @@ func IsPythonExposedDunder(name string) bool {
 
 func (c *Checker) IsPythonKeyExcludedDunder(name string) bool {
 	return len(name) > 4 && strings.HasPrefix(name, "__") && strings.HasSuffix(name, "__") && !IsPythonExposedDunder(name)
+}
+
+// pythonMemberOverrideCompatible is ordinary assignability, except operation
+// dunders. Those must accept the parent signature. __init__ and __new__ stay
+// unconstrained so a subclass constructor can differ.
+func (c *Checker) pythonMemberOverrideCompatible(name string, child *Type, parent *Type) bool {
+	if name == "__init__" || name == "__new__" || !c.IsPythonKeyExcludedDunder(name) {
+		return c.isTypeAssignableTo(child, parent)
+	}
+	return c.PythonOperationOverrideCompatible(child, parent)
+}
+
+// PythonOperationOverrideCompatible reports whether child can replace parent
+// for a call or operation dunder. The child must accept every parent parameter
+// after the receiver and return a type assignable to the parent result.
+func (c *Checker) PythonOperationOverrideCompatible(child *Type, parent *Type) bool {
+	childSignatures := c.getSignaturesOfType(child, SignatureKindCall)
+	parentSignatures := c.getSignaturesOfType(parent, SignatureKindCall)
+	if len(childSignatures) == 0 || len(parentSignatures) == 0 {
+		return c.isTypeAssignableTo(child, parent)
+	}
+	for _, parentSignature := range parentSignatures {
+		matched := false
+		for _, childSignature := range childSignatures {
+			if c.pythonDunderSignatureCompatible(childSignature, parentSignature) {
+				matched = true
+				break
+			}
+		}
+		if !matched {
+			return false
+		}
+	}
+	return true
+}
+
+func (c *Checker) pythonDunderSignatureCompatible(child *Signature, parent *Signature) bool {
+	if c.getMinArgumentCount(child) > c.getMinArgumentCount(parent) {
+		return false
+	}
+	childParameters := child.parameters
+	parentParameters := parent.parameters
+	childRest := c.hasEffectiveRestParameter(child)
+	if childRest && len(childParameters) > 0 {
+		childParameters = childParameters[:len(childParameters)-1]
+	}
+	if len(childParameters) < len(parentParameters) && !childRest {
+		return false
+	}
+	limit := len(parentParameters)
+	if len(childParameters) < limit {
+		limit = len(childParameters)
+	}
+	for index := 0; index < limit; index++ {
+		if !c.isTypeAssignableTo(c.getTypeOfSymbol(parentParameters[index]), c.getTypeOfSymbol(childParameters[index])) {
+			return false
+		}
+	}
+	return c.isTypeAssignableTo(c.getReturnTypeOfSignature(child), c.getReturnTypeOfSignature(parent))
 }
 
 // SignatureWithoutReceiver drops the bound-or-unbound receiver parameter.
@@ -617,6 +676,21 @@ func (c *Checker) MarkPythonProtocolProperties(result *Type, protocol *Type) {
 			marked = make(map[string]bool)
 		}
 		marked[property.Name] = true
+	}
+	structured.pythonProtocolProperties = marked
+}
+
+func (c *Checker) MarkPythonProtocolPropertyNames(result *Type, names []string) {
+	if result == nil || result.flags&TypeFlagsObject == 0 || len(names) == 0 {
+		return
+	}
+	structured := c.resolveStructuredTypeMembers(result)
+	marked := structured.pythonProtocolProperties
+	if marked == nil {
+		marked = make(map[string]bool)
+	}
+	for _, name := range names {
+		marked[name] = true
 	}
 	structured.pythonProtocolProperties = marked
 }
@@ -1124,6 +1198,77 @@ func (c *Checker) IsPythonMappingType(t *Type) bool {
 // NewSyntheticTypeParameter creates a type parameter for a non-TypeScript
 // frontend while retaining the checker's normal constraint, inference, and
 // instantiation behavior.
+// PythonThisType is the polymorphic this parameter already stored on a synthetic class or interface.
+func (c *Checker) PythonThisType(t *Type) *Type {
+	if t == nil {
+		return nil
+	}
+	if t.objectFlags&ObjectFlagsReference != 0 {
+		if target := t.Target(); target != nil && target != t {
+			t = target
+		}
+	}
+	iface, ok := t.data.(*InterfaceType)
+	if !ok || iface.thisType == nil {
+		return nil
+	}
+	return iface.thisType
+}
+
+// PythonThisConstraint is the class or interface a polymorphic this parameter stands for.
+func (c *Checker) PythonThisConstraint(t *Type) *Type {
+	if t != nil && t.flags&TypeFlagsTypeParameter != 0 && t.AsTypeParameter().isThisType && t.AsTypeParameter().constraint != nil {
+		return t.AsTypeParameter().constraint
+	}
+	return t
+}
+
+// SubstitutePythonThis replaces polymorphic this parameters in t with the receiver the member was read from.
+func (c *Checker) SubstitutePythonThis(t *Type, receiver *Type) *Type {
+	if t == nil || receiver == nil || t == receiver {
+		return t
+	}
+	params := c.pythonThisParameters(t, make(map[*Type]bool))
+	if len(params) == 0 {
+		return t
+	}
+	targets := make([]*Type, len(params))
+	for index := range targets {
+		targets[index] = receiver
+	}
+	return c.instantiateType(t, newTypeMapper(params, targets))
+}
+
+func (c *Checker) pythonThisParameters(t *Type, seen map[*Type]bool) []*Type {
+	if t == nil || seen[t] {
+		return nil
+	}
+	seen[t] = true
+	if t.flags&TypeFlagsTypeParameter != 0 && t.AsTypeParameter().isThisType {
+		return []*Type{t}
+	}
+	if t.flags&TypeFlagsIndexedAccess != 0 {
+		access := t.AsIndexedAccessType()
+		return append(c.pythonThisParameters(access.ObjectType(), seen), c.pythonThisParameters(access.IndexType(), seen)...)
+	}
+	var found []*Type
+	if t.flags&(TypeFlagsUnion|TypeFlagsIntersection) != 0 {
+		for _, part := range t.Types() {
+			found = append(found, c.pythonThisParameters(part, seen)...)
+		}
+		return found
+	}
+	if t.flags&TypeFlagsObject != 0 {
+		for _, signature := range c.getSignaturesOfType(t, SignatureKindCall) {
+			found = append(found, c.pythonThisParameters(c.getReturnTypeOfSignature(signature), seen)...)
+			for _, parameter := range signature.parameters {
+				found = append(found, c.pythonThisParameters(c.getTypeOfSymbol(parameter), seen)...)
+			}
+		}
+	}
+	return found
+}
+
 func (c *Checker) NewSyntheticTypeParameter(name string, constraint *Type, defaultType *Type) *Type {
 	symbol := c.newSymbol(ast.SymbolFlagsTypeParameter, name)
 	t := c.newTypeParameter(symbol)
@@ -1491,6 +1636,7 @@ func (c *Checker) GetPythonSliceType(t *Type) *Type {
 }
 
 func (c *Checker) CheckPythonAttributeAssignment(t *Type, name string, value *Type, allowReadonly bool) error {
+	t = c.PythonThisConstraint(t)
 	if t.flags&TypeFlagsAny != 0 {
 		return nil
 	}

@@ -8,8 +8,8 @@ name, count = pair
 row: (str, int, int) = ("Ada", 3, 4)
 first_name, *scores = row
 
-numbers: []int = [1, 2, 3]
-extended = [0, *numbers]
+numbers = [1, 2, 3] as const
+extended = [0, *numbers] as const
 immutable = (0, *numbers)
 
 headed_tuple: HeadedTuple(str, int) = ("scores", *numbers)

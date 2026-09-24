@@ -194,14 +194,110 @@ user.
 	hidden := program.AttributeCompletionsAt("app.ty", query)
 	query.Prefix = "__"
 	visible := program.AttributeCompletionsAt("app.ty", query)
-	if completionHas(hidden, "__add__") || completionHas(hidden, "__call__") || completionHas(hidden, "__class__") {
+	if completionHas(hidden, "__add__") || completionHas(hidden, "__call__") || completionHas(hidden, "__class__") || completionHas(hidden, "__doc__") {
 		t.Fatalf("hidden completions = %v", completionLabels(hidden))
 	}
-	if !completionHas(hidden, "__doc__") {
-		t.Fatalf("hidden completions = %v, want __doc__", completionLabels(hidden))
-	}
-	if !completionHas(visible, "__add__") {
+	if !completionHas(visible, "__doc__") || !completionHas(visible, "__add__") {
 		t.Fatalf("prefixed completions = %v, want __add__", completionLabels(visible))
+	}
+}
+
+func TestShorterFunctionIsNotAssignable(t *testing.T) {
+	t.Parallel()
+	source := `def take(callback: (int, str) -> None):
+    pass
+
+def short(value: int):
+    pass
+
+def full(value: int, label: str):
+    pass
+
+take(short)
+take(full)
+
+class Base:
+    def show(self, value: int, label: str) -> None:
+        pass
+
+class Child(Base):
+    def show(self, value: int) -> None:
+        pass
+`
+	program := BuildProgram(newPythonChecker(t), []SourceInput{{FileName: "app.ty", Text: source}})
+	var messages []string
+	for _, diagnostic := range program.Diagnostics {
+		messages = append(messages, diagnostic.Message)
+	}
+	joined := strings.Join(messages, "\n")
+	if strings.Count(joined, "not assignable") < 2 {
+		t.Fatalf("diagnostics = %v", program.Diagnostics)
+	}
+	if strings.Contains(joined, "full") {
+		t.Fatalf("diagnostics = %v, full callback must be accepted", program.Diagnostics)
+	}
+}
+
+func TestDunderOverrideMustAcceptParentSignature(t *testing.T) {
+	t.Parallel()
+	source := `class Vec:
+    def __add__(self, other: int) -> int:
+        return other
+    def __init__(self, name: str):
+        pass
+
+class Point(Vec):
+    def __add__(self) -> int:
+        return 0
+    def __init__(self, name: str, kind: str):
+        pass
+`
+	program := BuildProgram(newPythonChecker(t), []SourceInput{{FileName: "app.ty", Text: source}})
+	var messages []string
+	for _, diagnostic := range program.Diagnostics {
+		messages = append(messages, diagnostic.Message)
+	}
+	joined := strings.Join(messages, "\n")
+	if !strings.Contains(joined, `incompatible attribute override for "__add__"`) {
+		t.Fatalf("diagnostics = %v", program.Diagnostics)
+	}
+	if strings.Contains(joined, "__init__") {
+		t.Fatalf("diagnostics = %v, __init__ must stay free", program.Diagnostics)
+	}
+}
+
+func TestPythonThisSubstitutesTheReceiver(t *testing.T) {
+	t.Parallel()
+	source := `class Box:
+    def clone(self) -> this:
+        return self
+    def tagged(self, id: int) -> this & { "id": int }:
+        return self
+
+class Gift(Box):
+    label: str = ""
+
+gift = Gift()
+cloned = gift.clone()
+label: str = cloned.label
+tagged = gift.tagged(1)
+marked: int = tagged["id"]
+outside: this = 1
+`
+	program := BuildProgram(newPythonChecker(t), []SourceInput{{FileName: "app.ty", Text: source}})
+	var messages []string
+	for _, diagnostic := range program.Diagnostics {
+		messages = append(messages, diagnostic.Message)
+	}
+	joined := strings.Join(messages, "\n")
+	if strings.Contains(joined, "label") || strings.Contains(joined, "no item") || strings.Contains(joined, "has no attribute") {
+		t.Fatalf("diagnostics = %v", program.Diagnostics)
+	}
+	if !strings.Contains(joined, "this is only valid in a class or interface") {
+		t.Fatalf("diagnostics = %v, want this outside a class", program.Diagnostics)
+	}
+	if !strings.Contains(joined, "not assignable to this &") {
+		t.Fatalf("diagnostics = %v, want returning self rejected for the intersection", program.Diagnostics)
 	}
 }
 

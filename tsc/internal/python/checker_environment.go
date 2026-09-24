@@ -502,6 +502,13 @@ func (e *CheckerTypeEnvironment) resolveCheckerTypeWorker(expression TypeExpr, s
 	}
 	switch expression := expression.(type) {
 	case *NameTypeExpr:
+		if expression.Name == "this" {
+			if value := scope["this"]; value != nil {
+				return value
+			}
+			e.reportChecker(expression.Range(), "this is only valid in a class or interface")
+			return e.checker.GetErrorType()
+		}
 		if value := scope[expression.Name]; value != nil {
 			return value
 		}
@@ -784,6 +791,7 @@ func (e *CheckerTypeEnvironment) resolveCheckerGenericSymbol(symbol *CheckerType
 		local[parameter.Name] = typeParameter
 	}
 	symbol.TypeParameters = parameters
+	local = e.withThis(local, symbol.Instance)
 	if symbol.Interface != nil {
 		e.checker.SetSyntheticObjectTypeParameters(symbol.Instance, parameters)
 		e.checker.PopulateObjectTypeFromType(symbol.Instance, e.resolveCheckerInterface(symbol.Interface, local))
@@ -960,8 +968,9 @@ func (e *CheckerTypeEnvironment) objectProtocolType() *checker.Type {
 // checker lookup. Explicit members always win, while primitives and otherwise
 // empty structural values still expose the declaration-driven object surface.
 func (e *CheckerTypeEnvironment) getAttributeType(target *checker.Type, key *checker.Type) *checker.Type {
-	if result := e.checker.GetAttributeType(target, key); result != nil {
-		return result
+	lookup := e.checker.PythonThisConstraint(target)
+	if result := e.checker.GetAttributeType(lookup, key); result != nil {
+		return e.checker.SubstitutePythonThis(result, target)
 	}
 	if target == nil || target.Flags()&checker.TypeFlagsNever != 0 {
 		return nil
@@ -1316,7 +1325,7 @@ func (e *CheckerTypeEnvironment) resolveCheckerCallableWithParameterTypes(expres
 }
 
 func (e *CheckerTypeEnvironment) resolveCheckerInterfaceInto(symbol *CheckerTypeSymbol, declaration *InterfaceDeclaration, scope map[string]*checker.Type) {
-	resolved := e.resolveCheckerInterface(declaration, scope)
+	resolved := e.resolveCheckerInterface(declaration, e.withThis(scope, symbol.Instance))
 	e.checker.PopulateObjectTypeFromType(symbol.Instance, resolved)
 }
 
@@ -1340,7 +1349,9 @@ func (e *CheckerTypeEnvironment) resolveCheckerInterface(declaration *InterfaceD
 }
 
 func (e *CheckerTypeEnvironment) resolveCheckerClassInto(symbol *CheckerTypeSymbol, declaration *ClassDeclaration, scope map[string]*checker.Type) {
-	instance, value := e.resolveCheckerClass(declaration, scope)
+	scope = copyCheckerScope(scope)
+	scope[declaration.Name] = symbol.Instance
+	instance, value := e.resolveCheckerClass(declaration, e.withThis(scope, symbol.Instance))
 	if instance.Flags()&checker.TypeFlagsIntersection != 0 {
 		symbol.Instance = instance
 	} else {
@@ -1370,14 +1381,14 @@ func (e *CheckerTypeEnvironment) resolveCheckerClass(declaration *ClassDeclarati
 	if !e.installingBuiltins {
 		bases = append(bases, e.resolveCheckerSymbol("Object"))
 	}
-	own, classValue := e.resolveCheckerMembers(declaration.Members, scope)
+	own, classValue := e.resolveCheckerMembers(declaration.Members, e.withThis(scope, scope[declaration.Name]))
 	for _, base := range bases {
 		baseCalls := e.checker.GetSignaturesOfType(base, checker.SignatureKindCall)
 		ownCalls := e.checker.GetSignaturesOfType(own, checker.SignatureKindCall)
 		if len(baseCalls) == 0 || len(ownCalls) == 0 {
 			continue
 		}
-		if !e.checker.IsTypeAssignableTo(e.checker.NewObjectTypeFromCallSignatures(ownCalls), e.checker.NewObjectTypeFromCallSignatures(baseCalls)) {
+		if !e.checker.PythonOperationOverrideCompatible(e.checker.NewObjectTypeFromCallSignatures(ownCalls), e.checker.NewObjectTypeFromCallSignatures(baseCalls)) {
 			e.reportChecker(declaration.Range(), "incompatible __call__ override")
 		}
 	}
@@ -1388,6 +1399,24 @@ func (e *CheckerTypeEnvironment) resolveCheckerClass(declaration *ClassDeclarati
 	}
 	if len(primitiveBases) != 0 {
 		instance = e.checker.GetIntersectionType(append(primitiveBases, instance))
+	}
+	if !e.installingBuiltins {
+		if protocol := e.objectProtocolType(); protocol != nil {
+			before := map[string]bool{}
+			for _, property := range e.checker.GetPropertiesOfType(instance) {
+				before[property.Name] = true
+			}
+			if merged, err := e.checker.ExtendPythonClassFacetTypes([]*checker.Type{protocol, instance}, instance); err == nil {
+				var inherited []string
+				for _, property := range e.checker.GetPropertiesOfType(protocol) {
+					if !before[property.Name] {
+						inherited = append(inherited, property.Name)
+					}
+				}
+				e.checker.MarkPythonProtocolPropertyNames(merged, inherited)
+				instance = merged
+			}
+		}
 	}
 	classValue = e.attachPythonConstruction(classValue, instance)
 	e.checker.OmitPythonInstanceContracts(e.checker.PythonConstructionCarrier(instance))
@@ -1938,6 +1967,16 @@ func typeExpressionReferencesName(expression TypeExpr, name string) bool {
 		return any(expression.ReturnType) || expression.Predicate != nil && any(expression.Predicate.Type)
 	}
 	return false
+}
+
+func (e *CheckerTypeEnvironment) withThis(scope map[string]*checker.Type, instance *checker.Type) map[string]*checker.Type {
+	thisType := e.checker.PythonThisType(instance)
+	if thisType == nil {
+		return scope
+	}
+	scope = copyCheckerScope(scope)
+	scope["this"] = thisType
+	return scope
 }
 
 func copyCheckerScope(scope map[string]*checker.Type) map[string]*checker.Type {

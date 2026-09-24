@@ -915,8 +915,9 @@ Built-in protocols live in bundled `.d.ty` declarations. `object` fallback is
 applied at runtime/editor boundaries rather than injected into every finite
 `keyof` result.
 
-Third-party decorators are ignored unless a future explicit decorator typing
-contract is designed. Potential decorator APIs are intentionally deferred.
+Third-party decorators are ignored unless the phase 2 decorator contract below
+is implemented. A decorator does not change a name's type until that contract
+exists.
 
 ## Editor behavior
 
@@ -1242,13 +1243,76 @@ verification does not substitute for an interactive extension-host smoke test.
 - exact static semantics for more exotic hashable key types;
 - exact tuple/list slice-result calculation;
 - spread syntax inside type shapes such as `{ **Record(str, int) }`;
-- an explicit third-party decorator transformation API;
+- an explicit decorator input/output contract (see phase 2);
 - deeper metaclass and descriptor modeling;
 - richer standard-library and third-party declaration coverage.
 
 These are deferred because none should compromise the core rule: Python syntax
 and runtime semantics at the boundary, existing TypeScript type machinery at
 the center.
+
+## Phase 2 and later
+
+Not current work. Recorded so the behavior is not relitigated from scratch.
+
+### Tython types as Python annotations
+
+Phase one erases types, so runtime reflection (`__annotations__`,
+`typing.get_type_hints`, and libraries that read them) sees no Tython type.
+A later emission pass projects a checker type into a Python annotation.
+
+The projection covers types Python can already spell: names, `X | Y`,
+generics such as `list[int]` and `dict[str, int]`, and `typing.Literal` where
+the value is a legal literal. The checker type stays authoritative. The
+annotation is only a reflection view of that type.
+
+Tython-only types have no runtime Python type: conditionals, mapped types,
+`keyof`, indexed access, `this`, and `defer`. Those stay erased or become an
+explicit documented fallback. They must not be emitted as an annotation that
+claims a different type.
+
+### Decorator input and output
+
+A decorator is a callable. Its input is the type it accepts for the decorated
+declaration. Its output is the type of that name after decoration.
+
+The declaration must be assignable to the input. After decoration, uses of the
+name see the output, not the original function or class. Stacked decorators
+apply inside-out, matching Python: the bottom decorator runs first, and each
+output is the next input.
+
+`@property`, `@classmethod`, and `@staticmethod` stay built-in special cases.
+This contract is the general rule for user and library decorators. Until it
+exists, an unrecognized decorator still does not change the declared type.
+
+### `defer`: bind a blank type from one target
+
+Python cannot introduce a class inline, and inline functions are a poor place
+to carry a type. `defer` is a blank alias that is filled from exactly one
+program location, so a caller can reuse a target type without importing that
+parameter's declared type or its type arguments.
+
+```ty
+type U = defer
+
+user: U = {"id": 12, "name": "hello"}
+
+call_me("hello", user as infer U)
+```
+
+`type U = defer` introduces an unbound alias. `as infer U` is the link. The
+contextual type of that location becomes `U`. Here that is the type `call_me`
+expects for the argument, including inferred type arguments. `user: U` then
+sees that bound type, including when the annotation is written before the link.
+
+The link is mandatory and unique. No link, or more than one link, is an error.
+`U` is not a value and not a generic: the link supplies the whole type. It
+erases. This is not conditional-type `infer`, which binds a pattern variable.
+`defer` binds one named alias from one target location.
+
+The spelling (`defer`, `as infer U`) is the working proposal, not a locked
+syntax. The locked part is the behavior: one blank alias, one link, the
+location's target type is the alias, and other uses of the alias see that type.
 
 ### Required instance fields and inferred build roots
 

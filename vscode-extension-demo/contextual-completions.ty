@@ -1,12 +1,15 @@
 # Try Ctrl+Space inside the quoted values, including before the first character.
 type Mode = "read" | "write"
-type Options = { "mode": Mode, "encoding": "utf-8" | "ascii" }
+type Options = {"mode": Mode, "encoding": "utf-8" | "ascii"}
+
 
 def select_mode(mode: Mode) -> Mode:
     return mode
 
-def configure(options: Options) -> Mode:
+
+def configure<M extends Mode>(options: Options & {"mode": M}) -> M:
     return options["mode"]
+
 
 selected = select_mode("read")
 named = select_mode(mode="write")

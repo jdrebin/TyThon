@@ -32,20 +32,17 @@ class User(Named, Timestamped):
     def valid_name(value: str) -> bool:
         return bool(value)
 
-    def __eq__(self):
-        return ""
-
     def __bool__(self):
         return 54
 
 
 class TextValue:
-    value: str
+    value!: str
 
 
 class NumericValue:
-    value: int
-    scale: int
+    value!: int
+    scale!: int
 
 
 type NumericWithoutValue = {

@@ -1531,6 +1531,13 @@ func (c *Checker) compareSignaturesRelated(source *Signature, target *Signature,
 		}
 		return TernaryFalse
 	}
+	// Python raises TypeError when a call passes more positional arguments than
+	// the callee accepts. A shorter function is not assignable to a longer one
+	// unless the shorter one absorbs the extra arguments with *args.
+	if c.pythonValueHierarchy != nil && !c.hasEffectiveRestParameter(source) &&
+		(c.hasEffectiveRestParameter(target) || c.getParameterCount(source) < targetCount) {
+		return TernaryFalse
+	}
 	if len(source.typeParameters) != 0 && !core.Same(source.typeParameters, target.typeParameters) {
 		target = c.getCanonicalSignature(target)
 		source = c.instantiateSignatureInContextOf(source, target /*inferenceContext*/, nil, compareTypes)
