@@ -11,19 +11,23 @@ sequence: Object = [1, 2]
 pair: Object = (1, "name")
 callback: Object = lambda value: value
 
+
 def require_some<T>(value: T) -> T & Some:
     if value is None:
         raise ValueError("missing value")
     return value
+
 
 def non_none(value: object) -> Some:
     if value is not None:
         return value
     return False
 
+
 # Inheriting a primitive retains its primitive type and adds an object shape.
 class Label(str):
     id = 1
+
 
 interface Identified(Object):
     id: int
@@ -33,7 +37,7 @@ label = Label()
 text: str = label
 shaped: Object = label
 labeled: LabeledText = label
-plain_shape: str & { id: int } = label
+plain_shape: str & {id: int} = label
 identifier: int = label.id
 
 type PresentValues = Extract(str | int | None, Some)

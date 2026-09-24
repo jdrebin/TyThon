@@ -1,6 +1,7 @@
 package python
 
 import (
+	"strconv"
 	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/internal/ast"
@@ -114,6 +115,9 @@ func printPythonTypeNode(node *ast.Node, emit *printer.EmitContext) string {
 		case ast.KindRestType:
 			return "*" + render(node.AsRestTypeNode().Type)
 		case ast.KindTypeLiteral:
+			if tuple, ok := pythonTupleLiteral(node, render); ok {
+				return tuple
+			}
 			return "{ " + join(node.Members(), ", ") + " }"
 		case ast.KindPropertySignature:
 			prefix := ""
@@ -160,4 +164,67 @@ func printPythonTypeNode(node *ast.Node, emit *printer.EmitContext) string {
 		return replaceCheckerTypeWords(writer.String())
 	}
 	return render(node)
+}
+
+// A tuple pattern is built as an object literal: numeric slots, an int index
+// for the rest, and the sequence methods. Print the tuple, not those methods.
+func pythonTupleLiteral(node *ast.Node, render func(*ast.Node) string) (string, bool) {
+	fixed := map[int]string{}
+	rest := ""
+	for _, member := range node.Members() {
+		switch member.Kind {
+		case ast.KindIndexSignature:
+			parameters := member.Parameters()
+			if len(parameters) != 1 {
+				return "", false
+			}
+			key := render(parameters[0].Type())
+			if index, err := strconv.Atoi(key); err == nil && index >= 0 {
+				fixed[index] = render(member.Type())
+				continue
+			}
+			if key != "int" && key != "bigint" {
+				return "", false
+			}
+			element := render(member.Type())
+			if !strings.HasPrefix(element, "()") && !strings.HasPrefix(element, "[]") {
+				element = "()" + element
+			}
+			rest = "*" + element
+		case ast.KindPropertySignature, ast.KindMethodSignature:
+			name := render(member.Name())
+			if strings.HasPrefix(name, "__") && strings.HasSuffix(name, "__") || strings.Contains(name, "more") {
+				continue
+			}
+			index, err := strconv.Atoi(name)
+			if err != nil || index < 0 {
+				return "", false
+			}
+			fixed[index] = render(member.Type())
+		default:
+			if member.Name() == nil {
+				return "", false
+			}
+			name := render(member.Name())
+			if strings.HasPrefix(name, "__") && strings.HasSuffix(name, "__") || strings.Contains(name, "more") {
+				continue
+			}
+			return "", false
+		}
+	}
+	if len(fixed) == 0 && rest == "" {
+		return "", false
+	}
+	elements := make([]string, 0, len(fixed)+1)
+	for index := 0; index < len(fixed); index++ {
+		element, ok := fixed[index]
+		if !ok {
+			return "", false
+		}
+		elements = append(elements, element)
+	}
+	if rest != "" {
+		elements = append(elements, rest)
+	}
+	return "(" + strings.Join(elements, ", ") + ")", true
 }

@@ -21,3 +21,4 @@ modes: []Mode = ["read", "write"]
 # Within options["..."], suggest only its keys. An ordinary string stays quiet.
 encoding = options["encoding"]
 ordinary = "no unrelated variable suggestions here"
+repr

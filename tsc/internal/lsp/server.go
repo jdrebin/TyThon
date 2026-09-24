@@ -1803,7 +1803,7 @@ func (s *Server) handleInitialize(ctx context.Context, params *lsproto.Initializ
 		},
 	}
 	if s.pythonMode {
-		pythonCompletionTriggers := []string{".", "[", `"`, "'"}
+		pythonCompletionTriggers := []string{".", "[", `"`, "'", "_"}
 		pythonSignatureTriggers := []string{"(", ","}
 		pythonSignatureRetriggers := []string{","}
 		response.ServerInfo = &lsproto.ServerInfo{

@@ -337,10 +337,37 @@ def validate_output(source, output):
     black.assert_equivalent(before["erased"], after["erased"])
 
 
+def stabilize_indent(source):
+    # Black's tokenizer rejects a suite whose indents are not multiples of the
+    # block width. Round those widths so Format Document can still repair them.
+    lines = source.splitlines(keepends=True)
+    changed = False
+    normalized = []
+    for line in lines:
+        body = line.lstrip(" \t")
+        if body == "" or body.startswith("#"):
+            normalized.append(line)
+            continue
+        width = 0
+        for character in line[: len(line) - len(body)]:
+            width += 4 if character == "\t" else 1
+        rounded = width if width % 4 == 0 else int(width / 4 + 0.5) * 4
+        if rounded != width or "\t" in line[: len(line) - len(body)]:
+            changed = True
+        newline = "\n" if line.endswith("\n") else ""
+        if line.endswith("\r\n"):
+            newline = "\r\n"
+        normalized.append(" " * rounded + body.rstrip("\r\n") + newline)
+    return "".join(normalized) if changed else source
+
+
 def format_source(source, width=88, *, magic_trailing_comma=True):
     mode = black.Mode(line_length=width, string_normalization=False,
                       magic_trailing_comma=magic_trailing_comma)
-    output = black.format_str(source, mode=mode)
+    try:
+        output = black.format_str(source, mode=mode)
+    except (tokenize.TokenError, IndentationError, black.parsing.InvalidInput):
+        output = black.format_str(stabilize_indent(source), mode=mode)
     validate_output(source, output)
     black.assert_stable(source, output, mode)
     return output

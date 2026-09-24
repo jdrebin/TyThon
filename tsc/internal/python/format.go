@@ -94,7 +94,7 @@ func formatType(c *checker.Checker, t *checker.Type, state *typeFormatState) str
 	}
 	switch {
 	case t.Flags()&checker.TypeFlagsTypeParameter != 0 && t.AsTypeParameter().IsThisType():
-		return "this"
+		return "self"
 	case t.Flags()&checker.TypeFlagsString != 0:
 		return "str"
 	case t.Flags()&checker.TypeFlagsNumber != 0:
@@ -305,13 +305,13 @@ func formatPythonObject(c *checker.Checker, t *checker.Type, state *typeFormatSt
 	if c.IsPythonMappingType(t) && hasOnlyLiteralItemKeys(infos) {
 		return "Dict & " + formatPythonMappingShape(c, t, infos, state), true
 	}
-	if !c.IsPythonMappingType(t) && sequenceKind == checker.PythonSequenceNone && hasOnlyLiteralItemKeys(infos) {
+	if !c.IsPythonMappingType(t) && sequenceKind == checker.PythonSequenceNone && hasOnlyLiteralItemKeys(infos) && !isSequenceIndexShape(c, infos) {
 		// Quoted-key type expressions are exact structural item shapes. They use
 		// the same checker index metadata as dictionaries without claiming the
 		// runtime Dict identity in their display.
 		return formatPythonMappingShape(c, t, infos, state), true
 	}
-	if !c.IsPythonMappingType(t) && c.HasSeparateAttributeAndItemFacets(t) && sequenceKind == checker.PythonSequenceNone && len(infos) != 0 && len(c.GetSignaturesOfType(t, checker.SignatureKindCall)) == 0 {
+	if !c.IsPythonMappingType(t) && c.HasSeparateAttributeAndItemFacets(t) && sequenceKind == checker.PythonSequenceNone && len(infos) != 0 && !isSequenceIndexShape(c, infos) && len(c.GetSignaturesOfType(t, checker.SignatureKindCall)) == 0 {
 		// An exact structural object may mix attribute and item facets, including
 		// an open-ended item surface. Named interfaces/classes have already been
 		// folded (or deliberately expanded) above, so this is their Python-facing
@@ -383,7 +383,7 @@ func formatPythonObject(c *checker.Checker, t *checker.Type, state *typeFormatSt
 		sort.Strings(parts)
 		return "{ " + strings.Join(parts, ", ") + " }", true
 	}
-	if sequenceKind == checker.PythonSequenceNone && (len(infos) == 0 || !attributes["__iter__"] || !attributes["__contains__"]) {
+	if sequenceKind == checker.PythonSequenceNone && !isSequenceIndexShape(c, infos) && (len(infos) == 0 || !attributes["__iter__"] || !attributes["__contains__"]) {
 		return "", false
 	}
 	readonly := sequenceKind == checker.PythonSequenceTuple
@@ -395,6 +395,9 @@ func formatPythonObject(c *checker.Checker, t *checker.Type, state *typeFormatSt
 	for _, info := range infos {
 		readonly = readonly && info.IsReadonly()
 		key := info.KeyType()
+		if _, attribute := c.GetPythonAttributeNameType(key); attribute {
+			continue
+		}
 		if key.Flags()&checker.TypeFlagsBigInt != 0 {
 			rest = info.ValueType()
 			continue
@@ -443,6 +446,21 @@ func formatSequenceConstructorArgument(c *checker.Checker, t *checker.Type, stat
 		return "(" + formatted + ")"
 	}
 	return formatted
+}
+
+func isSequenceIndexShape(c *checker.Checker, infos []*checker.IndexInfo) bool {
+	found := false
+	for _, info := range infos {
+		if _, attribute := c.GetPythonAttributeNameType(info.KeyType()); attribute {
+			continue
+		}
+		flags := info.KeyType().Flags()
+		if flags&checker.TypeFlagsBigInt == 0 && flags&checker.TypeFlagsBigIntLiteral == 0 {
+			return false
+		}
+		found = true
+	}
+	return found
 }
 
 func hasOnlyLiteralItemKeys(infos []*checker.IndexInfo) bool {
@@ -539,7 +557,7 @@ func shouldHideHoverDunder(c *checker.Checker, owner *checker.Type, property *as
 // FormatDiagnosticMessage removes names and punctuation that belong only to
 // the TypeScript checker's internal representation.
 func FormatDiagnosticMessage(message string) string {
-	return strings.ReplaceAll(message, "=>", "->")
+	return replaceCheckerTypeWords(strings.ReplaceAll(message, "=>", "->"))
 }
 
 func replaceCheckerTypeWords(text string) string {

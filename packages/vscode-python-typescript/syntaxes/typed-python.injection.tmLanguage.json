@@ -4,30 +4,31 @@
     "injectionSelector": "L:source.python.typed -comment -string",
     "patterns": [
         {
-            "name": "keyword.operator.presence.typed-python",
-            "match": "-optional\\b|!(?!=)"
+            "include": "source.python.typed#comments"
         },
         {
-            "match": "(?<![\\w])(__)([A-Za-z][A-Za-z0-9_]*?)(__)(?![\\w])",
+            "match": "(-)(optional)\\b|(!(?!=))",
+            "captures": {
+                "1": { "name": "keyword.operator.arithmetic.python" },
+                "2": { "name": "storage.modifier.declaration.python" },
+                "3": { "name": "keyword.operator.arithmetic.python" }
+            }
+        },
+        {
+            "match": "(?<!\\bdef\\s+)(?<![\\w])(__)([A-Za-z][A-Za-z0-9_]*?)(__)(?![\\w])",
             "captures": {
                 "2": { "name": "keyword.control.flow.python" }
             }
         },
         {
-            "match": "\\b(def)\\s+(__)([A-Za-z][A-Za-z0-9_]*?)(__)(?=\\s*(?:<[^>]*>)?\\s*\\()",
+            "match": "(?<![\\w.)\\]])(\\*{1,2})([[:alpha:]_]\\w*)",
             "captures": {
-                "1": { "name": "storage.type.function.python" },
-                "3": { "name": "keyword.control.flow.python" }
+                "1": { "name": "keyword.operator.unpacking.parameter.python" },
+                "2": { "name": "variable.other.readwrite.python" }
             }
         },
         {
-            "include": "#structural-method"
-        },
-        {
             "include": "#type-alias-declaration"
-        },
-        {
-            "include": "#interface-declaration"
         },
         {
             "include": "#declaration-modifiers"
@@ -169,6 +170,10 @@
                     "match": "(\\||&)"
                 },
                 {
+                    "name": "punctuation.separator.annotation.result.python",
+                    "match": "->"
+                },
+                {
                     "include": "source.python.typed#expression"
                 }
             ]
@@ -211,15 +216,24 @@
             ]
         },
         "structural-method": {
-            "match": "\\b(def)\\s+([[:alpha:]_]\\w*)(?=\\s*(?:<[^>]*>)?\\s*\\()",
-            "captures": {
-                "1": {
-                    "name": "storage.type.function.python"
+            "begin": "\\b(def)\\s+([[:alpha:]_]\\w*)(?=\\s*(?:<[^>]*>)?\\s*\\()",
+            "end": "(?=:|#|$)",
+            "beginCaptures": {
+                "1": { "name": "storage.type.function.python" },
+                "2": { "name": "entity.name.function.python" }
+            },
+            "patterns": [
+                { "include": "source.python.typed#comments" },
+                { "include": "#type-parameters" },
+                {
+                    "name": "punctuation.separator.annotation.result.python",
+                    "match": "->"
                 },
-                "2": {
-                    "name": "entity.name.function.python"
-                }
-            }
+                { "include": "#type-keywords" },
+                { "include": "#type-utilities" },
+                { "include": "#attribute-key" },
+                { "include": "source.python.typed#expression" }
+            ]
         },
         "type-keywords": {
             "patterns": [

@@ -192,7 +192,7 @@ user.
 		}
 	}
 	hidden := program.AttributeCompletionsAt("app.ty", query)
-	query.Prefix = "__"
+	query.Prefix = "_"
 	visible := program.AttributeCompletionsAt("app.ty", query)
 	if completionHas(hidden, "__add__") || completionHas(hidden, "__call__") || completionHas(hidden, "__class__") || completionHas(hidden, "__doc__") {
 		t.Fatalf("hidden completions = %v", completionLabels(hidden))
@@ -269,9 +269,9 @@ class Point(Vec):
 func TestPythonThisSubstitutesTheReceiver(t *testing.T) {
 	t.Parallel()
 	source := `class Box:
-    def clone(self) -> this:
+    def clone(self) -> self:
         return self
-    def tagged(self, id: int) -> this & { "id": int }:
+    def tagged(self, id: int) -> self & { "id": int }:
         return self
 
 class Gift(Box):
@@ -282,7 +282,7 @@ cloned = gift.clone()
 label: str = cloned.label
 tagged = gift.tagged(1)
 marked: int = tagged["id"]
-outside: this = 1
+outside: self = 1
 `
 	program := BuildProgram(newPythonChecker(t), []SourceInput{{FileName: "app.ty", Text: source}})
 	var messages []string
@@ -293,10 +293,10 @@ outside: this = 1
 	if strings.Contains(joined, "label") || strings.Contains(joined, "no item") || strings.Contains(joined, "has no attribute") {
 		t.Fatalf("diagnostics = %v", program.Diagnostics)
 	}
-	if !strings.Contains(joined, "this is only valid in a class or interface") {
-		t.Fatalf("diagnostics = %v, want this outside a class", program.Diagnostics)
+	if !strings.Contains(joined, "self is only valid in a class or interface") {
+		t.Fatalf("diagnostics = %v, want self outside a class", program.Diagnostics)
 	}
-	if !strings.Contains(joined, "not assignable to this &") {
+	if !strings.Contains(joined, "not assignable to self &") {
 		t.Fatalf("diagnostics = %v, want returning self rejected for the intersection", program.Diagnostics)
 	}
 }

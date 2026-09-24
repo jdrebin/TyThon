@@ -17,6 +17,17 @@ type request struct {
 	Source string
 }
 
+// The first '>' after a type-parameter list is often the '>' inside '->'.
+// That arrow is not the closer.
+func markTypeParamClose(source string, from int, angles map[int]string) {
+	for index := from; index < len(source); index++ {
+		if source[index] == '>' && (index == 0 || source[index-1] != '-') {
+			angles[index] = "close"
+			return
+		}
+	}
+}
+
 func main() {
 	var input request
 	// JSON escaping can make a 1 MB source substantially larger on the wire.
@@ -102,7 +113,7 @@ func main() {
 				if last.Default != nil {
 					end = last.Default.Range().End
 				}
-				mark(end, len(input.Source), '>', "close")
+				markTypeParamClose(input.Source, end, angles)
 			}
 		}
 		switch value.Kind() {

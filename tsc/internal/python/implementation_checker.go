@@ -38,10 +38,12 @@ type RuntimeStringContext struct {
 }
 
 type TypedRuntimeExpression struct {
-	Range TextRange
-	Type  *checker.Type
-	Kind  QuickInfoKind
-	Name  string
+	Range          TextRange
+	Type           *checker.Type
+	Kind           QuickInfoKind
+	Name           string
+	DefinitionFile string
+	Definition     TextRange
 }
 
 // RuntimeScopeSnapshot retains the checker-backed values visible while a name
@@ -315,9 +317,11 @@ func (s *implementationChecker) applyRuntimeAssignment(statement *RuntimeAssignm
 	}
 	if expected != nil {
 		s.scope[statement.Name] = s.types.checker.AssignmentFlowType(expected, actual)
+		s.bindNameDefinition(statement.Name, statement.NameLoc)
 		s.recordNamedType(statement.NameLoc, expected, QuickInfoVariable, statement.Name)
 	} else {
 		s.scope[statement.Name] = s.types.checker.RegularTypeOfObjectLiteral(actual)
+		s.bindNameDefinition(statement.Name, statement.NameLoc)
 		s.recordNamedType(statement.NameLoc, actual, QuickInfoVariable, statement.Name)
 	}
 }
@@ -398,6 +402,11 @@ func (s *implementationChecker) checkAssignmentTarget(target RuntimeExpr, value 
 		if receiverName, ok := target.Target.(*RuntimeNameExpr); ok && receiverName.Name == s.readonlyAssignmentReceiverName && s.readonlyAssignmentReceiver != nil {
 			allowReadonly = (s.types.checker.IsTypeIdenticalTo(receiver, s.readonlyAssignmentReceiver) || s.types.checker.IsTypeIdenticalTo(s.types.checker.PythonThisConstraint(receiver), s.readonlyAssignmentReceiver)) && s.constructorWritableAttributes[target.Name]
 		}
+		shown := value
+		if existing := c.GetAttributeType(c.PythonThisConstraint(receiver), c.GetStringLiteralType(target.Name)); existing != nil {
+			shown = c.SubstitutePythonThis(existing, receiver)
+		}
+		s.recordNamedType(target.NameLoc, shown, QuickInfoProperty, target.Name)
 		if err := c.CheckPythonAttributeAssignment(receiver, target.Name, value, allowReadonly); err != nil {
 			s.report(loc, err.Error())
 		} else {
@@ -779,6 +788,8 @@ func (s *implementationChecker) checkTry(statement *RuntimeTryStatement, returnT
 				exceptionType = s.types.specializeCheckerSymbol("BaseExceptionGroup", exceptionType)
 			}
 			handlerScope[handler.Name] = exceptionType
+			s.recordNamedType(handler.NameLoc, exceptionType, QuickInfoVariable, handler.Name)
+			s.bindNameDefinition(handler.Name, handler.NameLoc)
 		} else if handler.Exception != nil {
 			s.exceptionInstanceType(handler.Exception)
 		}
@@ -904,6 +915,8 @@ func (s *implementationChecker) applyRuntimePattern(subject *checker.Type, patte
 			matched = s.types.newHomogeneousSequence(subject, false)
 		}
 		scope[pattern.Name] = matched
+		s.recordNamedType(pattern.Loc, matched, QuickInfoVariable, pattern.Name)
+		s.bindNameDefinition(pattern.Name, pattern.Loc)
 	case RuntimePatternLiteral:
 		matched = narrowRuntimeType(c, subject, s.typeOf(pattern.Literal), true)
 	case RuntimePatternClass:
@@ -1084,6 +1097,7 @@ type runtimeBindingFrame struct {
 	globals    map[string]bool
 	nonlocals  map[string]bool
 	declared   map[string]*checker.Type
+	origins    map[string]nameDefinition
 }
 
 type implementationChecker struct {
@@ -1287,7 +1301,13 @@ func (s *implementationChecker) checkFunction(statement *RuntimeFunctionStatemen
 		}
 	}
 	s.loops = nil
-	s.bindings = append(s.bindings, runtimeBindingFrame{parameters: parameterNames, locals: bindingInfo.locals, globals: bindingInfo.globals, nonlocals: bindingInfo.nonlocals, declared: make(map[string]*checker.Type)})
+	origins := make(map[string]nameDefinition, len(statement.Signature.Parameters))
+	if s.result != nil && s.result.File != nil {
+		for _, parameter := range statement.Signature.Parameters {
+			origins[parameter.Name] = nameDefinition{File: s.result.File.FileName, Range: parameter.NameLoc}
+		}
+	}
+	s.bindings = append(s.bindings, runtimeBindingFrame{parameters: parameterNames, locals: bindingInfo.locals, globals: bindingInfo.globals, nonlocals: bindingInfo.nonlocals, declared: make(map[string]*checker.Type), origins: origins})
 	returnType := s.types.checker.GetReturnTypeOfSignature(contractSignature)
 	inferReturn := !statement.ReturnAnnotated && (typedImplementation || declaredCallable == nil)
 	initializer := statement.Name == "__init__" && receiver != nil
@@ -1583,7 +1603,7 @@ func (s *implementationChecker) checkClass(statement *RuntimeClassStatement) {
 		s.typeScope[name] = t
 	}
 	if thisType := s.types.checker.PythonThisType(instance); thisType != nil {
-		s.typeScope["this"] = thisType
+		s.typeScope["self"] = thisType
 	}
 	defer func() { s.typeScope = previousTypeScope }()
 	var baseTypes []*checker.Type
@@ -1605,7 +1625,7 @@ func (s *implementationChecker) checkClass(statement *RuntimeClassStatement) {
 			if !s.types.checker.PopulateObjectTypeFromType(instance, refreshed) {
 				instance = refreshed
 			}
-		} else {
+		} else if !diagnosticOverlaps(s.types.diagnostics, err.Error(), declaration.Range(), statement.Range()) {
 			s.report(statement.Range(), err.Error())
 		}
 	}
@@ -1751,14 +1771,23 @@ func (s *implementationChecker) inferClassValueAttributes(statement *RuntimeClas
 				s.report(assignment.Range(), fmt.Sprintf("type %s is not assignable to %s", FormatType(s.types.checker, actual), FormatType(s.types.checker, expected)))
 			}
 			actual = expected
+		} else if declared := s.types.checker.GetAttributeType(instance, s.types.checker.GetStringLiteralType(assignment.Name)); declared != nil {
+			// An existing annotation owns the attribute. Check the initializer
+			// against it instead of merging a second, narrower declaration.
+			if !s.types.checker.IsTypeAssignableTo(actual, declared) {
+				s.report(assignment.Range(), fmt.Sprintf("type %s is not assignable to %s", FormatType(s.types.checker, actual), FormatType(s.types.checker, declared)))
+			}
+			s.recordNamedType(assignment.NameLoc, declared, QuickInfoProperty, assignment.Name)
+			continue
 		} else {
-			// Class attributes are mutable storage locations. Use the checker's
-			// ordinary literal widening rather than freezing an initializer such
-			// as "user" into a singleton type.
-			actual = s.types.checker.GetBaseTypeOfLiteralType(actual)
+			// Keep the initializer's literal, the same way a normal assignment
+			// records it. Do not widen "user" to str.
+			s.recordNamedType(assignment.NameLoc, actual, QuickInfoProperty, assignment.Name)
+		}
+		if assignment.Annotation != nil {
+			s.recordNamedType(assignment.NameLoc, actual, QuickInfoProperty, assignment.Name)
 		}
 		classLocals[assignment.Name] = actual
-		s.recordNamedType(assignment.NameLoc, actual, QuickInfoProperty, assignment.Name)
 		attributes = append(attributes, checker.ObjectFacetMember{Name: assignment.Name, Type: actual})
 	}
 	if len(attributes) == 0 {
@@ -2285,8 +2314,58 @@ func (s *implementationChecker) recordType(loc TextRange, t *checker.Type) {
 
 func (s *implementationChecker) recordNamedType(loc TextRange, t *checker.Type, kind QuickInfoKind, name string) {
 	if loc.End > loc.Start && t != nil {
-		s.result.Expressions = append(s.result.Expressions, TypedRuntimeExpression{Range: loc, Type: t, Kind: kind, Name: name})
+		file, span := s.nameDefinition(name)
+		s.result.Expressions = append(s.result.Expressions, TypedRuntimeExpression{Range: loc, Type: t, Kind: kind, Name: name, DefinitionFile: file, Definition: span})
 	}
+}
+
+func (s *implementationChecker) bindNameDefinition(name string, loc TextRange) {
+	if name == "" || loc.End <= loc.Start || s.result == nil || s.result.File == nil {
+		return
+	}
+	site := nameDefinition{File: s.result.File.FileName, Range: loc}
+	for index := len(s.bindings) - 1; index >= 0; index-- {
+		frame := &s.bindings[index]
+		if frame.globals[name] {
+			break
+		}
+		if frame.nonlocals[name] {
+			continue
+		}
+		if frame.locals[name] || frame.parameters[name] {
+			if _, exists := frame.origins[name]; exists {
+				return
+			}
+			if frame.origins == nil {
+				frame.origins = map[string]nameDefinition{}
+			}
+			frame.origins[name] = site
+			return
+		}
+	}
+	if s.types.definitionFile == "" {
+		s.types.definitionFile = site.File
+	}
+	s.types.noteValueDefinition(name, loc)
+}
+
+func (s *implementationChecker) nameDefinition(name string) (string, TextRange) {
+	for index := len(s.bindings) - 1; index >= 0; index-- {
+		frame := s.bindings[index]
+		if frame.globals[name] {
+			break
+		}
+		if frame.nonlocals[name] {
+			continue
+		}
+		if site, ok := frame.origins[name]; ok {
+			return site.File, site.Range
+		}
+	}
+	if file, span, ok := s.types.lookupValueDefinition(name); ok {
+		return file, span
+	}
+	return "", TextRange{}
 }
 
 func (s *implementationChecker) recordImportHovers(declaration *ImportDeclaration, resolution runtimeImportResolution) {
@@ -2397,8 +2476,6 @@ func (s *implementationChecker) typeOfWorker(expression RuntimeExpr) *checker.Ty
 			result = c.SubstitutePythonThis(result, target)
 			kind := QuickInfoProperty
 			if symbol := c.GetPropertyOfType(target, expression.Name); symbol != nil && symbol.Flags&ast.SymbolFlagsMethod != 0 {
-				kind = QuickInfoMethod
-			} else if len(c.GetSignaturesOfType(result, checker.SignatureKindCall)) != 0 {
 				kind = QuickInfoMethod
 			}
 			s.recordNamedType(expression.NameLoc, result, kind, expression.Name)

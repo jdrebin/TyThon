@@ -38,6 +38,8 @@ type SemanticHover struct {
 	TypeParameters []string
 	Readonly       bool
 	Async          bool
+	DefinitionFile string
+	Definition     TextRange
 	Text           string // Transitional fallback for declarations not yet modeled.
 }
 

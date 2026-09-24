@@ -291,6 +291,10 @@
                     "include": "#backticks"
                 },
                 {
+                    "name": "punctuation.separator.annotation.result.python",
+                    "match": "->"
+                },
+                {
                     "include": "#illegal-anno"
                 },
                 {
@@ -991,7 +995,7 @@
             "patterns": [
                 {
                     "name": "meta.class.python",
-                    "begin": "(?x)\n  \\s*(class)\\s+\n    (?=\n      [[:alpha:]_]\\w* \\s* (?: < [^>\\n]+ > \\s*)? (:|\\()\n    )\n",
+                    "begin": "(?x)\n  \\s*(class|interface)\\s+\n    (?=\n      (?: [[:alpha:]_]\\w* | \\* ) \\s* (?: < [^>\\n]+ > \\s*)? (:|\\()\n    )\n",
                     "end": "(:)",
                     "beginCaptures": {
                         "1": {
@@ -1024,7 +1028,7 @@
                 },
                 {
                     "name": "entity.name.type.class.python",
-                    "match": "(?x)\n  \\b ([[:alpha:]_]\\w*) \\b\n"
+                    "match": "(?x)\n  \\b ([[:alpha:]_]\\w*) \\b | (?<=interface\\s) \\*\n"
                 }
             ]
         },
@@ -1185,6 +1189,10 @@
                             "include": "#backticks"
                         },
                         {
+                            "name": "punctuation.separator.annotation.result.python",
+                            "match": "->"
+                        },
+                        {
                             "include": "#illegal-anno"
                         },
                         {
@@ -1270,6 +1278,19 @@
             "patterns": [
                 {
                     "include": "#function-def-name"
+                },
+                {
+                    "begin": "(<)",
+                    "end": "(>)",
+                    "beginCaptures": {
+                        "1": { "name": "punctuation.definition.typeparameters.begin.typed-python" }
+                    },
+                    "endCaptures": {
+                        "1": { "name": "punctuation.definition.typeparameters.end.typed-python" }
+                    },
+                    "patterns": [
+                        { "include": "#expression" }
+                    ]
                 },
                 {
                     "include": "#parameters"
@@ -1441,6 +1462,9 @@
                         }
                     },
                     "patterns": [
+                        {
+                            "include": "#string"
+                        },
                         {
                             "include": "#item-name"
                         },

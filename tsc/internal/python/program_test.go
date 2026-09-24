@@ -26,6 +26,37 @@ result = name_of(key)
 	}
 }
 
+func TestDefinitionNavigatesVariables(t *testing.T) {
+	t.Parallel()
+	source := "foo = \"bar\"\nfoo\n"
+	program := BuildProgram(newPythonChecker(t), []SourceInput{{FileName: "app.ty", Text: source}})
+	if len(program.Diagnostics) != 0 {
+		t.Fatalf("diagnostics = %v", program.Diagnostics)
+	}
+	file, span, ok := program.TypeDefinitionAt("app.ty", strings.Index(source, "\nfoo")+1)
+	if !ok || file != "app.ty" || source[span.Start:span.End] != "foo" || span.Start != 0 {
+		t.Fatalf("foo definition = %q %q %#v %v", file, source[span.Start:span.End], span, ok)
+	}
+}
+
+func TestDefinitionNavigatesValuesAndBuiltinMembers(t *testing.T) {
+	t.Parallel()
+	source := "def greet(name: str) -> str:\n    return name\nvalue = greet(\"Ada\")\nlabel = value.strip()\n"
+	program := BuildProgram(newPythonChecker(t), []SourceInput{{FileName: "app.ty", Text: source}})
+	if len(program.Diagnostics) != 0 {
+		t.Fatalf("diagnostics = %v", program.Diagnostics)
+	}
+	file, span, ok := program.TypeDefinitionAt("app.ty", strings.Index(source, "greet("))
+	if !ok || file != "app.ty" || source[span.Start:span.End] != "greet" {
+		t.Fatalf("greet definition = %q %#v %v", file, span, ok)
+	}
+	file, span, ok = program.TypeDefinitionAt("app.ty", strings.Index(source, "strip"))
+	text := BuiltinDeclarationSource()
+	if !ok || file != BuiltinDeclarationURI || text[span.Start:span.End] != "strip" {
+		t.Fatalf("strip definition = %q %#v %v", file, span, ok)
+	}
+}
+
 func TestTypeDefinitionNavigation(t *testing.T) {
 	t.Parallel()
 	source := "type A = { id: int }\ntype B = A.id\ntype Key = *<\"id\">\ntype Broad = *\n"
@@ -708,12 +739,12 @@ inherited_kind = admin.kind
 	module := program.Modules[0]
 	c := module.Types.Checker()
 	for _, name := range []string{"class_kind", "instance_kind", "inherited_kind"} {
-		if got := module.Runtime.Values[name]; got != c.GetStringType() {
-			t.Fatalf("%s = %s, want inferred str", name, FormatType(c, got))
+		if got := FormatType(c, module.Runtime.Values[name]); got != `"user"` {
+			t.Fatalf("%s = %s, want literal \"user\"", name, got)
 		}
 	}
-	if hover, ok := program.HoverAt("app.ty", strings.Index(typed, "kind =")); !ok || hover != "(property) kind: str" {
-		t.Fatalf("class attribute hover = %q, %v; want inferred property", hover, ok)
+	if hover, ok := program.HoverAt("app.ty", strings.Index(typed, "kind =")); !ok || hover != `(property) kind: "user"` {
+		t.Fatalf("class attribute hover = %q, %v; want literal property", hover, ok)
 	}
 }
 

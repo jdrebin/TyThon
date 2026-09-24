@@ -70,21 +70,38 @@ type checkerAliasResolution struct {
 	deferred []func()
 }
 
+type nameDefinition struct {
+	File  string
+	Range TextRange
+}
+
+type memberDefinition struct {
+	Name  string
+	Type  *checker.Type
+	File  string
+	Range TextRange
+}
+
 // CheckerTypeEnvironment binds Python declaration syntax directly to the
 // repository's mature checker.Type graph. The syntax tree in this package is a
 // frontend IR only; it is not a second semantic type system.
 type CheckerTypeEnvironment struct {
-	checker            *checker.Checker
-	symbols            map[string]*CheckerTypeSymbol
-	values             map[string]*checker.Type
-	valueKinds         map[string]QuickInfoKind
-	overloads          map[string]bool
-	diagnostics        []TypeDiagnostic
-	hovers             []SemanticHover
-	aliases            []*checkerAliasResolution
-	installingBuiltins bool
-	inferParameters    map[*checker.Type]bool
-	builtinObjectValue *checker.Type
+	checker               *checker.Checker
+	symbols               map[string]*CheckerTypeSymbol
+	values                map[string]*checker.Type
+	exported              map[string]bool
+	valueKinds            map[string]QuickInfoKind
+	valueDefinitions      map[string]nameDefinition
+	memberDefinitions     []memberDefinition
+	definitionFile        string
+	overloads             map[string]bool
+	diagnostics           []TypeDiagnostic
+	hovers                []SemanticHover
+	aliases               []*checkerAliasResolution
+	installingBuiltins    bool
+	publishBuiltinExports bool
+	inferParameters       map[*checker.Type]bool
+	builtinObjectValue    *checker.Type
 }
 
 func NewCheckerTypeEnvironment(c *checker.Checker) *CheckerTypeEnvironment {
@@ -97,11 +114,12 @@ func NewCheckerTypeEnvironment(c *checker.Checker) *CheckerTypeEnvironment {
 // without binding an embedded copy before the source being edited.
 func newCheckerTypeEnvironment(c *checker.Checker) *CheckerTypeEnvironment {
 	environment := &CheckerTypeEnvironment{
-		checker:    c,
-		symbols:    make(map[string]*CheckerTypeSymbol),
-		values:     make(map[string]*checker.Type),
-		valueKinds: make(map[string]QuickInfoKind),
-		overloads:  make(map[string]bool),
+		checker:          c,
+		symbols:          make(map[string]*CheckerTypeSymbol),
+		values:           make(map[string]*checker.Type),
+		valueKinds:       make(map[string]QuickInfoKind),
+		valueDefinitions: make(map[string]nameDefinition),
+		overloads:        make(map[string]bool),
 	}
 	for name, arity := range map[string]int{
 		"list": 1, "set": 1, "type": 1, "tuple": -1, "Awaitable": 1,
@@ -180,6 +198,7 @@ func (e *CheckerTypeEnvironment) Bind(file *PythonSourceFile) []TypeDiagnostic {
 // refer to each other's declared surfaces.
 func (e *CheckerTypeEnvironment) Declare(file *PythonSourceFile) []TypeDiagnostic {
 	e.diagnostics = nil
+	e.definitionFile = file.FileName
 	for _, declaration := range file.Declarations {
 		switch declaration := declaration.(type) {
 		case *TypeAliasDeclaration:
@@ -223,7 +242,9 @@ func (e *CheckerTypeEnvironment) Declare(file *PythonSourceFile) []TypeDiagnosti
 			if e.values[declaration.Name] == nil {
 				e.values[declaration.Name] = e.checker.NewObjectFacetPlaceholder()
 			}
+			e.noteExport(declaration.Name)
 			e.valueKinds[declaration.Name] = QuickInfoFunction
+			e.noteValueDefinition(declaration.Name, declaration.NameLoc)
 		}
 	}
 	for _, symbol := range e.symbols {
@@ -276,10 +297,12 @@ func (e *CheckerTypeEnvironment) ResolveDeclarations(file *PythonSourceFile) []T
 			}
 			if symbol := e.symbols[declaration.Name]; symbol != nil && symbol.Value != nil {
 				e.values[declaration.Name] = symbol.Value
+				e.noteExport(declaration.Name)
 				e.recordNamedHover(declaration.NameLoc, symbol.Value, QuickInfoClass, declaration.Name, typeParameterNames(declaration.TypeParameters))
 			}
 		case *VariableDeclaration:
 			e.values[declaration.Name] = e.resolveCheckerType(declaration.Type, nil)
+			e.noteExport(declaration.Name)
 			e.valueKinds[declaration.Name] = QuickInfoVariable
 			e.recordNamedHover(declaration.NameLoc, e.values[declaration.Name], QuickInfoVariable, declaration.Name, nil)
 		case *FunctionDeclaration:
@@ -297,6 +320,7 @@ func (e *CheckerTypeEnvironment) ResolveDeclarations(file *PythonSourceFile) []T
 		}
 	}
 	for name := range functionDeclarations {
+		e.noteExport(name)
 		callables := functionTypes[name]
 		if len(overloadTypes[name]) != 0 {
 			callables = overloadTypes[name]
@@ -349,6 +373,7 @@ func (e *CheckerTypeEnvironment) importValue(name string, value *checker.Type) e
 		return fmt.Errorf("imported value name %q conflicts with an existing declaration", name)
 	}
 	e.values[name] = value
+	e.noteExport(name)
 	return nil
 }
 
@@ -362,10 +387,20 @@ func (e *CheckerTypeEnvironment) exportedSymbols() map[string]*CheckerTypeSymbol
 	return result
 }
 
+func (e *CheckerTypeEnvironment) noteExport(name string) {
+	if name == "" || (e.installingBuiltins && !e.publishBuiltinExports) {
+		return
+	}
+	if e.exported == nil {
+		e.exported = map[string]bool{}
+	}
+	e.exported[name] = true
+}
+
 func (e *CheckerTypeEnvironment) exportedValues() map[string]*checker.Type {
 	result := make(map[string]*checker.Type)
 	for name, value := range e.values {
-		if !strings.HasPrefix(name, "_") {
+		if e.exported[name] && !strings.HasPrefix(name, "_") {
 			result[name] = value
 		}
 	}
@@ -502,11 +537,11 @@ func (e *CheckerTypeEnvironment) resolveCheckerTypeWorker(expression TypeExpr, s
 	}
 	switch expression := expression.(type) {
 	case *NameTypeExpr:
-		if expression.Name == "this" {
-			if value := scope["this"]; value != nil {
+		if expression.Name == "self" {
+			if value := scope["self"]; value != nil {
 				return value
 			}
-			e.reportChecker(expression.Range(), "this is only valid in a class or interface")
+			e.reportChecker(expression.Range(), "self is only valid in a class or interface")
 			return e.checker.GetErrorType()
 		}
 		if value := scope[expression.Name]; value != nil {
@@ -1602,6 +1637,7 @@ func (e *CheckerTypeEnvironment) resolveCheckerMembers(members []ObjectMemberDec
 			unbound := e.resolveCheckerCallable(member.Signature, scope, false, nil)
 			info := SemanticHover{Range: member.NameLoc, Kind: QuickInfoMethod, Name: member.Name, Type: bound, Async: member.Async}
 			e.hovers = append(e.hovers, info)
+			e.memberDefinitions = append(e.memberDefinitions, memberDefinition{Name: member.Name, Type: bound, File: e.definitionFile, Range: member.NameLoc})
 			if member.Async {
 				bound = e.asyncCallable(bound)
 				unbound = e.asyncCallable(unbound)
@@ -1975,7 +2011,7 @@ func (e *CheckerTypeEnvironment) withThis(scope map[string]*checker.Type, instan
 		return scope
 	}
 	scope = copyCheckerScope(scope)
-	scope["this"] = thisType
+	scope["self"] = thisType
 	return scope
 }
 
@@ -1991,6 +2027,20 @@ func (e *CheckerTypeEnvironment) reportChecker(loc TextRange, message string) {
 	e.diagnostics = append(e.diagnostics, TypeDiagnostic{Range: loc, Message: message})
 }
 
+func diagnosticOverlaps(diagnostics []TypeDiagnostic, message string, ranges ...TextRange) bool {
+	for _, diagnostic := range diagnostics {
+		if diagnostic.Message != message {
+			continue
+		}
+		for _, loc := range ranges {
+			if diagnostic.Range.Start < loc.End && loc.Start < diagnostic.Range.End {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 func (e *CheckerTypeEnvironment) recordHover(loc TextRange, t *checker.Type, text string) {
 	if loc.End > loc.Start && (t != nil || text != "") {
 		e.hovers = append(e.hovers, SemanticHover{Range: loc, Type: t, Text: text})
@@ -2002,7 +2052,46 @@ func (e *CheckerTypeEnvironment) recordNamedHover(loc TextRange, t *checker.Type
 		e.hovers = append(e.hovers, SemanticHover{
 			Range: loc, Kind: kind, Name: name, Type: t, TypeParameters: typeParameters,
 		})
+		if kind == QuickInfoMethod || kind == QuickInfoProperty || kind == QuickInfoFunction {
+			e.memberDefinitions = append(e.memberDefinitions, memberDefinition{Name: name, Type: t, File: e.definitionFile, Range: loc})
+		}
 	}
+}
+
+func (e *CheckerTypeEnvironment) noteValueDefinition(name string, loc TextRange) {
+	if name == "" || loc.End <= loc.Start || e.definitionFile == "" {
+		return
+	}
+	if _, exists := e.valueDefinitions[name]; exists {
+		return
+	}
+	e.valueDefinitions[name] = nameDefinition{File: e.definitionFile, Range: loc}
+}
+
+func (e *CheckerTypeEnvironment) lookupValueDefinition(name string) (string, TextRange, bool) {
+	definition, ok := e.valueDefinitions[name]
+	if !ok {
+		return "", TextRange{}, false
+	}
+	return definition.File, definition.Range, true
+}
+
+func (e *CheckerTypeEnvironment) lookupMemberDefinition(name string, memberType *checker.Type) (string, TextRange, bool) {
+	matches := make([]memberDefinition, 0, 1)
+	for _, definition := range e.memberDefinitions {
+		if definition.Name == name {
+			matches = append(matches, definition)
+		}
+	}
+	if len(matches) == 1 {
+		return matches[0].File, matches[0].Range, true
+	}
+	for _, definition := range matches {
+		if memberType != nil && (e.checker.IsTypeIdenticalTo(definition.Type, memberType) || e.checker.IsTypeAssignableTo(definition.Type, memberType) && e.checker.IsTypeAssignableTo(memberType, definition.Type)) {
+			return definition.File, definition.Range, true
+		}
+	}
+	return "", TextRange{}, false
 }
 
 func (e *CheckerTypeEnvironment) recordTypeNameHover(expression *NameTypeExpr, t *checker.Type, scope map[string]*checker.Type) {

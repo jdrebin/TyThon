@@ -29,7 +29,6 @@ def configure<T, U extends {}>(
 ) -> T:
     return value
 
-
 def transform<T, U>(value: T, callback: (value: T) -> U) -> U:
     return callback(value)
 

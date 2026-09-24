@@ -11,3 +11,4 @@ def welcome(name: str = "world") -> str:
 
 
 message = identity(welcome())
+type O = User.id

@@ -1134,7 +1134,7 @@ func includeDunderCompletion(name string, prefix string) bool {
 		return false
 	}
 	if len(name) > 4 && strings.HasPrefix(name, "__") && strings.HasSuffix(name, "__") {
-		return strings.HasPrefix(prefix, "__")
+		return strings.HasPrefix(prefix, "_")
 	}
 	return true
 }

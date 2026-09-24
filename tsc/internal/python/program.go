@@ -88,6 +88,7 @@ func BuildProgram(c *checker.Checker, inputs []SourceInput) *PythonProgram {
 		if files.Declaration != "" && hasNoDefaultLibrary(texts[files.Declaration]) {
 			environment = newCheckerTypeEnvironment(c)
 			environment.installingBuiltins = true
+			environment.publishBuiltinExports = true
 		} else {
 			environment = NewCheckerTypeEnvironment(c)
 		}
@@ -228,7 +229,7 @@ func (p *PythonProgram) QuickInfoAt(fileName string, offset int) (SemanticHover,
 			// Runtime exact spans win equal-width declaration spans because they
 			// may contain inferred returns or call-site generic instantiations.
 			if !found || width <= bestWidth {
-				best = SemanticHover{Range: expression.Range, Kind: expression.Kind, Name: expression.Name, Type: expression.Type}
+				best = SemanticHover{Range: expression.Range, Kind: expression.Kind, Name: expression.Name, Type: expression.Type, DefinitionFile: expression.DefinitionFile, Definition: expression.Definition}
 				bestChecker, bestWidth, found = module.Types.Checker(), width, true
 				bestObjectProtocol = module.Types.objectProtocolType()
 			}
@@ -257,24 +258,34 @@ func (p *PythonProgram) HoverAt(fileName string, offset int) (string, bool) {
 // as Quick Info. Imported aliases retain their owning declaration environment.
 func (p *PythonProgram) TypeDefinitionAt(fileName string, offset int) (string, TextRange, bool) {
 	info, _, ok := p.QuickInfoAt(fileName, offset)
-	if !ok || (info.Kind != QuickInfoType && info.Kind != QuickInfoTypeFunction && info.Kind != QuickInfoInterface && info.Kind != QuickInfoClass) {
+	if !ok || info.Name == "" {
 		return "", TextRange{}, false
+	}
+	if info.DefinitionFile != "" && info.Definition.End > info.Definition.Start {
+		return info.DefinitionFile, info.Definition, true
 	}
 	module := p.moduleForFile(fileName)
 	if module == nil {
 		return "", TextRange{}, false
 	}
 	symbol := module.Types.symbols[info.Name]
-	if symbol == nil || symbol.DefinitionFile == "" {
-		return "", TextRange{}, false
+	if symbol != nil && symbol.DefinitionFile != "" {
+		switch {
+		case symbol.Interface != nil:
+			return symbol.DefinitionFile, symbol.Interface.NameLoc, true
+		case symbol.Class != nil:
+			return symbol.DefinitionFile, symbol.Class.NameLoc, true
+		case symbol.Alias != nil:
+			return symbol.DefinitionFile, symbol.Alias.NameLoc, true
+		}
 	}
-	switch {
-	case symbol.Interface != nil:
-		return symbol.DefinitionFile, symbol.Interface.NameLoc, true
-	case symbol.Class != nil:
-		return symbol.DefinitionFile, symbol.Class.NameLoc, true
-	case symbol.Alias != nil:
-		return symbol.DefinitionFile, symbol.Alias.NameLoc, true
+	if file, span, ok := module.Types.lookupValueDefinition(info.Name); ok && (info.Kind == QuickInfoFunction || info.Kind == QuickInfoVariable || info.Kind == QuickInfoUnknown) {
+		return file, span, true
+	}
+	if info.Kind == QuickInfoMethod || info.Kind == QuickInfoProperty || info.Kind == QuickInfoFunction {
+		if file, span, ok := module.Types.lookupMemberDefinition(info.Name, info.Type); ok {
+			return file, span, true
+		}
 	}
 	return "", TextRange{}, false
 }

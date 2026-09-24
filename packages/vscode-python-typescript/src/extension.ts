@@ -75,7 +75,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         options: { cwd: vscode.workspace.workspaceFolders?.[0]?.uri.fsPath, env: { ...process.env, GOMEMLIMIT: launch.softLimit } },
     };
     const documentSelector = [
-        { language: "typed-python", scheme: "file", pattern: "**/*.ty" },
+        { language: "typed-python", scheme: "file" },
+        { language: "typed-python", scheme: "typed-python" },
     ];
     let pythonTools: PythonTools | undefined;
     const clientOptions: LanguageClientOptions = {
@@ -158,12 +159,30 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         output.appendLine(`Heap profile saved: ${result.file}`);
         output.show(true);
     }));
+    context.subscriptions.push(vscode.workspace.onDidOpenTextDocument(document => {
+        if (document.uri.scheme === "typed-python" && document.languageId !== "typed-python") {
+            void vscode.languages.setTextDocumentLanguage(document, "typed-python");
+        }
+    }));
     context.subscriptions.push(vscode.workspace.registerTextDocumentContentProvider("typed-python", {
         async provideTextDocumentContent(uri: vscode.Uri): Promise<string> {
-            if (uri.path !== "/builtins.d.ty" || !languageClient) return "";
+            if (!uri.path.endsWith("/builtins.d.ty") || !languageClient?.isRunning()) return "";
             return languageClient.sendRequest<string>("typedPython/builtinSource", {});
         },
     }));
+    context.subscriptions.push(vscode.languages.registerDefinitionProvider(
+        [{ language: "typed-python", scheme: "file" }, { language: "typed-python", scheme: "typed-python" }],
+        {
+            async provideDefinition(document, position, token) {
+                if (!languageClient?.isRunning()) return undefined;
+                const result = await languageClient.sendRequest<DefinitionResult | null>("textDocument/definition", {
+                    textDocument: { uri: document.uri.toString() },
+                    position: { line: position.line, character: position.character },
+                }, token);
+                return definitionLocations(result);
+            },
+        },
+    ));
     try {
         await languageClient.start();
         context.subscriptions.push(new BundledFormatter(context, output));
@@ -178,6 +197,22 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         void vscode.window.showErrorMessage("tython could not start safely. Check the language-server output. On Linux, a working systemd memory controller is required; the extension will not silently launch without containment.");
     }
 }
+
+function definitionLocations(result: DefinitionResult | null | undefined): vscode.Location[] | undefined {
+    if (!result) return undefined;
+    const locations = Array.isArray(result) ? result : [result];
+    const converted = locations.flatMap(location => {
+        const target = "targetUri" in location ? { uri: location.targetUri, range: location.targetRange } : location;
+        if (!target.uri || !target.range) return [];
+        return [new vscode.Location(vscode.Uri.parse(target.uri), new vscode.Range(
+            target.range.start.line, target.range.start.character, target.range.end.line, target.range.end.character))];
+    });
+    return converted.length ? converted : undefined;
+}
+
+type DefinitionResult = { uri: string; range: { start: { line: number; character: number }; end: { line: number; character: number } } }
+    | { targetUri: string; targetRange: { start: { line: number; character: number }; end: { line: number; character: number } } }
+    | Array<{ uri: string; range: { start: { line: number; character: number }; end: { line: number; character: number } } }>;
 
 function recolorSemanticTokens(document: vscode.TextDocument, provided: vscode.ProviderResult<vscode.SemanticTokens>): vscode.ProviderResult<vscode.SemanticTokens> {
     const keywordType = languageClient?.initializeResult?.capabilities?.semanticTokensProvider?.legend.tokenTypes.indexOf("keyword") ?? -1;

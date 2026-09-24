@@ -611,17 +611,24 @@ func (p *runtimeFileParser) parseRuntimePattern(source string, offset int) (Runt
 			return pattern, false
 		}
 		pattern.Kind, pattern.Name, pattern.Starred = RuntimePatternCapture, name, true
+		pattern.Loc = TextRange{Start: pattern.Loc.End - len(name), End: pattern.Loc.End}
 		return pattern, true
 	}
 	if len(trimmed) >= 2 && (trimmed[0] == '[' && matchingDelimiter(trimmed, 0, '[', ']') == len(trimmed)-1 || trimmed[0] == '(' && matchingDelimiter(trimmed, 0, '(', ')') == len(trimmed)-1) {
 		pattern.Kind = RuntimePatternSequence
 		inner := trimmed[1 : len(trimmed)-1]
-		for _, part := range splitTopLevel(inner, ',') {
-			part = strings.TrimSpace(part)
+		cursor := 0
+		for _, raw := range splitTopLevel(inner, ',') {
+			part := strings.TrimSpace(raw)
+			partStart := cursor
+			if part != "" {
+				partStart += strings.Index(raw, part)
+			}
+			cursor += len(raw) + 1
 			if part == "" {
 				continue
 			}
-			element, ok := p.parseRuntimePattern(part, offset+1+strings.Index(inner, part))
+			element, ok := p.parseRuntimePattern(part, offset+1+partStart)
 			if !ok {
 				return pattern, false
 			}
@@ -632,8 +639,14 @@ func (p *runtimeFileParser) parseRuntimePattern(source string, offset int) (Runt
 	if len(trimmed) >= 2 && trimmed[0] == '{' && matchingDelimiter(trimmed, 0, '{', '}') == len(trimmed)-1 {
 		pattern.Kind = RuntimePatternMapping
 		inner := trimmed[1 : len(trimmed)-1]
-		for _, part := range splitTopLevel(inner, ',') {
-			part = strings.TrimSpace(part)
+		cursor := 0
+		for _, raw := range splitTopLevel(inner, ',') {
+			part := strings.TrimSpace(raw)
+			partStart := cursor
+			if part != "" {
+				partStart += strings.Index(raw, part)
+			}
+			cursor += len(raw) + 1
 			if part == "" {
 				continue
 			}
@@ -650,9 +663,11 @@ func (p *runtimeFileParser) parseRuntimePattern(source string, offset int) (Runt
 				return pattern, false
 			}
 			keyText, valueText := strings.TrimSpace(part[:colon]), strings.TrimSpace(part[colon+1:])
-			key, errors := ParseRuntimeExpression(keyText, offset+1+strings.Index(inner, keyText))
+			keyAt := partStart + strings.Index(part[:colon], keyText)
+			valueAt := partStart + colon + 1 + strings.Index(part[colon+1:], valueText)
+			key, errors := ParseRuntimeExpression(keyText, offset+1+keyAt)
 			p.diagnostics = append(p.diagnostics, errors...)
-			valuePattern, ok := p.parseRuntimePattern(valueText, offset+1+strings.Index(inner, valueText))
+			valuePattern, ok := p.parseRuntimePattern(valueText, offset+1+valueAt)
 			if !ok {
 				return pattern, false
 			}
@@ -667,14 +682,20 @@ func (p *runtimeFileParser) parseRuntimePattern(source string, offset int) (Runt
 		}
 		pattern.Kind, pattern.Name = RuntimePatternClass, name
 		inner := trimmed[open+1 : len(trimmed)-1]
-		for _, part := range splitTopLevel(inner, ',') {
-			part = strings.TrimSpace(part)
+		cursor := 0
+		for _, raw := range splitTopLevel(inner, ',') {
+			part := strings.TrimSpace(raw)
+			partStart := cursor
+			if part != "" {
+				partStart += strings.Index(raw, part)
+			}
+			cursor += len(raw) + 1
 			if part == "" {
 				continue
 			}
 			equals := findTopLevel(part, '=')
 			if equals < 0 {
-				valuePattern, ok := p.parseRuntimePattern(part, offset+open+1+strings.Index(inner, part))
+				valuePattern, ok := p.parseRuntimePattern(part, offset+open+1+partStart)
 				if !ok {
 					return pattern, false
 				}
@@ -686,7 +707,8 @@ func (p *runtimeFileParser) parseRuntimePattern(source string, offset int) (Runt
 			if !isSimpleIdentifier(attribute) {
 				return pattern, false
 			}
-			valuePattern, ok := p.parseRuntimePattern(valueText, offset+open+1+strings.Index(inner, valueText))
+			valueAt := partStart + equals + 1 + strings.Index(part[equals+1:], valueText)
+			valuePattern, ok := p.parseRuntimePattern(valueText, offset+open+1+valueAt)
 			if !ok {
 				return pattern, false
 			}
@@ -832,7 +854,12 @@ func (p *runtimeFileParser) parseTry(start int, indent int) (*RuntimeTryStatemen
 				exception, errors = ParseRuntimeExpression(typeText, logicalLineTextOffset(line, typeText))
 				p.diagnostics = append(p.diagnostics, errors...)
 			}
-			statement.Handlers = append(statement.Handlers, RuntimeExceptClause{Exception: exception, Name: name, Body: body, Group: group})
+			var nameLoc TextRange
+			if name != "" {
+				start := logicalLineTextOffset(line, name)
+				nameLoc = TextRange{Start: start, End: start + len(name)}
+			}
+			statement.Handlers = append(statement.Handlers, RuntimeExceptClause{Exception: exception, Name: name, NameLoc: nameLoc, Body: body, Group: group})
 		case text == "else:":
 			statement.ElseBody = body
 		case text == "finally:":
@@ -2033,6 +2060,7 @@ func parseRuntimeBindingTarget(source string, offset int) (RuntimeBindingTarget,
 		return RuntimeBindingTarget{}, false
 	}
 	target.Name = trimmed
+	target.Loc = TextRange{Start: offset, End: offset + len(trimmed)}
 	return target, true
 }
 

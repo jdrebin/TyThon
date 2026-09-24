@@ -1,6 +1,7 @@
 package python
 
 import (
+	"os"
 	"strings"
 	"testing"
 
@@ -357,6 +358,148 @@ func TestImportedNamesAreHoverable(t *testing.T) {
 	if !ok || module.Name != "catalog" {
 		t.Fatalf("module hover = %+v, found=%v", module, ok)
 	}
+}
+
+func TestClassAttributeKeepsLiteral(t *testing.T) {
+	source := "class User:\n    kind = \"user\"\nvalue = User.kind\n"
+	program := BuildProgram(newPythonChecker(t), []SourceInput{{FileName: "main.ty", Text: source}})
+	info, c, ok := program.QuickInfoAt("main.ty", strings.Index(source, "kind"))
+	if !ok {
+		t.Fatal("no hover on kind")
+	}
+	text := FormatQuickInfo(c, info)
+	if !strings.Contains(text, `"user"`) {
+		t.Fatalf("kind hover = %s, diagnostics = %v", text, program.Diagnostics)
+	}
+	use, _, ok := program.QuickInfoAt("main.ty", strings.LastIndex(source, "kind"))
+	if !ok || FormatType(c, use.Type) != `"user"` {
+		t.Fatalf("User.kind = %s", FormatType(c, use.Type))
+	}
+}
+
+func TestDuplicateBaseConflictIsReportedOnce(t *testing.T) {
+	source := "class TextValue:\n    value!: str\nclass NumericValue:\n    value!: int\nclass ResolvedValue(TextValue, NumericValue):\n    marker: bool\n"
+	program := BuildProgram(newPythonChecker(t), []SourceInput{{FileName: "main.ty", Text: source}})
+	count := 0
+	for _, diagnostic := range program.Diagnostics {
+		if strings.Contains(diagnostic.Message, "conflicting") || strings.Contains(diagnostic.Message, "value") {
+			count++
+			t.Log(diagnostic.Message, diagnostic.Range)
+		}
+	}
+	if count != 1 {
+		t.Fatalf("conflict reports = %d, all = %v", count, program.Diagnostics)
+	}
+}
+
+func TestDemoSurfaces(t *testing.T) {
+	root := "/home/user/projects/TypeScript/vscode-extension-demo/"
+	for _, name := range []string{"core_operators.ty", "working.ty"} {
+		text, err := os.ReadFile(root + name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, runtimeErrors := ParseRuntimeFile(name, string(text))
+		_, declErrors := ParseTypedSourceDeclarations(name, string(text))
+		_, erasureErrors := EraseTypedPython(string(text))
+		t.Logf("%s runtime=%v decl=%v erasure=%v", name, runtimeErrors, declErrors, erasureErrors)
+	}
+	text, err := os.ReadFile(root + "core_operators.ty")
+	if err != nil {
+		t.Fatal(err)
+	}
+	program := BuildProgram(newPythonChecker(t), []SourceInput{{FileName: "core_operators.ty", Text: string(text)}})
+	source := string(text)
+	info, c, ok := program.QuickInfoAt("core_operators.ty", strings.Index(source, "FirstString"))
+	if !ok {
+		t.Fatalf("FirstString hover missing diagnostics=%v", program.Diagnostics)
+	}
+	hover := FormatQuickInfo(c, info)
+	if strings.Contains(hover, "__add__") || !strings.Contains(hover, "*()") {
+		t.Fatalf("FirstString hover = %s", hover)
+	}
+	modules, err := os.ReadFile(root + "advanced_modules.ty")
+	if err != nil {
+		t.Fatal(err)
+	}
+	declaration, err := os.ReadFile(root + "sample_package/models.d.ty")
+	if err != nil {
+		t.Fatal(err)
+	}
+	moduleFile := root + "advanced_modules.ty"
+	program = BuildProgram(newPythonChecker(t), []SourceInput{
+		{FileName: root + "sample_package/models.d.ty", Text: string(declaration)},
+		{FileName: moduleFile, Text: string(modules)},
+	})
+	modSource := string(modules)
+	for _, word := range []string{"sample_package", "models", "load_user", "User"} {
+		info, c, ok = program.QuickInfoAt(moduleFile, strings.Index(modSource, word))
+		if !ok {
+			t.Fatalf("import %s missing diagnostics=%v", word, program.Diagnostics)
+		}
+		hover := FormatQuickInfo(c, info)
+		if strings.Contains(hover, "AttributeError") || strings.Contains(hover, "BaseException") {
+			t.Fatalf("import %s includes builtins: %s", word, hover)
+		}
+		t.Logf("import %s = %s", word, hover)
+	}
+	classes, err := os.ReadFile(root + "advanced_classes.ty")
+	if err != nil {
+		t.Fatal(err)
+	}
+	program = BuildProgram(newPythonChecker(t), []SourceInput{{FileName: "advanced_classes.ty", Text: string(classes)}})
+	classSource := string(classes)
+	info, c, ok = program.QuickInfoAt("advanced_classes.ty", strings.Index(classSource, "return self.name")+12)
+	if ok {
+		t.Logf("name hover = %s kind=%d", FormatQuickInfo(c, info), info.Kind)
+	}
+	for _, diagnostic := range program.Diagnostics {
+		t.Logf("class diag %s @ %v", diagnostic.Message, diagnostic.Range)
+	}
+}
+
+func TestPatternBindingsAndAttributeAssignmentHover(t *testing.T) {
+	source := `declare class User:
+    name: str
+    active: bool
+
+def display(value: User | None) -> str:
+    match value:
+        case User(name=nam, active=ac):
+            return nam
+
+def read_row(row: { "name": str, "score": int }) -> str:
+    match row:
+        case {"name": name, "score": score}:
+            return name
+
+def assign(user: User) -> None:
+    user.kind = "admin"
+`
+	program := BuildProgram(newPythonChecker(t), []SourceInput{{FileName: "main.ty", Text: source}})
+	at := func(marker, name string, shift int) {
+		t.Helper()
+		offset := strings.Index(source, marker)
+		if offset < 0 {
+			t.Fatalf("missing %s", marker)
+		}
+		info, c, ok := program.QuickInfoAt("main.ty", offset+shift)
+		if !ok {
+			t.Fatalf("%s hover missing diagnostics=%v", name, program.Diagnostics)
+		}
+		if info.Name != name {
+			t.Fatalf("%s hover name = %q range=%v", name, info.Name, info.Range)
+		}
+		if source[info.Range.Start:info.Range.End] != name {
+			t.Fatalf("%s span = %q", name, source[info.Range.Start:info.Range.End])
+		}
+		t.Logf("%s = %s", name, FormatQuickInfo(c, info))
+	}
+	at("name=nam", "nam", len("name="))
+	at("active=ac", "ac", len("active="))
+	at(`"name": name`, "name", len(`"name": `))
+	at(`"score": score`, "score", len(`"score": `))
+	at("user.kind", "kind", len("user."))
 }
 
 func TestGenericWithoutArgumentsIsErrorType(t *testing.T) {

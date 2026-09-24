@@ -433,6 +433,7 @@ func (*RuntimeImportStatement) runtimeStatement()  {}
 type RuntimeExceptClause struct {
 	Exception RuntimeExpr
 	Name      string
+	NameLoc   TextRange
 	Body      []RuntimeStatement
 	Group     bool
 }
