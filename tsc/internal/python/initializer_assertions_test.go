@@ -220,7 +220,7 @@ class User:
     def __init__(self) -> asserts self is { "id": str }:
         pass
 `, "initializer assertion is not established"},
-		{"instance initializer still participates in structural assignment", `
+		{"initializer difference does not block instance assignment", `
 class Parent:
     id: str
     def __init__(self, id: str):
@@ -231,7 +231,7 @@ class Child(Parent):
 def consume(value: Parent):
     pass
 consume(Child(1))
-`, "not assignable"},
+`, ""},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			p := BuildProgram(newPythonChecker(t), []SourceInput{{FileName: "main.ty", Text: test.source}})

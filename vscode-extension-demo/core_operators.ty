@@ -10,8 +10,8 @@ def identity<const T>(value: T) -> T:
 inferred = identity({"id": 1, "names": ["Ada", "Grace"]})
 checked = {"id": 1} satisfies {"id": int}
 exact = {"id": 1, "names": ["Ada", "Grace"]} as const
-both = {"id": 1} as const satisfies {"id": int}
-
+both = {"id": 1} as {"id": int}
+both["id"] + 4
 # Uncomment separately to inspect diagnostics:
 # invalid = {"id": "wrong"} satisfies {"id": int}
 # exact["id"] = 2

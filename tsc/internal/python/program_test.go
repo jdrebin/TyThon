@@ -740,6 +740,20 @@ rendered: str = number.__str__()
 	}
 	completionProgram := BuildProgram(newPythonChecker(t), []SourceInput{{FileName: "completion.ty", Text: recovered}})
 	entries := completionProgram.AttributeCompletionsAt("completion.ty", query)
+	foundBitLength := false
+	for _, entry := range entries {
+		if entry.Label == "__str__" || entry.Label == "__call__" || entry.Label == "__class__" || entry.Label == "toString" || entry.Label == "valueOf" || entry.Label == "toLocaleString" {
+			t.Fatalf("completion %q is not a Python int attribute: %#v", entry.Label, entries)
+		}
+		if entry.Label == "bit_length" {
+			foundBitLength = true
+		}
+	}
+	if !foundBitLength {
+		t.Fatalf("int completion missing bit_length: %#v", entries)
+	}
+	query.Prefix = "__"
+	entries = completionProgram.AttributeCompletionsAt("completion.ty", query)
 	dundersStarted := false
 	foundString := false
 	for _, entry := range entries {
@@ -754,6 +768,31 @@ rendered: str = number.__str__()
 	}
 	if !foundString {
 		t.Fatalf("object completion surface missing __str__: %#v", entries)
+	}
+}
+
+func TestItemAccessCompletionUsesTheValueProtocol(t *testing.T) {
+	t.Parallel()
+	const source = `both = {"id": 1} as {"id": int}
+both["id"].
+`
+	recovered, query, ok := PrepareAttributeCompletion(source, len(source)-1)
+	if !ok {
+		t.Fatal("expected attribute completion")
+	}
+	program := BuildProgram(newPythonChecker(t), []SourceInput{{FileName: "app.ty", Text: recovered}})
+	entries := program.AttributeCompletionsAt("app.ty", query)
+	found := false
+	for _, entry := range entries {
+		if entry.Label == "toString" || entry.Label == "valueOf" || entry.Label == "toLocaleString" {
+			t.Fatalf("item completion offered %q: %#v", entry.Label, entries)
+		}
+		if entry.Label == "bit_length" {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("both[\"id\"] completions = %#v, want bit_length", entries)
 	}
 }
 

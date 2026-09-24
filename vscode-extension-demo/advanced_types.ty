@@ -9,7 +9,8 @@ type ScalarResult(T) = str if T extends str else bytes
 interface Box<T>:
     readonly optional value: T
 
-    def get(self) -> T: ...
+    def get(self) -> T
+    def __eq__(bool) -> str
 
 
 type User(T) = {
@@ -18,6 +19,9 @@ type User(T) = {
     "id": int,
     "enabled": bool,
     def inspect<U>(value: U) -> U,
+    def __add__(other: int) -> int,
+    def __init__(self) -> None,
+    def __eq__(other: int) -> None,
 }
 
 

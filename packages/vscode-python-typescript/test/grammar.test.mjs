@@ -133,6 +133,12 @@ for (const line of [9, 10, 11]) {
 }
 assertNotScope(mappedTypes, 9, "left", "entity.name.type.typed-python");
 
+const dunders = tokenize('def __add__(self, other: int) -> int:\n    return self.__radd__(other)\ntext = "__add__"\n# __init__ stays literal');
+assertScope(dunders, 0, "add", "keyword.control.flow.python");
+assertScope(dunders, 1, "radd", "keyword.control.flow.python");
+assertNotScope(dunders, 2, "__add__", "keyword.control.flow.python");
+assertNotScope(dunders, 3, "__init__", "keyword.control.flow.python");
+
 console.log("tython grammar tests passed.");
 
 function tokenize(text) {

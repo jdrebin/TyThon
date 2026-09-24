@@ -212,6 +212,9 @@ func (e *CheckerTypeEnvironment) initializeClassAssertions(declaration *ClassDec
 			bound   bool
 		}{{instance, true}, {classValue, false}} {
 			callable := e.checker.GetAttributeType(target.surface, e.checker.GetStringLiteralType("__init__"))
+			if callable == nil {
+				continue
+			}
 			var signatures []*checker.Signature
 			for _, signature := range e.checker.GetSignaturesOfType(callable, checker.SignatureKindCall) {
 				signatures = append(signatures, e.checker.SignatureWithInitializationAssertion(signature, assertion, member.Signature.Parameters[0].Name, target.bound))
@@ -219,6 +222,19 @@ func (e *CheckerTypeEnvironment) initializeClassAssertions(declaration *ClassDec
 			asserted := e.checker.NewObjectTypeFromCallSignatures(signatures)
 			if !e.checker.PopulateObjectTypeFromType(callable, asserted) {
 				e.checker.SetObjectAttributeType(target.surface, "__init__", asserted)
+			}
+		}
+		for index := range e.hovers {
+			hover := &e.hovers[index]
+			if hover.Name != "__init__" || hover.Range != member.NameLoc || hover.Type == nil {
+				continue
+			}
+			var signatures []*checker.Signature
+			for _, signature := range e.checker.GetSignaturesOfType(hover.Type, checker.SignatureKindCall) {
+				signatures = append(signatures, e.checker.SignatureWithInitializationAssertion(signature, assertion, member.Signature.Parameters[0].Name, true))
+			}
+			if len(signatures) != 0 {
+				e.checker.PopulateObjectTypeFromType(hover.Type, e.checker.NewObjectTypeFromCallSignatures(signatures))
 			}
 		}
 		return
@@ -260,7 +276,8 @@ func (e *CheckerTypeEnvironment) inheritedInitializerFields(declaration *ClassDe
 		if symbol == nil || symbol.Instance == nil {
 			continue
 		}
-		assertion := e.initializerAssertion(e.checker.GetAttributeType(symbol.Instance, e.checker.GetStringLiteralType("__init__")))
+		initializer, _ := e.checker.PythonConstruction(symbol.Instance)
+		assertion := e.initializerAssertion(initializer)
 		if assertion == nil {
 			continue
 		}
@@ -359,7 +376,8 @@ func (s *implementationChecker) requiredClassAttributes(statement *RuntimeClassS
 	var assertions []*checker.Type
 	for _, base := range declaration.Bases {
 		baseType := s.types.resolveCheckerType(base.Runtime, s.typeScope)
-		if assertion := s.types.initializerAssertion(s.types.checker.GetAttributeType(baseType, s.types.checker.GetStringLiteralType("__init__"))); assertion != nil {
+		initializer, _ := s.types.checker.PythonConstruction(baseType)
+		if assertion := s.types.initializerAssertion(initializer); assertion != nil {
 			assertions = append(assertions, assertion)
 		}
 	}

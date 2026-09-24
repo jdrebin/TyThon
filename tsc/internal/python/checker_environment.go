@@ -1371,6 +1371,16 @@ func (e *CheckerTypeEnvironment) resolveCheckerClass(declaration *ClassDeclarati
 		bases = append(bases, e.resolveCheckerSymbol("Object"))
 	}
 	own, classValue := e.resolveCheckerMembers(declaration.Members, scope)
+	for _, base := range bases {
+		baseCalls := e.checker.GetSignaturesOfType(base, checker.SignatureKindCall)
+		ownCalls := e.checker.GetSignaturesOfType(own, checker.SignatureKindCall)
+		if len(baseCalls) == 0 || len(ownCalls) == 0 {
+			continue
+		}
+		if !e.checker.IsTypeAssignableTo(e.checker.NewObjectTypeFromCallSignatures(ownCalls), e.checker.NewObjectTypeFromCallSignatures(baseCalls)) {
+			e.reportChecker(declaration.Range(), "incompatible __call__ override")
+		}
+	}
 	instance, err := e.checker.ExtendPythonClassFacetTypes(bases, own)
 	if err != nil {
 		e.reportChecker(declaration.Range(), err.Error())
@@ -1379,6 +1389,8 @@ func (e *CheckerTypeEnvironment) resolveCheckerClass(declaration *ClassDeclarati
 	if len(primitiveBases) != 0 {
 		instance = e.checker.GetIntersectionType(append(primitiveBases, instance))
 	}
+	classValue = e.attachPythonConstruction(classValue, instance)
+	e.checker.OmitPythonInstanceContracts(e.checker.PythonConstructionCarrier(instance))
 	e.checkIndexConstraints(instance, declaration.Range())
 	e.checkIndexConstraints(classValue, declaration.Range())
 	e.initializeClassAssertions(declaration, instance, classValue)
@@ -1389,36 +1401,27 @@ func (e *CheckerTypeEnvironment) resolveCheckerClass(declaration *ClassDeclarati
 			constructor.TypeParameters = append(constructor.TypeParameters, typeParameter)
 		}
 	}
-	hasInitializer := false
-	for _, member := range declaration.Members {
-		if member.Kind == ObjectMemberMethod && member.Name == "__init__" && member.Signature != nil {
-			hasInitializer = true
-			callable := e.resolveCheckerCallable(member.Signature, scope, true, instance)
-			signature := e.checker.GetSignaturesOfType(callable, checker.SignatureKindCall)[0]
-			constructor.TypeParameters = append(constructor.TypeParameters, signature.TypeParameters()...)
-			for index, parameter := range signature.Parameters() {
-				constructor.Parameters = append(constructor.Parameters, checker.ObjectFacetParameter{
-					Name: parameter.Name, Type: e.checker.GetTypeOfSymbol(parameter), Kind: signature.ParameterKinds()[index], HasDefault: parameter.Flags&ast.SymbolFlagsOptional != 0,
-				})
+	initType := e.checker.GetAttributeType(classValue, e.checker.GetStringLiteralType("__init__"))
+	newType := e.checker.GetAttributeType(classValue, e.checker.GetStringLiteralType("__new__"))
+	var classValueWithCall *checker.Type
+	switch {
+	case newType != nil:
+		signature := e.checker.GetSignaturesOfType(newType, checker.SignatureKindCall)[0]
+		public := e.checker.SignatureWithTypeParameters(e.checker.SignatureWithReturnType(e.checker.SignatureWithoutReceiver(signature), e.checker.GetReturnTypeOfSignature(signature)), constructor.TypeParameters...)
+		if initType != nil {
+			initializer := e.checker.SignatureWithoutReceiver(e.checker.GetSignaturesOfType(initType, checker.SignatureKindCall)[0])
+			if !constructionArgumentsCompatible(e.checker, public, initializer) {
+				e.reportChecker(declaration.Range(), "__new__ and __init__ must accept the same construction arguments")
 			}
-			break
+		} else if requiredConstructionParameters(public) > 0 {
+			e.reportChecker(declaration.Range(), "__new__ and __init__ must accept the same construction arguments")
 		}
-	}
-	classValueWithCall := e.checker.NewObjectTypeFromFacets(checker.ObjectFacets{Calls: []checker.ObjectFacetCall{constructor}})
-	if !hasInitializer {
-		if initializer := e.checker.GetAttributeType(instance, e.checker.GetStringLiteralType("__init__")); initializer != nil {
-			inherited := e.checker.NewObjectTypeFromFacets(checker.ObjectFacets{Attributes: []checker.ObjectFacetMember{{Name: "__init__", Type: e.checker.UnboundPythonInitializer(initializer, instance)}}})
-			if merged, err := e.checker.MergeObjectFacetTypes([]*checker.Type{classValue, inherited}); err == nil {
-				classValue = merged
-			}
-			var signatures []*checker.Signature
-			for _, signature := range e.checker.GetSignaturesOfType(initializer, checker.SignatureKindCall) {
-				signatures = append(signatures, e.checker.SignatureForPythonConstruction(signature, instance, constructor.TypeParameters...))
-			}
-			if len(signatures) != 0 {
-				classValueWithCall = e.checker.NewObjectTypeFromCallSignatures(signatures)
-			}
-		}
+		classValueWithCall = e.checker.NewObjectTypeFromCallSignatures([]*checker.Signature{public})
+	case initType != nil:
+		signature := e.checker.SignatureWithoutReceiver(e.checker.GetSignaturesOfType(initType, checker.SignatureKindCall)[0])
+		classValueWithCall = e.checker.NewObjectTypeFromCallSignatures([]*checker.Signature{e.checker.SignatureForPythonConstruction(signature, instance, constructor.TypeParameters...)})
+	default:
+		classValueWithCall = e.checker.NewObjectTypeFromFacets(checker.ObjectFacets{Calls: []checker.ObjectFacetCall{constructor}})
 	}
 	valueParts := []*checker.Type{classValue, classValueWithCall}
 	if declaration.Metaclass != nil {
@@ -1430,6 +1433,96 @@ func (e *CheckerTypeEnvironment) resolveCheckerClass(declaration *ClassDeclarati
 		value = classValueWithCall
 	}
 	return instance, value
+}
+
+func (e *CheckerTypeEnvironment) attachPythonConstruction(classValue *checker.Type, instance *checker.Type) *checker.Type {
+	initializer, newMethod := e.checker.PythonConstruction(instance)
+	classValue = e.mergeConstructionAttribute(classValue, "__init__", initializer)
+	return e.mergeConstructionAttribute(classValue, "__new__", newMethod)
+}
+
+func (e *CheckerTypeEnvironment) attachBoundPythonConstruction(target *checker.Type, instance *checker.Type) *checker.Type {
+	initializer, _ := e.checker.PythonConstruction(instance)
+	if initializer != nil {
+		initializer = e.checker.BoundPythonCallable(initializer)
+	}
+	return e.mergeConstructionAttribute(target, "__init__", initializer)
+}
+
+func (e *CheckerTypeEnvironment) mergeConstructionAttribute(classValue *checker.Type, name string, value *checker.Type) *checker.Type {
+	if value == nil || e.checker.GetAttributeType(classValue, e.checker.GetStringLiteralType(name)) != nil {
+		return classValue
+	}
+	merged, err := e.checker.MergeObjectFacetTypes([]*checker.Type{classValue, e.checker.NewObjectTypeFromFacets(checker.ObjectFacets{Attributes: []checker.ObjectFacetMember{{Name: name, Type: value}}})})
+	if err != nil {
+		return classValue
+	}
+	return merged
+}
+
+func constructionArgumentsCompatible(c *checker.Checker, published *checker.Signature, initializer *checker.Signature) bool {
+	publishedParameters := published.Parameters()
+	initializerParameters := initializer.Parameters()
+	if !constructionCovers(published, initializer) || !constructionCovers(initializer, published) {
+		return false
+	}
+	count := len(publishedParameters)
+	if len(initializerParameters) < count {
+		count = len(initializerParameters)
+	}
+	for index := 0; index < count; index++ {
+		if constructionParameterKind(published.ParameterKinds(), index) == checker.CallParameterVarPositional || constructionParameterKind(published.ParameterKinds(), index) == checker.CallParameterVarKeyword || constructionParameterKind(initializer.ParameterKinds(), index) == checker.CallParameterVarPositional || constructionParameterKind(initializer.ParameterKinds(), index) == checker.CallParameterVarKeyword {
+			break
+		}
+		if !c.IsTypeAssignableTo(c.GetTypeOfSymbol(publishedParameters[index]), c.GetTypeOfSymbol(initializerParameters[index])) {
+			return false
+		}
+	}
+	return true
+}
+
+func constructionCovers(provided *checker.Signature, required *checker.Signature) bool {
+	if constructionAcceptsExtras(required.ParameterKinds()) {
+		return true
+	}
+	for index, parameter := range provided.Parameters() {
+		kind := constructionParameterKind(provided.ParameterKinds(), index)
+		if kind == checker.CallParameterVarPositional || kind == checker.CallParameterVarKeyword || parameter.Flags&ast.SymbolFlagsOptional != 0 {
+			continue
+		}
+		if index >= len(required.Parameters()) {
+			return false
+		}
+	}
+	return true
+}
+
+func requiredConstructionParameters(signature *checker.Signature) int {
+	count := 0
+	for index, parameter := range signature.Parameters() {
+		kind := constructionParameterKind(signature.ParameterKinds(), index)
+		if kind == checker.CallParameterVarPositional || kind == checker.CallParameterVarKeyword || parameter.Flags&ast.SymbolFlagsOptional != 0 {
+			continue
+		}
+		count++
+	}
+	return count
+}
+
+func constructionAcceptsExtras(kinds []checker.CallParameterKind) bool {
+	for _, kind := range kinds {
+		if kind == checker.CallParameterVarPositional || kind == checker.CallParameterVarKeyword {
+			return true
+		}
+	}
+	return false
+}
+
+func constructionParameterKind(kinds []checker.CallParameterKind, index int) checker.CallParameterKind {
+	if index < len(kinds) {
+		return kinds[index]
+	}
+	return checker.CallParameterPositionalOrKeyword
 }
 
 func (e *CheckerTypeEnvironment) resolveCheckerMembers(members []ObjectMemberDeclaration, scope map[string]*checker.Type) (*checker.Type, *checker.Type) {
@@ -1447,6 +1540,9 @@ func (e *CheckerTypeEnvironment) resolveCheckerMembers(members []ObjectMemberDec
 	for _, member := range members {
 		switch member.Kind {
 		case ObjectMemberAttribute:
+			if member.Name == "__class__" {
+				break
+			}
 			if member.Static {
 				classOptional[member.Name] = member.Optional
 			} else {
@@ -1483,6 +1579,15 @@ func (e *CheckerTypeEnvironment) resolveCheckerMembers(members []ObjectMemberDec
 			}
 			if member.Name == "__call__" && !member.Static && !member.ClassMethod {
 				instanceCalls = append(instanceCalls, bound)
+				break
+			}
+			if member.Name == "__init__" && !member.Static && !member.ClassMethod {
+				classAttrs[member.Name] = append(classAttrs[member.Name], unbound)
+				break
+			}
+			if member.Name == "__new__" && !member.ClassMethod {
+				classAttrs[member.Name] = append(classAttrs[member.Name], unbound)
+				break
 			}
 			if member.Static || member.ClassMethod {
 				instanceAttrs[member.Name] = append(instanceAttrs[member.Name], bound)
@@ -1541,6 +1646,15 @@ func (e *CheckerTypeEnvironment) resolveCheckerMembers(members []ObjectMemberDec
 	instance := e.checker.NewObjectTypeFromFacets(checker.ObjectFacets{
 		Attributes: e.resolveCheckerAttributeGroupsWithOptional(instanceAttrs, instanceReadonly, instanceOptional), Items: instanceItems,
 	})
+	var initializer *checker.Type
+	var constructor *checker.Type
+	if declared := classAttrs["__init__"]; len(declared) != 0 {
+		initializer = declared[0]
+	}
+	if declared := classAttrs["__new__"]; len(declared) != 0 {
+		constructor = declared[0]
+	}
+	e.checker.SetPythonConstruction(instance, initializer, constructor)
 	if len(instanceCalls) != 0 {
 		parts := append([]*checker.Type{instance}, instanceCalls...)
 		if callable, err := e.checker.MergeObjectFacetTypes(parts); err == nil {

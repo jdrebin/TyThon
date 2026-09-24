@@ -1,4 +1,6 @@
 # Intended behavior: this should defer T[K] like the equivalent constrained
 # TypeScript indexed access. It currently reports that T has no key K.
 
-type ValueOf(T, K extends keyof T = keyof T) = T[K] if T extends { (P): any for P in K } else never
+type ValueOf(T, K extends keyof T = keyof T) = T[K] if T extends {
+    (P): any for P in K
+} else never

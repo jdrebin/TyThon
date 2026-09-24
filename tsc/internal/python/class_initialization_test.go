@@ -42,6 +42,34 @@ func TestClassDefiniteInitialization(t *testing.T) {
 	}
 }
 
+func TestDefiniteAssignmentAssertion(t *testing.T) {
+	for _, source := range []string{
+		"class User:\n    id!: str\n",
+		"class User:\n    id!: str\n    def __init__(self):\n        pass\n",
+		"class User:\n    readonly id!: str\n    def __init__(self):\n        pass\n",
+	} {
+		p := BuildProgram(newPythonChecker(t), []SourceInput{{FileName: "main.ty", Text: source}})
+		if len(p.Diagnostics) != 0 {
+			t.Fatalf("%s: %v", source, p.Diagnostics)
+		}
+	}
+	source := "class User:\n    id!: str\n    name: str\n"
+	p := BuildProgram(newPythonChecker(t), []SourceInput{{FileName: "main.ty", Text: source}})
+	if len(p.Diagnostics) != 1 || !strings.Contains(p.Diagnostics[0].Message, "attribute \"name\"") {
+		t.Fatalf("assertion must not cover a sibling field: %v", p.Diagnostics)
+	}
+	emitted, diagnostics := EraseTypedPython("class User:\n    id!: str\n    name!: str = \"a\"\n")
+	if len(diagnostics) != 0 {
+		t.Fatal(diagnostics)
+	}
+	if strings.Contains(emitted, "!") || strings.Contains(emitted, "id") {
+		t.Fatalf("assertion leaked into Python:\n%s", emitted)
+	}
+	if !strings.Contains(emitted, "name") || !strings.Contains(emitted, "\"a\"") {
+		t.Fatalf("initialized assertion lost its value:\n%s", emitted)
+	}
+}
+
 func TestClassInitializationDeclarationOnlyAndOptional(t *testing.T) {
 	for _, test := range []SourceInput{
 		{FileName: "api.d.ty", Text: "class User:\n    id: str\n"},

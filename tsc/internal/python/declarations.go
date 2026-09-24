@@ -54,17 +54,20 @@ const (
 )
 
 type ObjectMemberDeclaration struct {
-	Loc                 TextRange
-	Kind                ObjectMemberKind
-	Name                string
-	NameLoc             TextRange
-	Key                 TypeExpr
-	IndexName           string
-	IndexKey            TypeExpr
-	Type                TypeExpr
-	Signature           *CallableTypeExpr
-	Readonly            bool
-	Optional            bool
+	Loc       TextRange
+	Kind      ObjectMemberKind
+	Name      string
+	NameLoc   TextRange
+	Key       TypeExpr
+	IndexName string
+	IndexKey  TypeExpr
+	Type      TypeExpr
+	Signature *CallableTypeExpr
+	Readonly  bool
+	Optional  bool
+	// Definite asserts initialization the checker cannot see. It does not
+	// change the attribute's type or optionality.
+	Definite            bool
 	ConstructorWritable bool
 	Static              bool
 	ClassMethod         bool

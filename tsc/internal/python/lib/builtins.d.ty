@@ -230,14 +230,14 @@ declare class EllipsisType(Some):
 
 Ellipsis: EllipsisType
 
-declare class slice:
+declare class slice(Object):
     def __init__(self, start: int | None = ..., stop: int | None = ..., step: int | None = ...) -> None
 
 declare class Template:
     strings: ()str
     values: ()object
 
-declare class BaseException:
+declare class BaseException(Object):
     def __init__(self, *args: []any) -> None
 
 declare class Exception(BaseException):

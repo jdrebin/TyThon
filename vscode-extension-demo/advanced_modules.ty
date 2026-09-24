@@ -1,7 +1,6 @@
 import sample_package.models as models
 from sample_package.models import load_user, User
 
-
 loaded = load_user(7)
 loaded_name = loaded.name
 loaded_label = loaded.label

@@ -13,6 +13,8 @@ import {
     StaticFeature,
     TransportKind,
 } from "vscode-languageclient/node";
+import { recolorDunderTokens } from "./dunderConceal";
+import { presentDunderCompletion, registerDunderMask } from "./dunderMask";
 import { registerHoverFeature } from "./hover";
 import { createServerLaunch } from "./serverLaunch";
 import { PythonTools } from "./pythonTools";
@@ -27,6 +29,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     shuttingDown = false;
     const output = vscode.window.createOutputChannel("TyThon");
     context.subscriptions.push(output);
+    registerDunderMask(context);
 
     context.subscriptions.push(vscode.commands.registerCommand("pythonTypeScript.openPreview", async () => {
         const selected = await vscode.window.showOpenDialog({ canSelectFiles: false, canSelectFolders: true, canSelectMany: false,
@@ -95,12 +98,22 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
                 // headers, or a missing native result, never replace a typed
                 // local member signature.
                 const memberContext = /\.\w*$/.test(linePrefix);
-                if (!pythonTools || (!importContext && !memberContext && !defContext && !classContext && items.length)) return native;
+                if (!pythonTools || (!importContext && !memberContext && !defContext && !classContext && items.length)) {
+                    for (const item of items) presentDunderCompletion(item);
+                    return native;
+                }
                 const external = await pythonTools.completions(document, position, token, !importContext && !defContext && !classContext && items.length > 0);
                 if (token.isCancellationRequested || document.isClosed || document.version !== version) return undefined;
                 const labels = new Set(items.map(item => typeof item.label === "string" ? item.label : item.label.label));
-                return new vscode.CompletionList([...items, ...external.filter(item => !labels.has(String(item.label)))],
-                    (!Array.isArray(native) && native?.isIncomplete) || false);
+                const merged = [...items, ...external.filter(item => !labels.has(String(item.label)))];
+                for (const item of merged) presentDunderCompletion(item);
+                return new vscode.CompletionList(merged, (!Array.isArray(native) && native?.isIncomplete) || false);
+            },
+            provideDocumentSemanticTokens(document, token, next) {
+                return recolorSemanticTokens(document, next(document, token));
+            },
+            provideDocumentRangeSemanticTokens(document, range, token, next) {
+                return recolorSemanticTokens(document, next(document, range, token));
             },
             async provideDefinition(document, position, token, next) {
                 const native = await next(document, position, token);
@@ -164,6 +177,15 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         await stopContainedServer?.();
         void vscode.window.showErrorMessage("tython could not start safely. Check the language-server output. On Linux, a working systemd memory controller is required; the extension will not silently launch without containment.");
     }
+}
+
+function recolorSemanticTokens(document: vscode.TextDocument, provided: vscode.ProviderResult<vscode.SemanticTokens>): vscode.ProviderResult<vscode.SemanticTokens> {
+    const keywordType = languageClient?.initializeResult?.capabilities?.semanticTokensProvider?.legend.tokenTypes.indexOf("keyword") ?? -1;
+    if (keywordType < 0) return provided;
+    return Promise.resolve(provided).then(tokens => {
+        if (!tokens) return tokens;
+        return new vscode.SemanticTokens(recolorDunderTokens(document.getText(), tokens.data, keywordType), tokens.resultId);
+    });
 }
 
 export async function deactivate(): Promise<void> {

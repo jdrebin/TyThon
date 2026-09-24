@@ -737,7 +737,7 @@ func (p *PythonProgram) AttributeCompletionsAt(fileName string, query AttributeC
 		}
 		for _, property := range c.PropertiesForCompletion(surface) {
 			name := property.Name
-			if c.IsPythonPrivateAttributeName(name) {
+			if c.IsPythonPrivateAttributeName(name) || !includeDunderCompletion(name, query.Prefix) {
 				continue
 			}
 			if _, exists := seen[name]; exists || query.Prefix != "" && !strings.HasPrefix(strings.ToLower(name), strings.ToLower(query.Prefix)) {
@@ -755,7 +755,9 @@ func (p *PythonProgram) AttributeCompletionsAt(fileName string, query AttributeC
 			})
 		}
 	}
-	addProperties(t)
+	for _, surface := range pythonAttributeCompletionSurfaces(c, t) {
+		addProperties(surface)
+	}
 	// object is a universal Python base even for values represented by checker
 	// primitives. Keep the common surface in bundled declarations and compose
 	// it only at the editor boundary so inferred type displays stay compact.
@@ -1102,6 +1104,42 @@ func sortCompletionEntries(entries []CompletionEntry) {
 		}
 		return strings.Compare(strings.ToLower(left.Label), strings.ToLower(right.Label))
 	})
+}
+
+// Primitives keep their JavaScript wrapper methods on the apparent type.
+// Attribute completion uses the declared Python protocol instead, so an int
+// offers bit_length rather than toString.
+func pythonAttributeCompletionSurfaces(c *checker.Checker, t *checker.Type) []*checker.Type {
+	if t == nil {
+		return nil
+	}
+	if t.Flags()&checker.TypeFlagsUnion != 0 {
+		var surfaces []*checker.Type
+		for _, part := range t.Types() {
+			surfaces = append(surfaces, pythonAttributeCompletionSurfaces(c, part)...)
+		}
+		return surfaces
+	}
+	if protocol := c.PythonPrimitiveProtocol(t); protocol != nil {
+		return []*checker.Type{protocol}
+	}
+	if c.PythonPrimitiveBase(t) != nil {
+		return nil
+	}
+	return []*checker.Type{t}
+}
+
+func includeDunderCompletion(name string, prefix string) bool {
+	if name == "__call__" || name == "__class__" {
+		return false
+	}
+	if len(name) <= 4 || !strings.HasPrefix(name, "__") || !strings.HasSuffix(name, "__") {
+		return true
+	}
+	if checker.IsPythonExposedDunder(name) {
+		return true
+	}
+	return strings.HasPrefix(prefix, "__")
 }
 
 func compareDunderCompletionPriority(left string, right string) int {

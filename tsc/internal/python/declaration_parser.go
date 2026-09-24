@@ -749,7 +749,7 @@ func parseObjectMembers(lines []logicalLine, declarationOnly bool, initialized m
 		member, parseErrors := parseObjectMember(line)
 		errors = append(errors, parseErrors...)
 		if member != nil {
-			if initialized != nil && member.Name != "" && findRuntimeAssignment(text) >= 0 {
+			if initialized != nil && member.Name != "" && (member.Definite || findRuntimeAssignment(text) >= 0) {
 				initialized[member.Name] = true
 			}
 			members = append(members, *member)
@@ -778,6 +778,46 @@ func trimOptionalMemberModifier(text string) string {
 		return text
 	}
 	return rest
+}
+
+// A trailing '!' is a definite-assignment assertion: id!: str. The attribute
+// stays required; the checker trusts that some path it does not analyze
+// initializes it.
+func trimDefiniteAssignmentAssertion(text string) (string, bool) {
+	trimmed := strings.TrimSpace(text)
+	bang := strings.LastIndex(trimmed, "!")
+	if bang < 0 || strings.TrimSpace(trimmed[bang+1:]) != "" {
+		return text, false
+	}
+	stripped := strings.TrimSpace(trimmed[:bang])
+	if !isSimpleIdentifier(stripped) {
+		return text, false
+	}
+	return stripped, true
+}
+
+func annotatedDeclarationName(text string) (string, bool) {
+	name := strings.TrimSpace(text)
+	for {
+		switch {
+		case strings.HasPrefix(name, "static "):
+			name = strings.TrimSpace(strings.TrimPrefix(name, "static "))
+		case strings.HasPrefix(name, "readonly "):
+			name = strings.TrimSpace(strings.TrimPrefix(name, "readonly "))
+		default:
+			if stripped := trimOptionalMemberModifier(name); stripped != name {
+				name = stripped
+				continue
+			}
+			if stripped, ok := trimDefiniteAssignmentAssertion(name); ok {
+				name = stripped
+			}
+			if isSimpleIdentifier(name) {
+				return name, true
+			}
+			return "", false
+		}
+	}
 }
 
 func parseObjectMember(line logicalLine) (*ObjectMemberDeclaration, []TypeParseError) {
@@ -841,7 +881,11 @@ modifiersDone:
 		keyOffset := logicalLineTextOffset(line, left)
 		relocateTypeExpression(member.Key, keyOffset)
 		errors = append(errors, relocateErrors(parseErrors, keyOffset)...)
-	} else {
+	} else if name, definite := trimDefiniteAssignmentAssertion(left); definite || isSimpleIdentifier(left) {
+		if definite {
+			left = name
+			member.Definite = true
+		}
 		member.Kind = ObjectMemberAttribute
 		member.Name = left
 		member.NameLoc = declarationNameRange(line, left)
@@ -851,6 +895,11 @@ modifiersDone:
 		if strings.Contains(left, "?") {
 			errors = append(errors, errorForLine(line, "optional members use the 'optional' modifier"))
 		}
+	} else {
+		member.Kind = ObjectMemberAttribute
+		member.Name = left
+		member.NameLoc = declarationNameRange(line, left)
+		errors = append(errors, errorForLine(line, "non-identifier item keys must be literals or wrapped in parentheses"))
 	}
 	return member, errors
 }

@@ -959,6 +959,11 @@ type StructuredType struct {
 	// remain available to runtime attribute lookup but are excluded from Dir
 	// and from Class/Dict facet conversion.
 	pythonProtocolProperties map[string]bool
+	// Construction metadata is not an instance member. __init__ and __new__
+	// stay available to the class value and to subclass construction without
+	// participating in instance assignability.
+	pythonInitializer *Type
+	pythonNew         *Type
 
 	objectTypeWithoutAbstractConstructSignatures *Type
 }

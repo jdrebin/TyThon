@@ -437,26 +437,40 @@ func eraseVariableAnnotations(source string, removed []bool, diagnostics *[]Eras
 			if equals >= 0 {
 				left := line[:equals]
 				colon := findTopLevel(left, ':')
-				if colon >= 0 && isSimpleIdentifier(trimOptionalMemberModifier(strings.TrimSpace(left[:colon]))) {
-					markErased(removed, lineStart+colon, lineStart+equals)
-					name := strings.TrimSpace(left[:colon])
-					if trimOptionalMemberModifier(name) != name {
-						modifier := strings.Index(left[:colon], "optional")
-						// The position-preserving provider projection cannot remove a
-						// leading modifier without altering Python suite indentation.
-						*diagnostics = append(*diagnostics, ErasureDiagnostic{Range: TextRange{Start: lineStart + modifier, End: lineStart + modifier + len("optional")}, Message: "declare the optional attribute separately from its initializer"})
-						markErased(removed, lineStart+modifier, lineStart+modifier+len("optional"))
+				if colon >= 0 {
+					if _, named := annotatedDeclarationName(left[:colon]); named {
+						markErased(removed, lineStart+colon, lineStart+equals)
+						eraseDefiniteAssignmentMark(line, lineStart, colon, removed)
+						name := strings.TrimSpace(left[:colon])
+						if trimOptionalMemberModifier(name) != name {
+							modifier := strings.Index(left[:colon], "optional")
+							// The position-preserving provider projection cannot remove a
+							// leading modifier without altering Python suite indentation.
+							*diagnostics = append(*diagnostics, ErasureDiagnostic{Range: TextRange{Start: lineStart + modifier, End: lineStart + modifier + len("optional")}, Message: "declare the optional attribute separately from its initializer"})
+							markErased(removed, lineStart+modifier, lineStart+modifier+len("optional"))
+						}
 					}
 				}
-			} else if colon := findTopLevel(line, ':'); colon >= 0 && isSimpleIdentifier(trimOptionalMemberModifier(strings.TrimSpace(line[:colon]))) {
-				// A bare Python annotation statement has no runtime value after
-				// static erasure; erase its name as well instead of turning it into
-				// an accidental expression statement.
-				markErased(removed, lineStart, lineEnd)
+			} else if colon := findTopLevel(line, ':'); colon >= 0 {
+				if _, named := annotatedDeclarationName(line[:colon]); named {
+					// A bare Python annotation statement has no runtime value after
+					// static erasure; erase its name as well instead of turning it into
+					// an accidental expression statement.
+					markErased(removed, lineStart, lineEnd)
+				}
 			}
 		}
 		lineStart = lineEnd + 1
 	}
+}
+
+func eraseDefiniteAssignmentMark(line string, lineStart int, colon int, removed []bool) {
+	left := line[:colon]
+	bang := strings.LastIndex(left, "!")
+	if bang < 0 || strings.TrimSpace(left[bang+1:]) != "" {
+		return
+	}
+	markErased(removed, lineStart+bang, lineStart+bang+1)
 }
 
 func eraseGenericApplications(source string, removed []bool, diagnostics *[]ErasureDiagnostic) {

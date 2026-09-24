@@ -328,23 +328,24 @@ func (p *runtimeFileParser) parseSuite(start int, indent int) ([]RuntimeStatemen
 			index++
 			continue
 		}
-		if colon := findTopLevel(text, ':'); findRuntimeAssignment(text) < 0 && colon >= 0 && (isSimpleIdentifier(strings.TrimSpace(text[:colon])) || indent == p.classIndent && isSimpleIdentifier(trimOptionalMemberModifier(strings.TrimSpace(text[:colon])))) {
-			name := trimOptionalMemberModifier(strings.TrimSpace(text[:colon]))
-			typeText := strings.TrimSpace(text[colon+1:])
-			typeOffset := logicalLineTextOffset(line, typeText)
-			annotation, errors := ParseTypeExpression(typeText)
-			for _, parseError := range errors {
-				parseError.Range.Start += typeOffset
-				parseError.Range.End += typeOffset
-				p.diagnostics = append(p.diagnostics, RuntimeParseError{Range: parseError.Range, Message: parseError.Message})
+		if colon := findTopLevel(text, ':'); findRuntimeAssignment(text) < 0 && colon >= 0 {
+			if name, named := annotatedDeclarationName(text[:colon]); named {
+				typeText := strings.TrimSpace(text[colon+1:])
+				typeOffset := logicalLineTextOffset(line, typeText)
+				annotation, errors := ParseTypeExpression(typeText)
+				for _, parseError := range errors {
+					parseError.Range.Start += typeOffset
+					parseError.Range.End += typeOffset
+					p.diagnostics = append(p.diagnostics, RuntimeParseError{Range: parseError.Range, Message: parseError.Message})
+				}
+				relocateTypeExpression(annotation, typeOffset)
+				nameStart := logicalLineTextOffset(line, name)
+				statements = append(statements, &RuntimeAnnotatedDeclaration{
+					Loc: lineRange(line), Name: name, NameLoc: TextRange{Start: nameStart, End: nameStart + len(name)}, Annotation: annotation,
+				})
+				index++
+				continue
 			}
-			relocateTypeExpression(annotation, typeOffset)
-			nameStart := logicalLineTextOffset(line, name)
-			statements = append(statements, &RuntimeAnnotatedDeclaration{
-				Loc: lineRange(line), Name: name, NameLoc: TextRange{Start: nameStart, End: nameStart + len(name)}, Annotation: annotation,
-			})
-			index++
-			continue
 		}
 		if operatorIndex, operator := findRuntimeAugmentedAssignment(text); operatorIndex >= 0 {
 			leftText := strings.TrimSpace(text[:operatorIndex])
@@ -435,6 +436,9 @@ func (p *runtimeFileParser) parseAssignment(line logicalLine) RuntimeStatement {
 				p.diagnostics = append(p.diagnostics, RuntimeParseError{Range: lineRange(line), Message: "declare the optional attribute separately from its initializer"})
 			}
 			name = trimOptionalMemberModifier(name)
+		}
+		if stripped, ok := trimDefiniteAssignmentAssertion(name); ok {
+			name = stripped
 		}
 		typeText := strings.TrimSpace(left[colon+1:])
 		typeOffset := logicalLineTextOffset(line, typeText)

@@ -1346,6 +1346,17 @@ func (s *implementationChecker) checkFunction(statement *RuntimeFunctionStatemen
 			s.yieldDepth = 0
 		}
 	}
+	if spec, ok := closedInstanceDunder(statement, receiver); ok {
+		closedReturn := s.closedType(spec.returnType)
+		inferReturn = false
+		s.inferringReturn = false
+		s.inferredReturns = nil
+		returnType = closedReturn
+		s.yieldType = nil
+		s.sendType = nil
+		s.yieldDepth = 0
+		s.checkClosedDunder(statement, runtimeSignature, spec, closedReturn)
+	}
 	s.readonlyAssignmentReceiverName = ""
 	s.readonlyAssignmentReceiver = nil
 	s.constructorWritableAttributes = nil
@@ -1555,7 +1566,9 @@ func (s *implementationChecker) checkClass(statement *RuntimeClassStatement) {
 			placeholder = resolvedInstance
 		}
 		instance, classValue = placeholder, resolvedValue
-		s.types.checker.SetObjectCallReturnType(classValue, instance)
+		if _, newMethod := s.types.checker.PythonConstruction(instance); newMethod == nil {
+			s.types.checker.SetObjectCallReturnType(classValue, instance)
+		}
 		if s.typeScope == nil {
 			s.typeScope = make(map[string]*checker.Type)
 		}
@@ -1601,13 +1614,12 @@ func (s *implementationChecker) checkClass(statement *RuntimeClassStatement) {
 	if !ownInitializer {
 		var initializers []*checker.Type
 		for _, base := range baseTypes {
-			if initializer := s.types.checker.GetAttributeType(base, s.types.checker.GetStringLiteralType("__init__")); initializer != nil {
+			if initializer, _ := s.types.checker.PythonConstruction(base); initializer != nil {
 				initializers = append(initializers, initializer)
 			}
 		}
 		if len(initializers) != 0 {
 			initializer := s.types.checker.GetUnionType(initializers)
-			s.types.checker.SetObjectAttributeType(instance, "__init__", initializer)
 			s.types.checker.SetObjectAttributeType(classValue, "__init__", s.types.checker.UnboundPythonInitializer(initializer, instance))
 		}
 	}
@@ -1621,8 +1633,11 @@ func (s *implementationChecker) checkClass(statement *RuntimeClassStatement) {
 	// The declaration pass creates the class call signature before runtime
 	// class-body inference. Retarget that native checker signature to the
 	// enriched instance so User() exposes inferred class-attribute fallback.
-	s.types.checker.SetObjectCallReturnType(classValue, instance)
-	if constructor != nil {
+	// __new__'s return is the class call result and is not replaced.
+	if _, newMethod := s.types.checker.PythonConstruction(instance); newMethod == nil {
+		s.types.checker.SetObjectCallReturnType(classValue, instance)
+	}
+	if _, newMethod := s.types.checker.PythonConstruction(instance); constructor != nil && newMethod == nil {
 		constructor.ReturnType = instance
 		extension := s.types.checker.NewObjectTypeFromFacets(checker.ObjectFacets{Calls: []checker.ObjectFacetCall{*constructor}})
 		if merged, err := s.types.checker.MergeObjectFacetTypes([]*checker.Type{classValue, extension}); err == nil {
@@ -1637,7 +1652,7 @@ func (s *implementationChecker) checkClass(statement *RuntimeClassStatement) {
 	s.currentSuperType = nil
 	if len(baseTypes) != 0 {
 		if superType, err := s.types.checker.ExtendPythonClassFacetTypes(baseTypes, s.types.checker.NewObjectTypeFromFacets(checker.ObjectFacets{})); err == nil {
-			s.currentSuperType = superType
+			s.currentSuperType = s.types.attachBoundPythonConstruction(superType, superType)
 		}
 	}
 	constructorWritable := make(map[string]bool)
@@ -1672,6 +1687,11 @@ func (s *implementationChecker) checkClass(statement *RuntimeClassStatement) {
 		default:
 			receiver = instance
 			declaredCallable = s.types.checker.GetAttributeType(instance, s.types.checker.GetStringLiteralType(function.Name))
+			if function.Name == "__init__" {
+				if declared := s.types.checker.GetAttributeType(classValue, s.types.checker.GetStringLiteralType("__init__")); declared != nil {
+					declaredCallable = s.types.checker.BoundPythonCallable(declared)
+				}
+			}
 		}
 		if containsString(function.Decorators, "property") && declaredCallable != nil && len(s.types.checker.GetSignaturesOfType(declaredCallable, checker.SignatureKindCall)) == 0 {
 			declaredCallable = s.types.checker.NewObjectTypeFromFacets(checker.ObjectFacets{Calls: []checker.ObjectFacetCall{{ReturnType: declaredCallable}}})
@@ -1797,7 +1817,7 @@ func (s *implementationChecker) inferImplementationInstance(statement *RuntimeCl
 		if !ok || function.Name != "__init__" || len(function.Signature.Parameters) == 0 {
 			continue
 		}
-		declared := s.types.checker.GetAttributeType(instance, s.types.checker.GetStringLiteralType("__init__"))
+		declared, _ := s.types.checker.PythonConstruction(instance)
 		runtimeCallable := s.types.resolveCheckerCallable(function.Signature, s.typeScope, false, nil)
 		runtimeSignatures := s.types.checker.GetSignaturesOfType(runtimeCallable, checker.SignatureKindCall)
 		if len(runtimeSignatures) == 0 {

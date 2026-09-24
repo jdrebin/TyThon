@@ -2,8 +2,7 @@
 # surfaces deliberately contain the same spelling with different types.
 
 type Registry = {
-    version: 'v1' | 'v2',
-    *<"hi" | "bye">: int,
+    version: 'v1' | 'v2', *<"hi" | "bye">: int,
     readonly size: int,
     "version": int,
     "retries": int,
@@ -13,7 +12,7 @@ type Registry = {
 type OO(O = keyof Registry) = F if O extends *<infer F> else never
 type O = OO()
 # A static quoted-key shape is not automatically a concrete Dict.
-type RegistryItems = { "version": int, "retries": int }
+type RegistryItems = {"version": int, "retries": int}
 
 type L = Registry.version
 registry: Registry
@@ -21,7 +20,7 @@ registry: Registry
 attribute_version = registry.version
 indexed_version = registry["version"]
 retry_count = registry["retries"]
-binary_flag = registry[b"enabled"]
+binary_flag = registry[b"retries"]
 description = registry.describe("registry")
 attribute_version = 'v2'
 

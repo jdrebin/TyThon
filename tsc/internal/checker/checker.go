@@ -19596,6 +19596,8 @@ func (c *Checker) resolveObjectTypeMembers(t *Type, source *Type, typeParameters
 		targetStructured.pythonSequenceType = instantiate(sourceStructured.pythonSequenceType)
 		targetStructured.pythonSequenceKind = sourceStructured.pythonSequenceKind
 		targetStructured.pythonProtocolProperties = sourceStructured.pythonProtocolProperties
+		targetStructured.pythonInitializer = c.instantiateType(sourceStructured.pythonInitializer, mapper)
+		targetStructured.pythonNew = c.instantiateType(sourceStructured.pythonNew, mapper)
 	}
 }
 
@@ -21118,6 +21120,8 @@ func (c *Checker) resolveAnonymousTypeMembers(t *Type) {
 		t.AsStructuredType().pythonMapping = targetStructured.pythonMapping
 		t.AsStructuredType().pythonSequenceKind = targetStructured.pythonSequenceKind
 		t.AsStructuredType().pythonProtocolProperties = targetStructured.pythonProtocolProperties
+		t.AsStructuredType().pythonInitializer = c.instantiateType(targetStructured.pythonInitializer, d.mapper)
+		t.AsStructuredType().pythonNew = c.instantiateType(targetStructured.pythonNew, d.mapper)
 		if targetStructured.pythonSequenceType != nil {
 			t.AsStructuredType().pythonSequenceType = c.instantiateType(targetStructured.pythonSequenceType, d.mapper)
 		}
@@ -28852,6 +28856,8 @@ func (c *Checker) getRegularTypeOfObjectLiteral(t *Type) *Type {
 		regular.AsStructuredType().separateAttributeAndItem = true
 		regular.AsStructuredType().pythonMapping = resolved.pythonMapping
 		regular.AsStructuredType().pythonProtocolProperties = resolved.pythonProtocolProperties
+		regular.AsStructuredType().pythonInitializer = resolved.pythonInitializer
+		regular.AsStructuredType().pythonNew = resolved.pythonNew
 		regular.AsStructuredType().indexInfos = core.SameMap(resolved.indexInfos, func(info *IndexInfo) *IndexInfo {
 			value := c.getRegularTypeOfObjectLiteral(info.valueType)
 			if value == info.valueType {

@@ -8,6 +8,19 @@
             "match": "-optional\\b|!(?!=)"
         },
         {
+            "match": "(?<![\\w])(__)([A-Za-z][A-Za-z0-9_]*?)(__)(?![\\w])",
+            "captures": {
+                "2": { "name": "keyword.control.flow.python" }
+            }
+        },
+        {
+            "match": "\\b(def)\\s+(__)([A-Za-z][A-Za-z0-9_]*?)(__)(?=\\s*(?:<[^>]*>)?\\s*\\()",
+            "captures": {
+                "1": { "name": "storage.type.function.python" },
+                "3": { "name": "keyword.control.flow.python" }
+            }
+        },
+        {
             "include": "#structural-method"
         },
         {

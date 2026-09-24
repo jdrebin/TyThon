@@ -5,6 +5,7 @@ import (
 	"slices"
 	"sort"
 	"strconv"
+	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/internal/ast"
 	"github.com/microsoft/TypeScript/tsc/internal/core"
@@ -75,6 +76,8 @@ func (c *Checker) mergeObjectFacetTypes(types []*Type, own *Type, initializers b
 	pythonSequenceKind := PythonSequenceNone
 	protocolProperties := make(map[string]bool)
 	explicitProperties := make(map[string]bool)
+	var pythonInitializer *Type
+	var pythonNew *Type
 	for _, t := range types {
 		if c.pythonValueHierarchy != nil && t != nil {
 			if primitive := c.PythonPrimitiveBase(t); primitive != nil {
@@ -96,6 +99,10 @@ func (c *Checker) mergeObjectFacetTypes(types []*Type, own *Type, initializers b
 		}
 		if t == nil || t.flags&TypeFlagsStructuredType == 0 {
 			return nil, fmt.Errorf("object facet composition requires object types")
+		}
+		if structured := t.AsStructuredType(); structured != nil {
+			pythonInitializer = mergePythonConstructionSlot(c, pythonInitializer, structured.pythonInitializer, t == own)
+			pythonNew = mergePythonConstructionSlot(c, pythonNew, structured.pythonNew, t == own)
 		}
 		sourceProtocolProperties := c.getPythonProtocolProperties(t)
 		for _, property := range c.getPropertiesOfType(t) {
@@ -182,6 +189,8 @@ func (c *Checker) mergeObjectFacetTypes(types []*Type, own *Type, initializers b
 	if len(protocolProperties) != 0 {
 		result.AsStructuredType().pythonProtocolProperties = protocolProperties
 	}
+	result.AsStructuredType().pythonInitializer = pythonInitializer
+	result.AsStructuredType().pythonNew = pythonNew
 	if pythonSequenceType != nil {
 		result.objectFlags &^= ObjectFlagsCouldContainTypeVariablesComputed | ObjectFlagsCouldContainTypeVariables
 	}
@@ -189,6 +198,140 @@ func (c *Checker) mergeObjectFacetTypes(types []*Type, own *Type, initializers b
 		return c.getIntersectionType(append(primitiveBases, result)), nil
 	}
 	return result, nil
+}
+
+func mergePythonConstructionSlot(c *Checker, current *Type, next *Type, own bool) *Type {
+	if own {
+		if next != nil {
+			return next
+		}
+		return current
+	}
+	if next == nil {
+		return current
+	}
+	if current == nil {
+		return next
+	}
+	return c.getUnionType([]*Type{current, next})
+}
+
+// IsPythonExposedDunder reports dunder names that are data or a real protocol
+// call, so keyof and completion keep them. Operation hooks are excluded.
+func IsPythonExposedDunder(name string) bool {
+	switch name {
+	case "__dict__", "__name__", "__qualname__", "__module__", "__doc__", "__annotations__",
+		"__slots__", "__match_args__", "__file__", "__package__", "__path__", "__bases__", "__mro__", "__weakref__",
+		"__get__", "__set__", "__delete__", "__set_name__",
+		"__reduce__", "__reduce_ex__", "__getstate__", "__setstate__", "__html__", "__missing__", "__copy__", "__deepcopy__":
+		return true
+	default:
+		return false
+	}
+}
+
+func (c *Checker) IsPythonKeyExcludedDunder(name string) bool {
+	return len(name) > 4 && strings.HasPrefix(name, "__") && strings.HasSuffix(name, "__") && !IsPythonExposedDunder(name)
+}
+
+// SignatureWithoutReceiver drops the bound-or-unbound receiver parameter.
+// Construction publishes __init__ and __new__ without self or cls.
+func (c *Checker) SignatureWithoutReceiver(signature *Signature) *Signature {
+	if len(signature.parameters) == 0 {
+		return signature
+	}
+	result := c.cloneSignature(signature)
+	result.resolvedReturnType = c.getReturnTypeOfSignature(signature)
+	result.resolvedTypePredicate = c.getTypePredicateOfSignature(signature)
+	result.parameters = slices.Clone(signature.parameters[1:])
+	if len(signature.parameterKinds) > 1 {
+		result.parameterKinds = slices.Clone(signature.parameterKinds[1:])
+	} else {
+		result.parameterKinds = nil
+	}
+	if result.minArgumentCount > 0 {
+		result.minArgumentCount--
+	}
+	if result.resolvedMinArgumentCount > 0 {
+		result.resolvedMinArgumentCount--
+	}
+	return result
+}
+
+func (c *Checker) SignatureWithTypeParameters(signature *Signature, typeParameters ...*Type) *Signature {
+	result := c.cloneSignature(signature)
+	result.resolvedReturnType = c.getReturnTypeOfSignature(signature)
+	result.resolvedTypePredicate = c.getTypePredicateOfSignature(signature)
+	result.typeParameters = append(slices.Clone(typeParameters), result.typeParameters...)
+	return result
+}
+
+func (c *Checker) SetPythonConstruction(t *Type, initializer *Type, newMethod *Type) {
+	structured := t.AsStructuredType()
+	if structured == nil {
+		return
+	}
+	if initializer != nil {
+		structured.pythonInitializer = initializer
+	}
+	if newMethod != nil {
+		structured.pythonNew = newMethod
+	}
+}
+
+func (c *Checker) PythonConstruction(t *Type) (initializer *Type, newMethod *Type) {
+	if t == nil {
+		return nil, nil
+	}
+	if t.flags&TypeFlagsIntersection != 0 {
+		for _, part := range t.Types() {
+			partInitializer, partNew := c.PythonConstruction(part)
+			if partInitializer != nil {
+				initializer = partInitializer
+			}
+			if partNew != nil {
+				newMethod = partNew
+			}
+		}
+		return initializer, newMethod
+	}
+	if t.flags&TypeFlagsStructuredType == 0 {
+		return nil, nil
+	}
+	structured := t.AsStructuredType()
+	return structured.pythonInitializer, structured.pythonNew
+}
+
+func (c *Checker) PythonConstructionCarrier(t *Type) *Type {
+	if t == nil || t.flags&TypeFlagsIntersection == 0 {
+		return t
+	}
+	for _, part := range slices.Backward(t.Types()) {
+		if part.flags&TypeFlagsStructuredType != 0 {
+			return part
+		}
+	}
+	return t
+}
+
+// OmitPythonInstanceContracts removes constructor and call names from an
+// instance after they have been copied onto the class value or a call signature.
+func (c *Checker) OmitPythonInstanceContracts(t *Type) {
+	if t == nil || t.flags&TypeFlagsStructuredType == 0 {
+		return
+	}
+	structured := c.resolveStructuredTypeMembers(t)
+	removed := false
+	for _, name := range []string{"__init__", "__new__", "__call__", "__class__"} {
+		if _, ok := structured.members[name]; ok {
+			delete(structured.members, name)
+			removed = true
+		}
+	}
+	if !removed {
+		return
+	}
+	c.setStructuredTypeMembers(t, structured.members, slices.Clone(structured.CallSignatures()), slices.Clone(structured.ConstructSignatures()), slices.Clone(structured.indexInfos))
 }
 
 // SortedAttributeNames is a stable frontend/testing view over known attrs.
@@ -575,6 +718,29 @@ func (c *Checker) SignatureForPythonConstruction(signature *Signature, instance 
 	return result
 }
 
+// BoundPythonCallable is the instance-facing form of an unbound initializer.
+// super().__init__ does not take self; an assertion on that receiver becomes asserts this.
+func (c *Checker) BoundPythonCallable(callable *Type) *Type {
+	if callable == nil {
+		return nil
+	}
+	if callable.flags&TypeFlagsUnion != 0 {
+		return c.getUnionType(core.Map(callable.Types(), func(part *Type) *Type { return c.BoundPythonCallable(part) }))
+	}
+	var signatures []*Signature
+	for _, signature := range c.getSignaturesOfType(callable, SignatureKindCall) {
+		bound := c.SignatureWithoutReceiver(signature)
+		if predicate := c.getTypePredicateOfSignature(signature); predicate != nil && predicate.kind == TypePredicateKindAssertsIdentifier && predicate.parameterIndex == 0 {
+			bound.resolvedTypePredicate = c.newTypePredicate(TypePredicateKindAssertsThis, predicate.parameterName, -1, predicate.t)
+		}
+		signatures = append(signatures, bound)
+	}
+	if len(signatures) == 0 {
+		return callable
+	}
+	return c.NewObjectTypeFromCallSignatures(signatures)
+}
+
 // Python exposes an inherited method on the class value as an unbound method.
 // Adapt only receiver binding; keep native generic and assertion types intact.
 func (c *Checker) UnboundPythonInitializer(callable *Type, receiver *Type) *Type {
@@ -877,6 +1043,8 @@ func (c *Checker) PopulateObjectTypeFromType(target *Type, source *Type) bool {
 	targetStructured.pythonSequenceType = sourceStructured.pythonSequenceType
 	targetStructured.pythonSequenceKind = sourceStructured.pythonSequenceKind
 	targetStructured.pythonProtocolProperties = sourceStructured.pythonProtocolProperties
+	targetStructured.pythonInitializer = sourceStructured.pythonInitializer
+	targetStructured.pythonNew = sourceStructured.pythonNew
 
 	if target.objectFlags&ObjectFlagsClassOrInterface != 0 {
 		declared := target.AsInterfaceType()
@@ -1096,7 +1264,7 @@ func (c *Checker) GetItemKeyType(t *Type) *Type {
 	infos := c.getIndexInfosOfType(t)
 	keys := make([]*Type, 0, len(infos)+len(c.getPropertiesOfType(t)))
 	for _, property := range c.getPropertiesOfType(t) {
-		if c.IsPythonPrivateAttributeName(property.Name) {
+		if c.IsPythonPrivateAttributeName(property.Name) || c.IsPythonKeyExcludedDunder(property.Name) {
 			continue
 		}
 		keys = append(keys, c.NewPythonAttributeKeyType(c.getStringLiteralType(property.Name)))
