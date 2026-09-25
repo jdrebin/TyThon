@@ -692,7 +692,6 @@ type Checker struct {
 	assertionLinks                              core.LinkStore[*ast.Node, AssertionLinks]
 	arrayLiteralLinks                           core.LinkStore[*ast.Node, ArrayLiteralLinks]
 	switchStatementLinks                        core.LinkStore[*ast.Node, SwitchStatementLinks]
-	jsxElementLinks                             core.LinkStore[*ast.Node, JsxElementLinks]
 	computedNameLinks                           core.LinkStore[*ast.Node, ComputedNameNodeLinks]
 	symbolReferenceLinks                        core.LinkStore[*ast.Symbol, SymbolReferenceLinks]
 	valueSymbolLinks                            symbolArenaLinkStore[ValueSymbolLinks]
@@ -2576,10 +2575,6 @@ func (c *Checker) checkDeferredNode(node *ast.Node) {
 		c.checkClassExpressionDeferred(node)
 	case ast.KindTypeParameter:
 		c.checkTypeParameterDeferred(node)
-	case ast.KindJsxSelfClosingElement:
-		c.checkJsxSelfClosingElementDeferred(node)
-	case ast.KindJsxElement:
-		c.checkJsxElementDeferred(node)
 	case ast.KindTypeAssertionExpression, ast.KindAsExpression:
 		c.checkAssertionDeferred(node)
 	case ast.KindVoidExpression:
@@ -8012,18 +8007,8 @@ func (c *Checker) checkExpressionWorker(node *ast.Node, checkMode CheckMode) *Ty
 		return c.checkYieldExpression(node)
 	case ast.KindSyntheticExpression:
 		return c.checkSyntheticExpression(node)
-	case ast.KindJsxExpression:
-		return c.checkJsxExpression(node, checkMode)
-	case ast.KindJsxElement:
-		return c.checkJsxElement(node, checkMode)
-	case ast.KindJsxSelfClosingElement:
-		return c.checkJsxSelfClosingElement(node, checkMode)
-	case ast.KindJsxFragment:
-		return c.checkJsxFragment(node)
-	case ast.KindJsxAttributes:
-		return c.checkJsxAttributes(node, checkMode)
-	case ast.KindJsxOpeningElement:
-		panic("Should never directly check a JsxOpeningElement")
+	case ast.KindJsxExpression, ast.KindJsxElement, ast.KindJsxSelfClosingElement, ast.KindJsxFragment, ast.KindJsxAttributes, ast.KindJsxOpeningElement:
+		return c.errorType
 	}
 	return c.errorType
 }
@@ -17007,7 +16992,7 @@ func (c *Checker) getTypeOfVariableOrParameterOrPropertyWorker(symbol *ast.Symbo
 	case ast.KindBinaryExpression, ast.KindCallExpression:
 		result = c.getWidenedTypeForAssignmentDeclaration(symbol)
 	case ast.KindJsxAttribute:
-		result = c.checkJsxAttribute(declaration, CheckModeNormal)
+		result = c.errorType
 	case ast.KindEnumMember:
 		result = c.getTypeOfEnumMember(symbol)
 	default:
@@ -29210,51 +29195,7 @@ func (c *Checker) markExportAssignmentAliasReferenced(location *ast.Node /*Expor
 	}
 }
 
-func (c *Checker) markJsxAliasReferenced(node *ast.Node /*JsxOpeningLikeElement | JsxOpeningFragment*/) {
-	if c.getJsxNamespaceContainerForImplicitImport(node) != nil {
-		return
-	}
-	// The reactNamespace/jsxFactory's root symbol should be marked as 'used' so we don't incorrectly elide its import.
-	// And if there is no reactNamespace/jsxFactory's symbol in scope when targeting React emit, we should issue an error.
-	jsxFactoryRefErr := core.IfElse(c.compilerOptions.Jsx == core.JsxEmitReact, diagnostics.This_JSX_tag_requires_0_to_be_in_scope_but_it_could_not_be_found, nil)
-	jsxFactoryNamespace := c.getJsxNamespace(node)
-	jsxFactoryLocation := node
-	if ast.IsJsxOpeningLikeElement(node) {
-		jsxFactoryLocation = node.TagName()
-	}
-	shouldFactoryRefErr := c.compilerOptions.Jsx != core.JsxEmitPreserve && c.compilerOptions.Jsx != core.JsxEmitReactNative
-	// #38720/60122, allow null as jsxFragmentFactory
-	var jsxFactorySym *ast.Symbol
-	if !(ast.IsJsxOpeningFragment(node) && jsxFactoryNamespace == "null") {
-		flags := ast.SymbolFlagsValue
-		if !shouldFactoryRefErr {
-			flags &^= ast.SymbolFlagsEnum
-		}
-		jsxFactorySym = c.resolveName(jsxFactoryLocation, jsxFactoryNamespace, flags, jsxFactoryRefErr, true /*isUse*/, false /*excludeGlobals*/)
-	}
-	if jsxFactorySym != nil {
-		// Mark local symbol as referenced here because it might not have been marked
-		// if jsx emit was not jsxFactory as there wont be error being emitted
-		c.symbolReferenced(jsxFactorySym, ast.SymbolFlagsAll)
-		// If react/jsxFactory symbol is alias, mark it as referenced
-		if c.canCollectSymbolAliasAccessibilityData && jsxFactorySym.Flags&ast.SymbolFlagsAlias != 0 && c.getTypeOnlyAliasDeclaration(jsxFactorySym) == nil {
-			c.markAliasSymbolAsReferenced(jsxFactorySym)
-		}
-	}
-	// if JsxFragment, additionally mark jsx pragma as referenced, since `getJsxNamespace` above would have resolved to only the fragment factory if they are distinct
-	if ast.IsJsxOpeningFragment(node) {
-		file := ast.GetSourceFileOfNode(node)
-		entity := c.getJsxFactoryEntity(file.AsNode())
-		if entity != nil {
-			localJsxNamespace := ast.GetFirstIdentifier(entity).Text()
-			flags := ast.SymbolFlagsValue
-			if !shouldFactoryRefErr {
-				flags &^= ast.SymbolFlagsEnum
-			}
-			c.resolveName(jsxFactoryLocation, localJsxNamespace, flags, jsxFactoryRefErr, true /*isUse*/, false /*excludeGlobals*/)
-		}
-	}
-}
+func (c *Checker) markJsxAliasReferenced(*ast.Node) {}
 
 func (c *Checker) markImportEqualsAliasReferenced(location *ast.Node /*ImportEqualsDeclaration*/) {
 	if ast.HasSyntacticModifier(location, ast.ModifierFlagsExport) {
@@ -32470,14 +32411,7 @@ func (c *Checker) getSymbolAtLocation(node *ast.Node, ignoreErrors bool) *ast.Sy
 	case ast.KindMetaProperty:
 		return c.checkExpression(node).symbol
 	case ast.KindJsxNamespacedName:
-		if ast.IsJsxTagName(node) && isJsxIntrinsicTagName(node) {
-			symbol := c.getIntrinsicTagSymbol(node.Parent)
-			if symbol == c.unknownSymbol {
-				return nil
-			}
-			return symbol
-		}
-		fallthrough
+		return nil
 	default:
 		return nil
 	}
@@ -32567,10 +32501,6 @@ func (c *Checker) getSymbolOfNameOrPropertyAccessExpression(name *ast.Node) *ast
 		}
 		isJSDoc := ast.IsJSDocNameReferenceContext(name)
 		if ast.IsIdentifier(name) {
-			if ast.IsJsxTagName(name) && isJsxIntrinsicTagName(name) {
-				symbol := c.getIntrinsicTagSymbol(name.Parent)
-				return core.IfElse(symbol == c.unknownSymbol, nil, symbol)
-			}
 			meaning := core.IfElse(isJSDoc, ast.SymbolFlagsValue|ast.SymbolFlagsType|ast.SymbolFlagsNamespace, ast.SymbolFlagsValue)
 			var location *ast.Node
 			if isJSDoc {

@@ -542,18 +542,7 @@ func (c *Checker) IsDeclarationUsed(
 	jsxElementsPresent bool,
 	jsxModeNeedsExplicitImport bool,
 ) bool {
-	if jsxElementsPresent && jsxModeNeedsExplicitImport {
-		jsxNamespace := c.getJsxNamespace(sourceFile.AsNode())
-		jsxFragmentFactory := c.GetJsxFragmentFactory(sourceFile.AsNode())
-		identifierText := identifier.Text
-		if identifierText == jsxNamespace {
-			return true
-		}
-		if jsxFragmentFactory != "" && identifierText == jsxFragmentFactory {
-			return true
-		}
-	}
-
+	_, _ = jsxElementsPresent, jsxModeNeedsExplicitImport
 	symbol := c.GetSymbolAtLocation(identifier.AsNode())
 	if symbol == nil {
 		return true
@@ -870,13 +859,7 @@ func (c *Checker) getExportsOfModuleAsArray(moduleSymbol *ast.Symbol) []*ast.Sym
 }
 
 // Returns all the properties of the Jsx.IntrinsicElements interface.
-func (c *Checker) GetJsxIntrinsicTagNamesAt(location *ast.Node) []*ast.Symbol {
-	intrinsics := c.getJsxType(JsxNames.IntrinsicElements, location)
-	if intrinsics == nil {
-		return nil
-	}
-	return c.GetPropertiesOfType(intrinsics)
-}
+func (c *Checker) GetJsxIntrinsicTagNamesAt(*ast.Node) []*ast.Symbol { return nil }
 
 func (c *Checker) GetContextualTypeForJsxAttribute(attribute *ast.JsxAttributeLike) *Type {
 	return c.getContextualTypeForJsxAttribute(attribute, ContextFlagsNone)

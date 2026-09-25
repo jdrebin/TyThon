@@ -867,6 +867,8 @@ async function evaluateEnumMembers(enumSource, enumName) {
 }
 
 async function runGenerateEnums() {
+    console.log("Tython does not emit the JavaScript enum copies.");
+    return;
     const ts = /** @type {typeof import("typescript")} */ (await import("typescript"));
 
     /**
@@ -1691,8 +1693,8 @@ function getPublishTag() {
     return "latest";
 }
 
-const extensionDir = path.resolve("./packages/vscode-typescript");
-const nightlyExtensionDir = path.resolve("./packages/vscode-typescript-nightly");
+const extensionDir = path.resolve("./local/typescript-reference/vscode-typescript");
+const nightlyExtensionDir = path.resolve("./local/typescript-reference/vscode-typescript-nightly");
 const builtNpm = path.resolve("./built/npm");
 const builtVsix = path.resolve("./built/vsix");
 const builtPublishedPlatformPackages = path.resolve("./built/published-platform-packages");

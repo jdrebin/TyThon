@@ -3,30 +3,14 @@ package checker_test
 import (
 	"testing"
 
-	"github.com/microsoft/TypeScript/tsc/internal/bundled"
 	"github.com/microsoft/TypeScript/tsc/internal/checker"
-	"github.com/microsoft/TypeScript/tsc/internal/compiler"
-	"github.com/microsoft/TypeScript/tsc/internal/core"
 	"github.com/microsoft/TypeScript/tsc/internal/jsnum"
-	"github.com/microsoft/TypeScript/tsc/internal/tsoptions"
-	"github.com/microsoft/TypeScript/tsc/internal/vfs/vfstest"
+	"github.com/microsoft/TypeScript/tsc/internal/python"
 )
 
 func newFacetChecker(t *testing.T) *checker.Checker {
 	t.Helper()
-	fs := vfstest.FromMap(map[string]string{
-		"/index.ts":      "export {};",
-		"/tsconfig.json": `{"compilerOptions": {"strict": true}, "files": ["index.ts"]}`,
-	}, true)
-	fs = bundled.WrapFS(fs)
-	host := compiler.NewCompilerHost("/", fs, bundled.LibPath(), nil, nil, nil)
-	parsed, errors := tsoptions.GetParsedCommandLineOfConfigFile("/tsconfig.json", &core.CompilerOptions{}, nil, host, nil)
-	if len(errors) != 0 {
-		t.Fatalf("parse config: %v", errors)
-	}
-	program := compiler.NewProgram(compiler.ProgramOptions{Config: parsed, Host: host})
-	program.BindSourceFiles()
-	c, done := program.GetTypeChecker(t.Context())
+	c, done := python.NewChecker()
 	t.Cleanup(done)
 	return c
 }

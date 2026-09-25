@@ -33,14 +33,7 @@ var libPath = sync.OnceValue(func() string {
 	if testing.Testing() {
 		return TestingLibPath()
 	}
-	dir := executableDir()
-
-	libdts := tspath.CombinePaths(dir, "lib.d.ts")
-	if info := osvfs.FS().Stat(libdts); info == nil {
-		panic(fmt.Sprintf("bundled: %v does not exist; this executable may be misplaced", libdts))
-	}
-
-	return dir
+	return executableDir()
 })
 
 func IsBundled(path string) bool {

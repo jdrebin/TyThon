@@ -19,6 +19,7 @@ const (
 
 func main() {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
+	log.Fatal("Tython does not embed lib*.d.ts; this generator is retired")
 
 	libs := readLibs()
 	generateLibList(libs)

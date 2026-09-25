@@ -50,17 +50,9 @@ func newEmitResolver(checker *Checker) *EmitResolver {
 	return e
 }
 
-func (r *EmitResolver) GetJsxFactoryEntity(location *ast.Node) *ast.Node {
-	r.checkerMu.Lock()
-	defer r.checkerMu.Unlock()
-	return r.checker.getJsxFactoryEntity(location)
-}
+func (r *EmitResolver) GetJsxFactoryEntity(*ast.Node) *ast.Node { return nil }
 
-func (r *EmitResolver) GetJsxFragmentFactoryEntity(location *ast.Node) *ast.Node {
-	r.checkerMu.Lock()
-	defer r.checkerMu.Unlock()
-	return r.checker.getJsxFragmentFactoryEntity(location)
-}
+func (r *EmitResolver) GetJsxFragmentFactoryEntity(*ast.Node) *ast.Node { return nil }
 
 func (r *EmitResolver) IsOptionalParameter(node *ast.Node) bool {
 	r.checkerMu.Lock()
