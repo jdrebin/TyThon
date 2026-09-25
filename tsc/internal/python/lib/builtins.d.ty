@@ -33,6 +33,84 @@ interface ObjectProtocol:
     def __getattribute__(self, name: str) -> any
     def __setattr__(self, name: str, value: any) -> None
     def __delattr__(self, name: str) -> None
+    optional def __bytes__(self) -> bytes
+    optional def __lt__(self, other: any) -> any
+    optional def __le__(self, other: any) -> any
+    optional def __gt__(self, other: any) -> any
+    optional def __ge__(self, other: any) -> any
+    optional def __bool__(self) -> bool
+    optional def __getattr__(self, name: str) -> any
+    optional def __len__(self) -> int
+    optional def __length_hint__(self) -> int
+    optional def __getitem__(self, key: any) -> any
+    optional def __setitem__(self, key: any, value: any) -> None
+    optional def __delitem__(self, key: any) -> None
+    optional def __iter__(self) -> Iterator<any>
+    optional def __next__(self) -> any
+    optional def __reversed__(self) -> Iterator<any>
+    optional def __contains__(self, item: any) -> bool
+    optional def __add__(self, other: any) -> any
+    optional def __sub__(self, other: any) -> any
+    optional def __mul__(self, other: any) -> any
+    optional def __matmul__(self, other: any) -> any
+    optional def __truediv__(self, other: any) -> any
+    optional def __floordiv__(self, other: any) -> any
+    optional def __mod__(self, other: any) -> any
+    optional def __divmod__(self, other: any) -> any
+    optional def __pow__(self, other: any) -> any
+    optional def __lshift__(self, other: any) -> any
+    optional def __rshift__(self, other: any) -> any
+    optional def __and__(self, other: any) -> any
+    optional def __xor__(self, other: any) -> any
+    optional def __or__(self, other: any) -> any
+    optional def __radd__(self, other: any) -> any
+    optional def __rsub__(self, other: any) -> any
+    optional def __rmul__(self, other: any) -> any
+    optional def __rmatmul__(self, other: any) -> any
+    optional def __rtruediv__(self, other: any) -> any
+    optional def __rfloordiv__(self, other: any) -> any
+    optional def __rmod__(self, other: any) -> any
+    optional def __rdivmod__(self, other: any) -> any
+    optional def __rpow__(self, other: any) -> any
+    optional def __rlshift__(self, other: any) -> any
+    optional def __rrshift__(self, other: any) -> any
+    optional def __rand__(self, other: any) -> any
+    optional def __rxor__(self, other: any) -> any
+    optional def __ror__(self, other: any) -> any
+    optional def __iadd__(self, other: any) -> any
+    optional def __isub__(self, other: any) -> any
+    optional def __imul__(self, other: any) -> any
+    optional def __imatmul__(self, other: any) -> any
+    optional def __itruediv__(self, other: any) -> any
+    optional def __ifloordiv__(self, other: any) -> any
+    optional def __imod__(self, other: any) -> any
+    optional def __ipow__(self, other: any) -> any
+    optional def __ilshift__(self, other: any) -> any
+    optional def __irshift__(self, other: any) -> any
+    optional def __iand__(self, other: any) -> any
+    optional def __ixor__(self, other: any) -> any
+    optional def __ior__(self, other: any) -> any
+    optional def __neg__(self) -> any
+    optional def __pos__(self) -> any
+    optional def __abs__(self) -> any
+    optional def __invert__(self) -> any
+    optional def __int__(self) -> int
+    optional def __float__(self) -> float
+    optional def __index__(self) -> int
+    optional def __complex__(self) -> complex
+    optional def __round__(self, ndigits: int = ...) -> any
+    optional def __trunc__(self) -> int
+    optional def __floor__(self) -> int
+    optional def __ceil__(self) -> int
+    optional def __sizeof__(self) -> int
+    optional def __del__(self) -> None
+    optional def __enter__(self) -> any
+    optional def __exit__(self, exc_type: any, exc_value: any, traceback: any) -> any
+    optional def __await__(self) -> Iterator<any>
+    optional def __aiter__(self) -> any
+    optional def __anext__(self) -> any
+    optional def __aenter__(self) -> any
+    optional def __aexit__(self, exc_type: any, exc_value: any, traceback: any) -> any
 
 declare class NotImplementedType(Some):
     (not_implemented_type): unknown

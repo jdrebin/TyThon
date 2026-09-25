@@ -712,7 +712,7 @@ func TestTypedLambdaChecksDefaultAgainstAnnotation(t *testing.T) {
 	typed := `bad = lambda value: str = 12: value
 `
 	program := BuildProgram(newPythonChecker(t), []SourceInput{{FileName: "app.ty", Text: typed}})
-	if len(program.Diagnostics) != 1 || !strings.Contains(program.Diagnostics[0].Message, "default value type") {
+	if len(program.Diagnostics) != 1 || !strings.Contains(program.Diagnostics[0].Message, "Type 'int' is not assignable to type 'str'.") {
 		t.Fatalf("diagnostics = %v, want typed lambda default error", program.Diagnostics)
 	}
 }
@@ -1031,7 +1031,7 @@ func TestTypedSourceChecksFunctionSuitesAndReturns(t *testing.T) {
 	}
 	found := false
 	for _, diagnostic := range program.Diagnostics {
-		if diagnostic.Kind == ProgramDiagnosticRuntimeType && strings.Contains(diagnostic.Message, "returned type") {
+		if diagnostic.Kind == ProgramDiagnosticRuntimeType && strings.Contains(diagnostic.Message, "is not assignable to type 'str'") {
 			found = true
 		}
 	}
@@ -1184,7 +1184,7 @@ func TestTypedSourceChecksExplicitParameterDefaults(t *testing.T) {
     return value
 `
 	program := BuildProgram(newPythonChecker(t), []SourceInput{{FileName: "app.ty", Text: typed}})
-	if len(program.Diagnostics) != 1 || !strings.Contains(program.Diagnostics[0].Message, "default value type 12 is not assignable to parameter type str") {
+	if len(program.Diagnostics) != 1 || !strings.Contains(program.Diagnostics[0].Message, "Type 'int' is not assignable to type 'str'.") {
 		t.Fatalf("diagnostics = %v", program.Diagnostics)
 	}
 }
@@ -1359,7 +1359,7 @@ func TestTypedSourceRejectsWrongGeneratorYieldType(t *testing.T) {
     yield "not an int"
 `
 	program := BuildProgram(newPythonChecker(t), []SourceInput{{FileName: "app.ty", Text: typed}})
-	if len(program.Diagnostics) == 0 || !strings.Contains(program.Diagnostics[0].Message, "yielded type") {
+	if len(program.Diagnostics) == 0 || !strings.Contains(program.Diagnostics[0].Message, "Type 'str' is not assignable to type 'int'.") {
 		t.Fatalf("diagnostics = %v, want yielded-type error", program.Diagnostics)
 	}
 }

@@ -33,6 +33,8 @@ type ObjectCallArgument struct {
 type ObjectCallDiagnostic struct {
 	Argument int
 	Message  string
+	Source   *Type
+	Target   *Type
 }
 
 // objectCallBinding is the Python-specific result of binding a supplied
@@ -77,7 +79,7 @@ func (c *Checker) checkObjectCallWithRelation(signature *Signature, arguments []
 		case ObjectCallArgumentKeywordSpread:
 			message = "keyword spread is not assignable to **kwargs"
 		}
-		diagnostics = append(diagnostics, ObjectCallDiagnostic{Argument: binding.argumentIndex, Message: message})
+		diagnostics = append(diagnostics, ObjectCallDiagnostic{Argument: binding.argumentIndex, Message: message, Source: actual, Target: expected})
 	}
 	for index, parameter := range signature.parameters {
 		if objectCallParameterKind(signature, index) != CallParameterVarKeyword {
@@ -99,7 +101,7 @@ func (c *Checker) checkObjectCallWithRelation(signature *Signature, arguments []
 		source := c.objectCallPackType(CallParameterVarKeyword, keywordBindings[index], false)
 		target := c.NewObjectTypeFromFacets(ObjectFacets{Items: items})
 		if !c.isTypeRelatedTo(source, target, relation) {
-			diagnostics = append(diagnostics, ObjectCallDiagnostic{Argument: -1, Message: fmt.Sprintf("keyword arguments are not assignable to **%s", parameter.Name)})
+			diagnostics = append(diagnostics, ObjectCallDiagnostic{Argument: -1, Message: fmt.Sprintf("keyword arguments are not assignable to **%s", parameter.Name), Source: source, Target: target})
 		}
 	}
 	return diagnostics
@@ -206,7 +208,7 @@ func (c *Checker) bindObjectCallArguments(signature *Signature, arguments []Obje
 		if bound[index] || parameter.Flags&ast.SymbolFlagsOptional != 0 || kind == CallParameterVarPositional || kind == CallParameterVarKeyword {
 			continue
 		}
-		diagnostics = append(diagnostics, ObjectCallDiagnostic{Argument: -1, Message: fmt.Sprintf("missing required argument %q", parameter.Name)})
+		diagnostics = append(diagnostics, ObjectCallDiagnostic{Argument: -1, Message: fmt.Sprintf("missing required argument %q of type %s", parameter.Name, c.TypeToString(c.getTypeOfSymbol(parameter)))})
 	}
 	return bindings, diagnostics
 }

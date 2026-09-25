@@ -24,6 +24,8 @@ declare class Box<T>:
 
     def get(self) -> T: ...
 
+declare class Box2(Box<int>):
+    def get(self) -> int: ...
 
 type BoxAttributes = Extract(keyof Box<str>, *)
 type BoxValue = Box<str>

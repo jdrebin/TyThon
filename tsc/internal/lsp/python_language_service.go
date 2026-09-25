@@ -224,7 +224,7 @@ func (s *pythonLanguageService) computeCompletion(ctx context.Context, params *l
 	case typeOK:
 		entries = program.TypeCompletionsAt(fileName, typeQuery)
 	case definitionOK:
-		entries = pythonfrontend.DefinitionCompletions(definitionQuery)
+		entries = program.DefinitionCompletionsAt(fileName, definitionQuery)
 	case stringOK:
 		entries = program.StringCompletionsAt(fileName, stringQuery)
 	default:
@@ -252,6 +252,8 @@ func (s *pythonLanguageService) computeCompletion(ctx context.Context, params *l
 			kind = lsproto.CompletionItemKindInterface
 		} else if entry.Kind == pythonfrontend.CompletionKindTypeParameter {
 			kind = lsproto.CompletionItemKindTypeParameter
+		} else if entry.Kind == pythonfrontend.CompletionKindKeyword {
+			kind = lsproto.CompletionItemKindKeyword
 		}
 		rangeStart, startOK := pythonPositionAt(source, entry.ReplaceFrom, encoding)
 		rangeEnd, endOK := pythonPositionAt(source, entry.ReplaceTo, encoding)
@@ -259,6 +261,15 @@ func (s *pythonLanguageService) computeCompletion(ctx context.Context, params *l
 			continue
 		}
 		sortText := string(ls.SortTextLocationPriority)
+		if entry.Kind == pythonfrontend.CompletionKindKeyword {
+			sortText = "11"
+		} else if entry.Kind != pythonfrontend.CompletionKindKeywordArgument {
+			group := "12"
+			if entry.Incompatible {
+				group = "13"
+			}
+			sortText = group + fmt.Sprintf("%03d", entry.Distance)
+		}
 		if entry.Kind == pythonfrontend.CompletionKindKeywordArgument {
 			// Use the language service's existing local-declaration tier so named
 			// parameters sort before ordinary visible names inside a call.
@@ -280,6 +291,12 @@ func (s *pythonLanguageService) computeCompletion(ctx context.Context, params *l
 			TextEdit: &lsproto.TextEditOrInsertReplaceEdit{TextEdit: &lsproto.TextEdit{
 				Range: lsproto.Range{Start: rangeStart, End: rangeEnd}, NewText: entry.InsertText,
 			}},
+		}
+		if entry.Description != "" {
+			item.LabelDetails = &lsproto.CompletionItemLabelDetails{Description: &entry.Description}
+		}
+		if entry.Documentation != "" {
+			item.Documentation = &lsproto.StringOrMarkupContent{String: &entry.Documentation}
 		}
 		if entry.Snippet {
 			item.InsertTextFormat = new(lsproto.InsertTextFormatSnippet)

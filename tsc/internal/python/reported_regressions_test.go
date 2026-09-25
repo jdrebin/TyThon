@@ -502,6 +502,27 @@ def assign(user: User) -> None:
 	at("user.kind", "kind", len("user."))
 }
 
+func TestAssignabilityChainNamesTheProperty(t *testing.T) {
+	source := `class Need:
+    id: int
+    name: str
+
+class Have:
+    name: str
+
+need: Need = Have()
+`
+	program := BuildProgram(newPythonChecker(t), []SourceInput{{FileName: "main.ty", Text: source}})
+	var messages []string
+	for _, diagnostic := range program.Diagnostics {
+		messages = append(messages, diagnostic.Message)
+	}
+	joined := strings.Join(messages, "\n")
+	if !strings.Contains(joined, "Property 'id' is missing") {
+		t.Fatalf("messages = %q", joined)
+	}
+}
+
 func TestGenericWithoutArgumentsIsErrorType(t *testing.T) {
 	source := "class Box<T>:\n    value: T\nitem: Box\n"
 	program := BuildProgram(newPythonChecker(t), []SourceInput{{FileName: "main.ty", Text: source}})

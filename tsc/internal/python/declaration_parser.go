@@ -692,6 +692,13 @@ func parseObjectMembers(lines []logicalLine, declarationOnly bool, initialized m
 			}
 			continue
 		}
+		optionalMember := false
+		if stripped := trimOptionalMemberModifier(text); stripped != text && (strings.HasPrefix(stripped, "def ") || strings.HasPrefix(stripped, "async def ") || strings.HasPrefix(stripped, "declare def ") || strings.HasPrefix(stripped, "declare async def ")) {
+			line.text = stripped
+			line.contentStart += len(text) - len(stripped)
+			text = stripped
+			optionalMember = true
+		}
 		if strings.HasPrefix(text, "def ") || strings.HasPrefix(text, "async def ") || strings.HasPrefix(text, "declare def ") || strings.HasPrefix(text, "declare async def ") {
 			allowInferredReturn := !declarationOnly && !pendingOverload && !strings.HasPrefix(text, "declare ") && !strings.HasPrefix(text, "declare async ")
 			function, parseErrors := parseFunctionDeclaration(line, true, pendingOverload, allowInferredReturn)
@@ -717,7 +724,7 @@ func parseObjectMembers(lines []logicalLine, declarationOnly bool, initialized m
 				} else {
 					members = append(members, ObjectMemberDeclaration{
 						Loc: lineRange(line), Kind: ObjectMemberMethod, Name: function.Name, NameLoc: function.NameLoc, Signature: function.Signature,
-						Static: pendingStatic, ClassMethod: pendingClassMethod, Overload: pendingOverload,
+						Static: pendingStatic, ClassMethod: pendingClassMethod, Overload: pendingOverload, Optional: optionalMember,
 						Async: function.Async, ReturnAnnotated: function.ReturnAnnotated,
 					})
 				}

@@ -115,7 +115,7 @@ class User:
 class User:
     def __init__(self):
         return 12
-`, "is not assignable to None"},
+`, "not assignable to type 'None'"},
 		{"unguarded root forwarding", `
 class Root:
     def __init__(self, id: int, **kwargs):

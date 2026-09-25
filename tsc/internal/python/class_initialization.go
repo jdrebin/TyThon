@@ -460,7 +460,7 @@ func (s *implementationChecker) finishConstructorInitialization(receiver string,
 		if fact == nil || !s.types.checker.IsTypeAssignableTo(fact, s.types.checker.GetBooleanLiteralType(true)) {
 			s.report(loc, fmt.Sprintf("attribute %q has no initializer and is not definitely assigned in __init__", name))
 		} else if actual, expected := joined[initializationValuePrefix+receiver+"."+name], state.expected[name]; actual != nil && expected != nil && !s.types.checker.IsTypeAssignableTo(actual, expected) {
-			s.report(loc, fmt.Sprintf("initializer assertion for attribute %q is not satisfied: %s is not assignable to %s", name, FormatType(s.types.checker, actual), FormatType(s.types.checker, expected)))
+			s.report(loc, fmt.Sprintf("initializer assertion for attribute %q is not satisfied:\n%s", name, FormatAssignability(s.types.checker, actual, expected)))
 		}
 	}
 	if state.explicit && state.assertion != nil {

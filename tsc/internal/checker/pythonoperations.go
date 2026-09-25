@@ -371,7 +371,7 @@ func (c *Checker) ResolvePythonItemAccess(receiver *Type, key *Type, slice bool)
 	if result, ok := c.tryPythonMethodCall(receiver, "__getitem__", key); ok {
 		return result, nil
 	}
-	return c.unknownType, []ObjectCallDiagnostic{{Argument: -1, Message: fmt.Sprintf("type has no item key %s", c.TypeToString(key))}}
+	return c.unknownType, []ObjectCallDiagnostic{{Argument: -1, Message: fmt.Sprintf("type %s has no item key %s", c.TypeToString(receiver), c.TypeToString(key))}}
 }
 
 func (c *Checker) ResolvePythonItemAssignment(receiver *Type, key *Type, value *Type, slice bool) []ObjectCallDiagnostic {

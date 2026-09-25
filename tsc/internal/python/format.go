@@ -8,6 +8,8 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/internal/ast"
 	"github.com/microsoft/TypeScript/tsc/internal/checker"
+	"github.com/microsoft/TypeScript/tsc/internal/diagnosticwriter"
+	"github.com/microsoft/TypeScript/tsc/internal/locale"
 )
 
 // FormatType presents checker types using the Python-facing primitive
@@ -560,10 +562,21 @@ func FormatDiagnosticMessage(message string) string {
 	return replaceCheckerTypeWords(strings.ReplaceAll(message, "=>", "->"))
 }
 
+// FormatAssignability renders the checker's own assignability chain.
+func FormatAssignability(c *checker.Checker, source *checker.Type, target *checker.Type) string {
+	reported := c.ExplainAssignability(source, target)
+	if len(reported) == 0 {
+		return FormatDiagnosticMessage("Type '" + FormatType(c, source) + "' is not assignable to type '" + FormatType(c, target) + "'.")
+	}
+	var text strings.Builder
+	diagnosticwriter.WriteFlattenedASTDiagnosticMessage(&text, reported[0], "\n", locale.Default)
+	return FormatDiagnosticMessage(text.String())
+}
+
 func replaceCheckerTypeWords(text string) string {
 	replacements := map[string]string{
 		"string": "str", "number": "float", "bigint": "int", "boolean": "bool", "null": "None", "undefined": "None", "void": "None",
-		"true": "True", "false": "False",
+		"true": "True", "false": "False", "this": "self",
 	}
 	var result strings.Builder
 	for index := 0; index < len(text); {

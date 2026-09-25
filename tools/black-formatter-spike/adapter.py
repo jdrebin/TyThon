@@ -33,7 +33,7 @@ token.tok_name[181] = "TY_ANNOTATION_COLON"
 REPLACEMENTS = {
     "type_stmt:": "type_stmt: \"type\" NAME ['(' [ty_typeparams] ')'] '=' ty_test",
     "typeparams:": "typeparams: '[' typeparam (',' typeparam)* [','] ']' | TY_LANGLE ty_typeparams '>'",
-    "funcdef:": "funcdef: 'def' NAME [typeparams] parameters ['->' ty_test] ':' suite",
+    "funcdef:": "funcdef: 'def' NAME [typeparams] parameters ['->' ty_test] (':' suite | NEWLINE)",
     "tname:": "tname: NAME [':' ty_test]",
     "tname_star:": "tname_star: NAME [':' ty_test]",
     "annassign:": "annassign: ':' ty_test ['=' (yield_expr|testlist_star_expr)]",
@@ -42,12 +42,13 @@ REPLACEMENTS = {
     "classdef:": "classdef: ('class' | \"interface\") (NAME | '*') [typeparams] ['(' [arglist] ')'] ':' suite",
     "test:": "test: ty_assertion ['if' or_test 'else' test] | lambdef",
     "trailer:": "trailer: '(' [arglist] ')' | '[' subscriptlist ']' | '.' NAME | '!' | ty_call_typeargs '(' [arglist] ')'",
-    "small_stmt:": "small_stmt: (ty_declare | type_stmt | expr_stmt | del_stmt | pass_stmt | flow_stmt |",
+    "small_stmt:": "small_stmt: (ty_modified_ann | type_stmt | expr_stmt | del_stmt | pass_stmt | flow_stmt |",
+    "compound_stmt:": "compound_stmt: ty_declare | if_stmt | while_stmt | for_stmt | try_stmt | with_stmt | funcdef | classdef | decorated | async_stmt | match_stmt",
 }
 
 RULES = r"""
 ty_typeparams: ty_typeparam (',' ty_typeparam)* [',']
-ty_typeparam: NAME ["extends" ty_test] ['=' ty_test]
+ty_typeparam: ["const"] NAME ["extends" ty_test] ['=' ty_test]
 ty_assertion: or_test (('as' | "satisfies") ty_test)*
 ty_test: ty_union ['if' ty_union "extends" ty_union 'else' ty_test]
 ty_union: ty_intersection ('|' ty_intersection)*
@@ -67,7 +68,8 @@ ty_comp_for: 'for' NAME 'in' ty_union ['if' ty_union "extends" ty_union]
 ty_generic_callable: ty_callable_typeparams parameters '->' ty_test
 ty_callable_typeparams: TY_LANGLE ty_typeparams '>'
 ty_call_typeargs: TY_LANGLE ty_arglist '>'
-ty_declare: "declare" ['async'] 'def' NAME [typeparams] parameters ['->' ty_test] [':' '.' '.' '.']
+ty_declare: "declare" (['async'] 'def' NAME [typeparams] parameters ['->' ty_test] [':' '.' '.' '.'] | ('class' | "interface") (NAME | '*') [typeparams] ['(' [arglist] ')'] ':' suite)
+ty_modified_ann: ("static" "readonly" "optional" | "static" "readonly" | "static" "optional" | "readonly" "optional" | "optional" "readonly" | "static" | "readonly" | "optional") NAME ':' ty_test ['=' test]
 """
 
 _initialize = pygram.initialize
@@ -114,6 +116,8 @@ def classify(self, kind, value, context):
         "satisfies",
         "optional",
         "readonly",
+        "const",
+        "static",
     }:
         return [self.grammar.tokens[token.NAME], self.grammar.soft_keywords[value]]
     return _classify(self, kind, value, context)

@@ -1251,6 +1251,10 @@ These are deferred because none should compromise the core rule: Python syntax
 and runtime semantics at the boundary, existing TypeScript type machinery at
 the center.
 
+### Completion call rows
+
+Not implemented. An open completion may later offer `call_me()` as its own row when the bare function is not assignable to the hole and a signature can be called with no required arguments whose return type is. The bare name stays the function and is not treated as valid just because its return type matches. Required arguments, unresolved generics, and overloads that do not instantiate against the hole do not get a call row.
+
 ## Phase 2 and later
 
 Not current work. Recorded so the behavior is not relitigated from scratch.

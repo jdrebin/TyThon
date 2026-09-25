@@ -21,16 +21,21 @@ const (
 	CompletionKindType
 	CompletionKindTypeParameter
 	CompletionKindKeywordArgument
+	CompletionKindKeyword
 )
 
 type CompletionEntry struct {
-	Label       string
-	Detail      string
-	Kind        CompletionKind
-	InsertText  string
-	ReplaceFrom int
-	ReplaceTo   int
-	Snippet     bool
+	Label         string
+	Detail        string
+	Description   string
+	Kind          CompletionKind
+	InsertText    string
+	Documentation string
+	ReplaceFrom   int
+	ReplaceTo     int
+	Snippet       bool
+	Distance      int
+	Incompatible  bool
 }
 
 type AttributeCompletionQuery struct {
@@ -50,10 +55,12 @@ type ItemCompletionQuery struct {
 }
 
 type VisibleNameCompletionQuery struct {
-	Prefix      string
-	ScopeOffset int
-	ReplaceFrom int
-	ReplaceTo   int
+	Prefix         string
+	ScopeOffset    int
+	ReplaceFrom    int
+	ReplaceTo      int
+	StatementStart bool
+	AfterValue     bool
 }
 
 type DefinitionCompletionQuery struct {
@@ -62,6 +69,9 @@ type DefinitionCompletionQuery struct {
 	ReplaceTo   int
 	Kind        string
 	InClass     bool
+	ClassName   string
+	Ambient     bool
+	Signature   bool
 	HasCall     bool
 	BodyIndent  string
 }
@@ -71,6 +81,8 @@ type TypeCompletionQuery struct {
 	Offset      int
 	ReplaceFrom int
 	ReplaceTo   int
+	Infer       bool
+	Extends     bool
 }
 
 type CallCompletionQuery struct {
@@ -227,8 +239,49 @@ func PrepareVisibleNameCompletion(source string, offset int) (string, VisibleNam
 	}
 	query := VisibleNameCompletionQuery{
 		Prefix: source[start:offset], ScopeOffset: start, ReplaceFrom: start, ReplaceTo: end,
+		StatementStart: statementStart(source, start), AfterValue: afterValue(source, start),
 	}
 	return source[:start] + "__completion__" + source[end:], query, true
+}
+
+func statementStart(source string, start int) bool {
+	lineStart := strings.LastIndexByte(source[:start], '\n') + 1
+	return strings.TrimSpace(source[lineStart:start]) == ""
+}
+
+func afterValue(source string, start int) bool {
+	before := start - 1
+	for before >= 0 && (source[before] == ' ' || source[before] == '\t') {
+		before--
+	}
+	if before < 0 {
+		return false
+	}
+	switch source[before] {
+	case ')', ']', '"', '\'':
+		return true
+	}
+	r, _ := utf8.DecodeLastRuneInString(source[:before+1])
+	return isIdentifierContinue(r)
+}
+
+func previousWord(source string, start int) string {
+	before := start - 1
+	for before >= 0 && (source[before] == ' ' || source[before] == '\t') {
+		before--
+	}
+	if before < 0 {
+		return ""
+	}
+	end := before + 1
+	for before >= 0 {
+		r, width := utf8.DecodeLastRuneInString(source[:before+1])
+		if !isIdentifierContinue(r) {
+			break
+		}
+		before -= width
+	}
+	return source[before+1 : end]
 }
 
 func definitionHeaderKind(before string) string {
@@ -295,63 +348,215 @@ func PrepareDefinitionCompletion(source string, offset int) (DefinitionCompletio
 	for lineEnd < len(source) && source[lineEnd] != '\n' && source[lineEnd] != '\r' {
 		lineEnd++
 	}
+	className, ambient, signature := enclosingClassHeader(source, lineStart)
+	if insideUnclosedBrace(source, lineStart) {
+		signature = true
+		ambient = false
+	}
 	return DefinitionCompletionQuery{
 		Prefix:      source[start:offset],
 		ReplaceFrom: start,
 		ReplaceTo:   end,
 		Kind:        kind,
-		InClass:     definitionInsideClass(source, lineStart),
+		InClass:     className != "" || signature,
+		ClassName:   className,
+		Ambient:     ambient,
+		Signature:   signature,
 		HasCall:     strings.Contains(source[end:lineEnd], "("),
 		BodyIndent:  continuationIndent(source, lineStart),
 	}, true
 }
 
-var pythonDunderMethods = []string{
-	"__init__", "__new__", "__del__",
-	"__repr__", "__str__", "__bytes__", "__format__",
-	"__lt__", "__le__", "__eq__", "__ne__", "__gt__", "__ge__",
-	"__hash__", "__bool__",
-	"__getattr__", "__getattribute__", "__setattr__", "__delattr__", "__dir__",
-	"__call__",
-	"__len__", "__getitem__", "__setitem__", "__delitem__", "__missing__",
-	"__iter__", "__next__", "__reversed__", "__contains__",
-	"__add__", "__sub__", "__mul__", "__matmul__", "__truediv__", "__floordiv__", "__mod__", "__divmod__", "__pow__",
-	"__lshift__", "__rshift__", "__and__", "__xor__", "__or__",
-	"__iadd__", "__isub__", "__imul__",
-	"__neg__", "__pos__", "__abs__", "__invert__",
-	"__int__", "__float__", "__index__", "__complex__",
-	"__enter__", "__exit__",
-	"__await__", "__aiter__", "__anext__", "__aenter__", "__aexit__",
-	"__init_subclass__", "__class_getitem__", "__mro_entries__",
-	"__set_name__", "__get__", "__set__", "__delete__",
+func insideUnclosedBrace(source string, lineStart int) bool {
+	depth := 0
+	for index := 0; index < lineStart && index < len(source); index++ {
+		switch source[index] {
+		case '#':
+			for index+1 < lineStart && source[index] != '\n' {
+				index++
+			}
+		case '\'', '"':
+			quote := source[index]
+			index++
+			for index < lineStart && source[index] != quote {
+				if source[index] == '\\' && index+1 < lineStart {
+					index++
+				}
+				index++
+			}
+		case '{':
+			depth++
+		case '}':
+			if depth > 0 {
+				depth--
+			}
+		}
+	}
+	return depth > 0
 }
+
+func enclosingClassHeader(source string, lineStart int) (name string, ambient bool, signature bool) {
+	indent := 0
+	for lineStart+indent < len(source) && (source[lineStart+indent] == ' ' || source[lineStart+indent] == '\t') {
+		indent++
+	}
+	search := lineStart
+	for search > 0 {
+		previousEnd := search - 1
+		previousStart := strings.LastIndexByte(source[:previousEnd], '\n') + 1
+		line := source[previousStart:previousEnd]
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" || strings.HasPrefix(trimmed, "#") {
+			search = previousStart
+			continue
+		}
+		content := 0
+		for content < len(line) && (line[content] == ' ' || line[content] == '\t') {
+			content++
+		}
+		if content < indent && (strings.HasPrefix(trimmed, "class ") || strings.HasPrefix(trimmed, "declare class ") || strings.HasPrefix(trimmed, "interface ")) {
+			ambient = strings.HasPrefix(trimmed, "declare ")
+			signature = strings.HasPrefix(trimmed, "interface ")
+			header := trimmed
+			if strings.HasPrefix(header, "declare ") {
+				header = strings.TrimSpace(header[len("declare "):])
+			}
+			header = strings.TrimSpace(strings.TrimPrefix(strings.TrimPrefix(header, "class "), "interface "))
+			for index, r := range header {
+				if !isIdentifierContinue(r) {
+					return header[:index], ambient, signature
+				}
+			}
+			return header, ambient, signature
+		}
+		search = previousStart
+	}
+	return "", false, false
+}
+
+var pythonDunderMethods = []string{"__init__", "__new__"}
 
 func DefinitionCompletions(query DefinitionCompletionQuery) []CompletionEntry {
 	if query.Kind != "def" || !strings.HasPrefix(query.Prefix, "__") {
 		return nil
 	}
-	entries := make([]CompletionEntry, 0)
-	for _, name := range pythonDunderMethods {
-		if query.Prefix != "" && !strings.HasPrefix(strings.ToLower(name), strings.ToLower(query.Prefix)) {
+	return dunderDefinitionEntries(query, nil)
+}
+
+func (p *PythonProgram) DefinitionCompletionsAt(fileName string, query DefinitionCompletionQuery) []CompletionEntry {
+	if query.Kind != "def" {
+		return nil
+	}
+	entries := dunderDefinitionEntries(query, nil)
+	seen := map[string]bool{}
+	for _, entry := range entries {
+		seen[entry.Label] = true
+	}
+	if module := p.moduleForFile(fileName); module != nil {
+		if protocol := module.Types.objectProtocolType(); protocol != nil {
+			c := module.Types.Checker()
+			for _, property := range c.PropertiesForCompletion(protocol) {
+				name := property.Name
+				if seen[name] || !strings.HasPrefix(query.Prefix, "__") || query.Prefix != "" && !strings.HasPrefix(strings.ToLower(name), strings.ToLower(query.Prefix)) {
+					continue
+				}
+				signatures := c.GetSignaturesOfType(c.GetTypeOfSymbol(property), checker.SignatureKindCall)
+				if len(signatures) == 0 {
+					continue
+				}
+				entries = append(entries, methodDefinitionEntry(query, name, methodDefinitionSignature(c, signatures[0], query.InClass)))
+				seen[name] = true
+			}
+		}
+	}
+	if query.ClassName == "" {
+		sortCompletionEntries(entries)
+		return entries
+	}
+	module := p.moduleForFile(fileName)
+	if module == nil {
+		sortCompletionEntries(entries)
+		return entries
+	}
+	symbol, ok := module.Types.Symbol(query.ClassName)
+	if !ok || symbol.Instance == nil {
+		sortCompletionEntries(entries)
+		return entries
+	}
+	c := module.Types.Checker()
+	for _, property := range c.PropertiesForCompletion(symbol.Instance) {
+		name := property.Name
+		if seen[name] || query.Prefix != "" && !strings.HasPrefix(strings.ToLower(name), strings.ToLower(query.Prefix)) {
 			continue
 		}
-		insert := name
-		snippet := false
-		if !query.HasCall {
-			params := ""
-			if query.InClass {
-				params = "self"
-			}
-			insert = name + "(" + params + "):\n" + query.BodyIndent + "$0"
-			snippet = true
+		if !includeDunderCompletion(name, query.Prefix) {
+			continue
 		}
-		entries = append(entries, CompletionEntry{
-			Label: name, Detail: "method", Kind: CompletionKindMethod, InsertText: insert,
-			ReplaceFrom: query.ReplaceFrom, ReplaceTo: query.ReplaceTo, Snippet: snippet,
-		})
+		propertyType := c.GetTypeOfSymbol(property)
+		signatures := c.GetSignaturesOfType(propertyType, checker.SignatureKindCall)
+		if len(signatures) == 0 {
+			continue
+		}
+		signature := methodDefinitionSignature(c, signatures[0], query.InClass)
+		entries = append(entries, methodDefinitionEntry(query, name, signature))
+		seen[name] = true
 	}
 	sortCompletionEntries(entries)
 	return entries
+}
+
+func dunderDefinitionEntries(query DefinitionCompletionQuery, seen map[string]bool) []CompletionEntry {
+	if query.Kind != "def" || !strings.HasPrefix(query.Prefix, "__") {
+		return nil
+	}
+	entries := make([]CompletionEntry, 0)
+	for _, name := range pythonDunderMethods {
+		if seen[name] || query.Prefix != "" && !strings.HasPrefix(strings.ToLower(name), strings.ToLower(query.Prefix)) {
+			continue
+		}
+		entries = append(entries, methodDefinitionEntry(query, name, dunderSignatureText(name, query.InClass)))
+	}
+	return entries
+}
+
+func methodDefinitionSignature(c *checker.Checker, signature *checker.Signature, inClass bool) string {
+	text := FormatCallableSignature(c, signature)
+	if inClass && !strings.Contains(text, "(self") {
+		if strings.HasPrefix(text, "()") {
+			text = "(self)" + text[len("()"):]
+		} else if strings.HasPrefix(text, "(") {
+			text = "(self, " + text[1:]
+		}
+	}
+	return text
+}
+
+func dunderSignatureText(name string, inClass bool) string {
+	if inClass {
+		return "(self)"
+	}
+	return "()"
+}
+
+func methodDefinitionEntry(query DefinitionCompletionQuery, name string, signature string) CompletionEntry {
+	insert := name
+	snippet := false
+	if !query.HasCall {
+		snippet = true
+		switch {
+		case query.Ambient:
+			insert = name + signature + ": ..."
+		case query.Signature:
+			insert = name + signature
+			snippet = false
+		default:
+			insert = name + signature + ":\n" + query.BodyIndent + "$0"
+		}
+	}
+	return CompletionEntry{
+		Label: name, Detail: signature, Documentation: signature, Kind: CompletionKindMethod, InsertText: insert,
+		ReplaceFrom: query.ReplaceFrom, ReplaceTo: query.ReplaceTo, Snippet: snippet,
+	}
 }
 
 // PrepareTypeCompletion identifies the Python positions in which a name is a
@@ -392,7 +597,11 @@ func PrepareTypeCompletion(source string, offset int) (TypeCompletionQuery, bool
 	if !isType {
 		return TypeCompletionQuery{}, false
 	}
-	return TypeCompletionQuery{Prefix: source[start:offset], Offset: start, ReplaceFrom: start, ReplaceTo: end}, true
+	word := previousWord(source, start)
+	return TypeCompletionQuery{
+		Prefix: source[start:offset], Offset: start, ReplaceFrom: start, ReplaceTo: end,
+		Infer: word == "extends", Extends: word != "" && word != "extends" && word != "keyof",
+	}, true
 }
 
 func isDeclaredMemberLeft(left string) bool {
@@ -833,7 +1042,9 @@ func (p *PythonProgram) ItemCompletionsAt(fileName string, query ItemCompletionQ
 func (p *PythonProgram) VisibleNameCompletionsAt(fileName string, query VisibleNameCompletionQuery) []CompletionEntry {
 	module := p.moduleForFile(fileName)
 	if module == nil || module.Runtime == nil {
-		return nil
+		entries := syntaxCompletions(query)
+		sortCompletionEntries(entries)
+		return entries
 	}
 	var best *RuntimeScopeSnapshot
 	for index := range module.Runtime.Scopes {
@@ -846,7 +1057,9 @@ func (p *PythonProgram) VisibleNameCompletionsAt(fileName string, query VisibleN
 		}
 	}
 	if best == nil {
-		return nil
+		entries := syntaxCompletions(query)
+		sortCompletionEntries(entries)
+		return entries
 	}
 	c := module.Types.Checker()
 	entries := make([]CompletionEntry, 0, len(best.Values))
@@ -861,12 +1074,52 @@ func (p *PythonProgram) VisibleNameCompletionsAt(fileName string, query VisibleN
 		if symbol := module.Types.symbols[name]; symbol != nil && symbol.Class != nil {
 			kind = CompletionKindClass
 		}
-		entries = append(entries, CompletionEntry{
+		entry := CompletionEntry{
 			Label: name, Detail: FormatType(c, t), Kind: kind, InsertText: name,
-			ReplaceFrom: query.ReplaceFrom, ReplaceTo: query.ReplaceTo,
+			ReplaceFrom: query.ReplaceFrom, ReplaceTo: query.ReplaceTo, Distance: 100,
+		}
+		if best.Distances != nil {
+			if distance, ok := best.Distances[name]; ok {
+				entry.Distance = distance
+			}
+		}
+		if best.Expected != nil && !c.IsTypeAssignableTo(t, best.Expected) {
+			entry.Incompatible = true
+			entry.Description = "not assignable"
+		}
+		entries = append(entries, entry)
+	}
+	entries = append(entries, syntaxCompletions(query)...)
+	sortCompletionEntries(entries)
+	return entries
+}
+
+func syntaxCompletions(query VisibleNameCompletionQuery) []CompletionEntry {
+	var words []string
+	if query.StatementStart {
+		words = []string{"if", "elif", "else", "for", "while", "def", "class", "return", "yield", "match", "case", "try", "except", "with", "assert", "pass", "break", "continue", "raise", "import", "from", "async", "await", "del", "lambda", "global", "nonlocal", "type", "interface", "declare"}
+	}
+	if query.AfterValue {
+		words = append(words, "as", "satisfies", "if", "and", "or")
+	}
+	entries := make([]CompletionEntry, 0, len(words))
+	seen := map[string]bool{}
+	for _, word := range words {
+		if seen[word] || query.Prefix != "" && !strings.HasPrefix(word, strings.ToLower(query.Prefix)) {
+			continue
+		}
+		seen[word] = true
+		insert := word + " "
+		snippet := false
+		if word == "as" || word == "satisfies" {
+			insert = word + " $0"
+			snippet = true
+		}
+		entries = append(entries, CompletionEntry{
+			Label: word, Detail: "keyword", Kind: CompletionKindKeyword, InsertText: insert, Snippet: snippet,
+			ReplaceFrom: query.ReplaceFrom, ReplaceTo: query.ReplaceTo, Distance: 0,
 		})
 	}
-	sortCompletionEntries(entries)
 	return entries
 }
 
@@ -883,22 +1136,23 @@ func (p *PythonProgram) TypeCompletionsAt(fileName string, query TypeCompletionQ
 	}
 	seen := make(map[string]bool)
 	entries := make([]CompletionEntry, 0, len(module.Types.symbols)+len(canonicalIntrinsicTypeNames)+len(builtinTypeFunctionNames))
-	add := func(name string, detail string, kind CompletionKind) {
+	add := func(name string, detail string, kind CompletionKind, distance int) {
 		if seen[name] || query.Prefix != "" && !strings.HasPrefix(strings.ToLower(name), strings.ToLower(query.Prefix)) {
 			return
 		}
 		seen[name] = true
 		entries = append(entries, CompletionEntry{
 			Label: name, Detail: detail, Kind: kind, InsertText: name,
-			ReplaceFrom: query.ReplaceFrom, ReplaceTo: query.ReplaceTo,
+			ReplaceFrom: query.ReplaceFrom, ReplaceTo: query.ReplaceTo, Distance: distance,
 		})
 	}
 	for _, name := range canonicalIntrinsicTypeNames {
-		add(name, "intrinsic type", CompletionKindType)
+		add(name, "intrinsic type", CompletionKindType, 200)
 	}
 	for _, name := range builtinTypeFunctionNames {
-		add(name, "type function", CompletionKindFunction)
+		add(name, "type function", CompletionKindFunction, 200)
 	}
+	declaredFile := declarationFileName(module.Files)
 	for name, symbol := range module.Types.symbols {
 		detail := "type"
 		kind := CompletionKindType
@@ -909,10 +1163,33 @@ func (p *PythonProgram) TypeCompletionsAt(fileName string, query TypeCompletionQ
 		case TypeSymbolGeneric:
 			detail = "generic type"
 		}
-		add(name, detail, kind)
+		distance := 150
+		if symbol.DefinitionFile == declaredFile {
+			distance = 100
+		}
+		if symbol.DefinitionFile == BuiltinDeclarationURI || symbol.BuiltinArity != 0 {
+			distance = 200
+		}
+		add(name, detail, kind, distance)
 	}
 	for _, parameter := range typeParametersAt(module.Declaration, query.Offset) {
-		add(parameter, "type parameter", CompletionKindTypeParameter)
+		add(parameter, "type parameter", CompletionKindTypeParameter, 0)
+	}
+	for _, word := range typeSyntaxWords(query) {
+		insert := word + " "
+		snippet := false
+		if word == "keyof" || word == "infer" {
+			insert = word + " $0"
+			snippet = true
+		}
+		if seen[word] || query.Prefix != "" && !strings.HasPrefix(word, strings.ToLower(query.Prefix)) {
+			continue
+		}
+		seen[word] = true
+		entries = append(entries, CompletionEntry{
+			Label: word, Detail: "keyword", Kind: CompletionKindKeyword, InsertText: insert, Snippet: snippet,
+			ReplaceFrom: query.ReplaceFrom, ReplaceTo: query.ReplaceTo,
+		})
 	}
 	sortCompletionEntries(entries)
 	return entries
@@ -1097,8 +1374,34 @@ func (p *PythonProgram) callableSignaturesAt(fileName string, query CallCompleti
 	return c, c.GetSignaturesOfType(t, checker.SignatureKindCall)
 }
 
+func typeSyntaxWords(query TypeCompletionQuery) []string {
+	words := []string{"keyof"}
+	if query.Infer {
+		words = append(words, "infer")
+	}
+	if query.Extends {
+		words = append(words, "extends")
+	}
+	return words
+}
+
 func sortCompletionEntries(entries []CompletionEntry) {
 	slices.SortFunc(entries, func(left, right CompletionEntry) int {
+		if left.Kind == CompletionKindKeyword && right.Kind != CompletionKindKeyword {
+			return -1
+		}
+		if right.Kind == CompletionKindKeyword && left.Kind != CompletionKindKeyword {
+			return 1
+		}
+		if left.Incompatible != right.Incompatible {
+			if left.Incompatible {
+				return 1
+			}
+			return -1
+		}
+		if left.Distance != right.Distance {
+			return left.Distance - right.Distance
+		}
 		if comparison := compareDunderCompletionPriority(left.Label, right.Label); comparison != 0 {
 			return comparison
 		}

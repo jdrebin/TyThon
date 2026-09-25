@@ -440,6 +440,19 @@ func (c *Checker) IsTypeAssignableTo(source *Type, target *Type) bool {
 	return c.isTypeAssignableTo(source, target)
 }
 
+// explainAssignabilityNode exists only so the relater reports a chain. Its parent
+// is a second empty node: excess-property reporting reads errorNode.Parent, and
+// GetSourceFileOfNode stops when Parent is nil. Neither node is a source file.
+var explainAssignabilityNode = &ast.Node{Parent: &ast.Node{}}
+
+// ExplainAssignability runs the same assignability relation as IsTypeAssignableTo
+// with error reporting on, and returns the checker's diagnostic chain.
+func (c *Checker) ExplainAssignability(source *Type, target *Type) []*ast.Diagnostic {
+	var reported []*ast.Diagnostic
+	c.checkTypeAssignableToEx(source, target, explainAssignabilityNode, diagnostics.Type_0_is_not_assignable_to_type_1, &reported)
+	return reported
+}
+
 func (c *Checker) IsTypeIdenticalTo(left *Type, right *Type) bool {
 	return c.isTypeIdenticalTo(left, right)
 }

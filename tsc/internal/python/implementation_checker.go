@@ -50,8 +50,10 @@ type TypedRuntimeExpression struct {
 // expression was checked. Editor queries use the narrowest containing snapshot
 // instead of rebuilding Python scope rules in the language server.
 type RuntimeScopeSnapshot struct {
-	Range  TextRange
-	Values map[string]*checker.Type
+	Range     TextRange
+	Values    map[string]*checker.Type
+	Distances map[string]int
+	Expected  *checker.Type
 }
 
 // CheckedRuntimeCall retains the checker signature selected at a call site.
@@ -151,7 +153,7 @@ func (s *implementationChecker) checkStatements(statements []RuntimeStatement, r
 				s.inferredReturns = append(s.inferredReturns, actual)
 			}
 			if returnType != nil && !s.types.checker.IsTypeAssignableTo(actual, returnType) {
-				s.report(statement.Range(), fmt.Sprintf("returned type %s is not assignable to %s", FormatType(s.types.checker, actual), FormatType(s.types.checker, returnType)))
+				s.reportAssignability(statement.Range(), actual, returnType)
 			}
 			if s.initialization != nil && !isRuntimeNever(actual) {
 				s.initialization.returns = append(s.initialization.returns, copyRuntimeScope(s.scope))
@@ -313,7 +315,7 @@ func (s *implementationChecker) applyRuntimeAssignment(statement *RuntimeAssignm
 		return
 	}
 	if expected != nil && !s.types.checker.IsTypeAssignableTo(actual, expected) {
-		s.report(statement.Range(), fmt.Sprintf("type %s is not assignable to %s", FormatType(s.types.checker, actual), FormatType(s.types.checker, expected)))
+		s.reportAssignability(statement.Range(), actual, expected)
 	}
 	if expected != nil {
 		s.scope[statement.Name] = s.types.checker.AssignmentFlowType(expected, actual)
@@ -384,7 +386,7 @@ func (s *implementationChecker) assignAugmentedTarget(target RuntimeExpr, value 
 		s.invalidatePresence(name.Name)
 		expected := s.scope[name.Name]
 		if expected != nil && !s.types.checker.IsTypeAssignableTo(value, expected) {
-			s.report(loc, fmt.Sprintf("augmented assignment result %s is not assignable to %s", FormatType(s.types.checker, value), FormatType(s.types.checker, expected)))
+			s.reportAssignability(loc, value, expected)
 			return
 		}
 		s.scope[name.Name] = value
@@ -434,6 +436,9 @@ func (s *implementationChecker) checkAssignmentTarget(target RuntimeExpr, value 
 }
 
 func (s *implementationChecker) typeOfWithContext(expression RuntimeExpr, expected *checker.Type) *checker.Type {
+	previousExpected := s.completionExpected
+	s.completionExpected = expected
+	defer func() { s.completionExpected = previousExpected }()
 	if literal, ok := expression.(*RuntimeLiteralExpr); ok && literal.Kind == RuntimeLiteralString && expected != nil {
 		s.result.StringContexts = append(s.result.StringContexts, RuntimeStringContext{Range: literal.Range(), Type: expected})
 	}
@@ -482,7 +487,7 @@ func (s *implementationChecker) typeOfWithContext(expression RuntimeExpr, expect
 	actualReturn := s.typeOf(lambda.Body)
 	s.scope = previous
 	if expectedReturn != nil && !c.IsTypeAssignableTo(actualReturn, expectedReturn) {
-		s.report(lambda.Range(), fmt.Sprintf("lambda return type %s is not assignable to %s", FormatType(c, actualReturn), FormatType(c, expectedReturn)))
+		s.reportAssignability(lambda.Range(), actualReturn, expectedReturn)
 	}
 	return c.NewObjectTypeFromFacets(checker.ObjectFacets{Calls: []checker.ObjectFacetCall{{Parameters: parameters, ReturnType: actualReturn}}})
 }
@@ -518,7 +523,7 @@ func (s *implementationChecker) typeOfTypedLambda(lambda *RuntimeLambdaExpr, exp
 			if parameter.Annotated || index < len(contextualParameters) {
 				actual := s.typeOfWithContext(parameter.DefaultValue, parameterType)
 				if !c.IsTypeAssignableTo(actual, parameterType) {
-					s.report(parameter.DefaultValue.Range(), fmt.Sprintf("default value type %s is not assignable to parameter type %s", FormatType(c, actual), FormatType(c, parameterType)))
+					s.reportAssignability(parameter.DefaultValue.Range(), actual, parameterType)
 				}
 			} else {
 				actual := s.typeOf(parameter.DefaultValue)
@@ -562,7 +567,7 @@ func (s *implementationChecker) typeOfTypedLambda(lambda *RuntimeLambdaExpr, exp
 
 	result := s.types.callableWithReturnType(callableSignature, actualReturn)
 	if expected != nil && !c.IsTypeAssignableTo(result, expected) {
-		s.report(lambda.Range(), fmt.Sprintf("lambda type %s is not assignable to %s", FormatType(c, result), FormatType(c, expected)))
+		s.reportAssignability(lambda.Range(), result, expected)
 	}
 	return result
 }
@@ -1108,6 +1113,7 @@ type implementationChecker struct {
 	types                          *CheckerTypeEnvironment
 	result                         *ImplementationCheckResult
 	scope                          map[string]*checker.Type
+	completionExpected             *checker.Type
 	yieldType                      *checker.Type
 	sendType                       *checker.Type
 	yieldDepth                     int
@@ -1123,6 +1129,34 @@ type implementationChecker struct {
 	loops                          []runtimeLoopContext
 	bindings                       []runtimeBindingFrame
 	imports                        runtimeImportResolver
+}
+
+func (s *implementationChecker) operationParentSignature(statement *RuntimeFunctionStatement, receiver *checker.Type) *checker.Signature {
+	if receiver == nil || statement == nil || containsString(statement.Decorators, "staticmethod") || containsString(statement.Decorators, "classmethod") {
+		return nil
+	}
+	name := statement.Name
+	if name == "__init__" || name == "__new__" || !s.types.checker.IsPythonKeyExcludedDunder(name) {
+		return nil
+	}
+	lookup := func(owner *checker.Type) *checker.Signature {
+		if owner == nil {
+			return nil
+		}
+		attribute := s.types.checker.GetAttributeType(owner, s.types.checker.GetStringLiteralType(name))
+		if attribute == nil {
+			return nil
+		}
+		signatures := s.types.checker.GetSignaturesOfType(attribute, checker.SignatureKindCall)
+		if len(signatures) == 0 {
+			return nil
+		}
+		return signatures[0]
+	}
+	if signature := lookup(s.currentSuperType); signature != nil {
+		return signature
+	}
+	return lookup(s.types.objectProtocolType())
 }
 
 func (s *implementationChecker) checkFunction(statement *RuntimeFunctionStatement, receiver *checker.Type, declaredCallable *checker.Type, constructorWritable map[string]bool, declarationKind QuickInfoKind, required ...*classInitializationContract) *checker.Type {
@@ -1182,7 +1216,7 @@ func (s *implementationChecker) checkFunction(statement *RuntimeFunctionStatemen
 		if expected != nil {
 			actual := s.typeOfWithContext(parameter.DefaultValue, expected)
 			if !s.types.checker.IsTypeAssignableTo(actual, expected) {
-				s.report(parameter.DefaultValue.Range(), fmt.Sprintf("default value type %s is not assignable to parameter type %s", FormatType(s.types.checker, actual), FormatType(s.types.checker, expected)))
+				s.reportAssignability(parameter.DefaultValue.Range(), actual, expected)
 			}
 			continue
 		}
@@ -1369,16 +1403,22 @@ func (s *implementationChecker) checkFunction(statement *RuntimeFunctionStatemen
 			s.yieldDepth = 0
 		}
 	}
-	if spec, ok := closedInstanceDunder(statement, receiver); ok {
-		closedReturn := s.closedType(spec.returnType)
-		inferReturn = false
-		s.inferringReturn = false
-		s.inferredReturns = nil
-		returnType = closedReturn
-		s.yieldType = nil
-		s.sendType = nil
-		s.yieldDepth = 0
-		s.checkClosedDunder(statement, runtimeSignature, spec, closedReturn)
+	if parent := s.operationParentSignature(statement, receiver); parent != nil {
+		child := s.types.checker.SignatureWithoutReceiver(runtimeSignature)
+		parentReturn := s.types.checker.GetReturnTypeOfSignature(parent)
+		if !statement.ReturnAnnotated {
+			child = s.types.checker.SignatureWithReturnType(child, parentReturn)
+			inferReturn = false
+			s.inferringReturn = false
+			s.inferredReturns = nil
+			returnType = parentReturn
+			s.yieldType = nil
+			s.sendType = nil
+			s.yieldDepth = 0
+		}
+		if !s.types.checker.PythonOperationOverrideCompatible(s.types.checker.NewObjectTypeFromCallSignatures([]*checker.Signature{child}), s.types.checker.NewObjectTypeFromCallSignatures([]*checker.Signature{parent})) {
+			s.report(statement.NameLoc, fmt.Sprintf("incompatible attribute override for %q", statement.Name))
+		}
 	}
 	s.readonlyAssignmentReceiverName = ""
 	s.readonlyAssignmentReceiver = nil
@@ -1768,14 +1808,14 @@ func (s *implementationChecker) inferClassValueAttributes(statement *RuntimeClas
 		s.scope = previous
 		if expected != nil {
 			if !s.types.checker.IsTypeAssignableTo(actual, expected) {
-				s.report(assignment.Range(), fmt.Sprintf("type %s is not assignable to %s", FormatType(s.types.checker, actual), FormatType(s.types.checker, expected)))
+				s.reportAssignability(assignment.Range(), actual, expected)
 			}
 			actual = expected
 		} else if declared := s.types.checker.GetAttributeType(instance, s.types.checker.GetStringLiteralType(assignment.Name)); declared != nil {
 			// An existing annotation owns the attribute. Check the initializer
 			// against it instead of merging a second, narrower declaration.
 			if !s.types.checker.IsTypeAssignableTo(actual, declared) {
-				s.report(assignment.Range(), fmt.Sprintf("type %s is not assignable to %s", FormatType(s.types.checker, actual), FormatType(s.types.checker, declared)))
+				s.reportAssignability(assignment.Range(), actual, declared)
 			}
 			s.recordNamedType(assignment.NameLoc, declared, QuickInfoProperty, assignment.Name)
 			continue
@@ -2252,6 +2292,32 @@ func filterRuntimeUnion(c *checker.Checker, source *checker.Type, keep func(*che
 	return c.FilterType(source, keep)
 }
 
+func (s *implementationChecker) completionDistances() map[string]int {
+	distances := make(map[string]int, len(s.scope))
+	for name := range visibleRuntimeScope(s.scope) {
+		distances[name] = s.nameDistance(name)
+	}
+	return distances
+}
+
+func (s *implementationChecker) nameDistance(name string) int {
+	for index := len(s.bindings) - 1; index >= 0; index-- {
+		frame := s.bindings[index]
+		if frame.globals[name] {
+			return 100
+		}
+		if frame.locals[name] || frame.parameters[name] {
+			return len(s.bindings) - 1 - index
+		}
+	}
+	if s.result != nil && s.result.File != nil {
+		if def, ok := s.types.valueDefinitions[name]; ok && def.File == s.result.File.FileName {
+			return 100
+		}
+	}
+	return 200
+}
+
 func copyRuntimeScope(scope map[string]*checker.Type) map[string]*checker.Type {
 	result := make(map[string]*checker.Type, len(scope))
 	for name, value := range scope {
@@ -2268,7 +2334,12 @@ func (s *implementationChecker) typeOf(expression RuntimeExpr) *checker.Type {
 	}
 	defer func() { s.constContext = previousConst }()
 	if name, ok := expression.(*RuntimeNameExpr); ok {
-		s.result.Scopes = append(s.result.Scopes, RuntimeScopeSnapshot{Range: name.Range(), Values: visibleRuntimeScope(s.scope)})
+		snapshot := RuntimeScopeSnapshot{Range: name.Range(), Values: visibleRuntimeScope(s.scope)}
+		if name.Name == "__completion__" {
+			snapshot.Distances = s.completionDistances()
+			snapshot.Expected = s.completionExpected
+		}
+		s.result.Scopes = append(s.result.Scopes, snapshot)
 	}
 	t := s.typeOfWorker(expression)
 	if _, literal := expression.(*RuntimeLiteralExpr); literal {
@@ -2633,7 +2704,7 @@ func (s *implementationChecker) checkYield(value RuntimeExpr, from bool, loc Tex
 		return c.GetUnknownType()
 	}
 	if !c.IsTypeAssignableTo(actual, s.yieldType) {
-		s.report(loc, fmt.Sprintf("yielded type %s is not assignable to %s", FormatType(c, actual), FormatType(c, s.yieldType)))
+		s.reportAssignability(loc, actual, s.yieldType)
 	}
 	if result == nil {
 		return c.GetUnknownType()
@@ -2858,7 +2929,7 @@ func (s *implementationChecker) typeOfCallWithContext(expression *RuntimeCallExp
 		Range: expression.Range(), Target: expression.Target.Range(), Callable: callable, Signature: resolution.Signature,
 	})
 	for _, diagnostic := range diagnostics {
-		s.report(expression.Range(), diagnostic.Message)
+		s.report(expression.Range(), s.objectCallMessage(diagnostic))
 	}
 	if resolution.Signature != nil {
 		if len(diagnostics) == 0 && forwardingValid && !isRuntimeNever(resolution.ReturnType) {
@@ -3368,4 +3439,21 @@ func (s *implementationChecker) typeOfComparison(expression *RuntimeComparisonEx
 
 func (s *implementationChecker) report(loc TextRange, message string) {
 	s.result.Diagnostics = append(s.result.Diagnostics, ImplementationDiagnostic{Range: loc, Message: message})
+}
+
+func (s *implementationChecker) reportAssignability(loc TextRange, source *checker.Type, target *checker.Type) {
+	s.report(loc, FormatAssignability(s.types.checker, source, target))
+}
+
+func (s *implementationChecker) objectCallMessage(diagnostic checker.ObjectCallDiagnostic) string {
+	if diagnostic.Source == nil || diagnostic.Target == nil {
+		return diagnostic.Message
+	}
+	c := s.types.checker
+	detail := FormatAssignability(c, diagnostic.Source, diagnostic.Target)
+	head := fmt.Sprintf("Argument of type '%s' is not assignable to parameter of type '%s'.", FormatType(c, diagnostic.Source), FormatType(c, diagnostic.Target))
+	if newline := strings.IndexByte(detail, '\n'); newline >= 0 {
+		head += detail[newline:]
+	}
+	return head
 }

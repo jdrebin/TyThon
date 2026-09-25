@@ -29,6 +29,7 @@ type RegistryAttributes = Extract(keyof Registry, *)
 type RegistryItemKeys = Exclude(keyof Registry, *)
 type VersionAttribute = Registry[*<"version">]
 type RegistryDictionary = {(K): Registry[K] for K in RegistryItemKeys}
+
 type RegistryClassShape = {version: int, retries: int}
 
 

@@ -122,6 +122,68 @@ def show(user: User):
 	}
 }
 
+func TestVisibleNameCompletionOrdersScopeAndMarksIncompatible(t *testing.T) {
+	const fileName = "/workspace/main.ty"
+	const source = `module_name = "m"
+
+def take(id: int):
+    local_name = "n"
+    take( )
+`
+	offset := strings.Index(source, " )")
+	recovered, query, ok := pythonfrontend.PrepareVisibleNameCompletion(source, offset)
+	if !ok {
+		t.Fatal("expected visible-name completion")
+	}
+	c, done := pythonfrontend.NewChecker()
+	defer done()
+	program := pythonfrontend.BuildProgram(c, []pythonfrontend.SourceInput{{FileName: fileName, Text: recovered}})
+	entries := program.VisibleNameCompletionsAt(fileName, query)
+	var local, module *pythonfrontend.CompletionEntry
+	for index := range entries {
+		switch entries[index].Label {
+		case "local_name":
+			local = &entries[index]
+		case "module_name":
+			module = &entries[index]
+		}
+	}
+	if local == nil || module == nil {
+		t.Fatalf("completions = %#v", entries)
+	}
+	if local.Distance >= module.Distance {
+		t.Fatalf("local distance %d, module distance %d", local.Distance, module.Distance)
+	}
+	if !local.Incompatible || local.Description != "not assignable" {
+		t.Fatalf("local = %#v, want not assignable to int", local)
+	}
+}
+
+func TestExpressionContinuationOffersAs(t *testing.T) {
+	const fileName = "main.ty"
+	source := "call_me(user )"
+	offset := strings.LastIndex(source, " ") + 1
+	recovered, query, ok := pythonfrontend.PrepareVisibleNameCompletion(source, offset)
+	if !ok || !query.AfterValue {
+		t.Fatalf("query = %#v, ok=%v", query, ok)
+	}
+	c, done := pythonfrontend.NewChecker()
+	defer done()
+	program := pythonfrontend.BuildProgram(c, []pythonfrontend.SourceInput{{FileName: fileName, Text: recovered}})
+	entries := program.VisibleNameCompletionsAt(fileName, query)
+	found := false
+	labels := make([]string, 0, len(entries))
+	for _, entry := range entries {
+		labels = append(labels, entry.Label)
+		if entry.Label == "as" && entry.Snippet && entry.InsertText == "as $0" {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("completions = %v", labels)
+	}
+}
+
 func TestTypeCompletionUsesDeclarationEnvironment(t *testing.T) {
 	const fileName = "/workspace/main.ty"
 	const source = `type User = { name: str }
@@ -194,6 +256,55 @@ result = identity("hello")
 	}
 }
 
+func TestOverrideCompletionFillsParentSignature(t *testing.T) {
+	const fileName = "syntax_highlighting.ty"
+	source := "declare class Box<T>:\n    def get(self) -> T: ...\n\ndeclare class Box2(Box<int>):\n    def g"
+	offset := len(source)
+	query, ok := pythonfrontend.PrepareDefinitionCompletion(source, offset)
+	if !ok || query.ClassName != "Box2" || !query.Ambient || query.Prefix != "g" {
+		t.Fatalf("query = %#v, ok=%v", query, ok)
+	}
+	c, done := pythonfrontend.NewChecker()
+	defer done()
+	program := pythonfrontend.BuildProgram(c, []pythonfrontend.SourceInput{{FileName: fileName, Text: source}})
+	entries := program.DefinitionCompletionsAt(fileName, query)
+	found := false
+	for _, entry := range entries {
+		if entry.Label != "get" {
+			continue
+		}
+		found = true
+		if !strings.Contains(entry.InsertText, "get(self) -> int") || !strings.Contains(entry.Documentation, "-> int") {
+			t.Fatalf("get = %#v", entry)
+		}
+	}
+	if !found {
+		t.Fatalf("missing get: %#v", entries)
+	}
+}
+
+func TestStatementCompletionOffersType(t *testing.T) {
+	source := "t"
+	_, query, ok := pythonfrontend.PrepareVisibleNameCompletion(source, len(source))
+	if !ok || !query.StatementStart {
+		t.Fatalf("query = %#v", query)
+	}
+	labels := map[string]bool{}
+	for _, entry := range pythonfrontend.DefinitionCompletions(pythonfrontend.DefinitionCompletionQuery{}) {
+		labels[entry.Label] = true
+	}
+	c, done := pythonfrontend.NewChecker()
+	defer done()
+	recovered, query, _ := pythonfrontend.PrepareVisibleNameCompletion(source, len(source))
+	program := pythonfrontend.BuildProgram(c, []pythonfrontend.SourceInput{{FileName: "main.ty", Text: recovered}})
+	for _, entry := range program.VisibleNameCompletionsAt("main.ty", query) {
+		labels[entry.Label] = true
+	}
+	if !labels["type"] {
+		t.Fatalf("labels = %v", labels)
+	}
+}
+
 func TestDefinitionCompletionExpandsDunderInit(t *testing.T) {
 	source := "class User:\n    def __in"
 	offset := len(source)
@@ -217,5 +328,26 @@ func TestDefinitionCompletionExpandsDunderInit(t *testing.T) {
 	}
 	if !found {
 		t.Fatalf("missing __init__: %#v", entries)
+	}
+}
+
+func TestDefinitionCompletionInTypeBodyIsASignature(t *testing.T) {
+	for _, source := range []string{
+		"type Greeter = {\n    def __in",
+		"interface Box:\n    def __in",
+	} {
+		query, ok := pythonfrontend.PrepareDefinitionCompletion(source, len(source))
+		if !ok || !query.Signature || query.Ambient {
+			t.Fatalf("source %q query = %#v, %v", source, query, ok)
+		}
+		entries := pythonfrontend.DefinitionCompletions(query)
+		for _, entry := range entries {
+			if entry.Label != "__init__" {
+				continue
+			}
+			if strings.Contains(entry.InsertText, ":") || strings.Contains(entry.InsertText, "\n") || entry.InsertText != "__init__(self)" {
+				t.Fatalf("source %q insert = %q", source, entry.InsertText)
+			}
+		}
 	}
 }

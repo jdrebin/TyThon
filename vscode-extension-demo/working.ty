@@ -9,7 +9,7 @@ def choose_name<E extends bool>(name: str, enabled: E) -> str if E extends True 
    if enabled:
        return name as (str if E extends True else never)
    else:
-         return None as (never if E extends True else None)
+        return None as (never if E extends True else None)
 
 
 # Hover over these expressions to see their inferred types.

@@ -1113,7 +1113,7 @@ func (e *CheckerTypeEnvironment) checkIndexConstraints(t *checker.Type, loc Text
 		return
 	}
 	for _, conflict := range e.checker.CheckPythonIndexConstraints(t) {
-		e.reportChecker(loc, fmt.Sprintf("member %s of type %s is not assignable to %s index type %s", FormatType(e.checker, conflict.Key), FormatType(e.checker, conflict.Value), FormatType(e.checker, conflict.IndexKey), FormatType(e.checker, conflict.IndexValue)))
+		e.reportChecker(loc, fmt.Sprintf("member %s is not assignable to %s index type %s\n%s", FormatType(e.checker, conflict.Key), FormatType(e.checker, conflict.IndexKey), FormatType(e.checker, conflict.IndexValue), FormatAssignability(e.checker, conflict.Value, conflict.IndexValue)))
 	}
 }
 

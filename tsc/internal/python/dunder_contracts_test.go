@@ -20,10 +20,10 @@ func TestClosedDundersRejectBadEqAndBool(t *testing.T) {
 		messages = append(messages, diagnostic.Message)
 	}
 	joined := strings.Join(messages, "\n")
-	if !strings.Contains(joined, "__eq__ must accept other: object") {
+	if !strings.Contains(joined, "incompatible attribute override for \"__eq__\"") {
 		t.Fatalf("diagnostics = %v", messages)
 	}
-	if strings.Count(joined, "not assignable to bool") < 2 {
+	if strings.Count(joined, "not assignable to type 'bool'") < 2 {
 		t.Fatalf("diagnostics = %v", messages)
 	}
 }
@@ -296,7 +296,7 @@ outside: self = 1
 	if !strings.Contains(joined, "self is only valid in a class or interface") {
 		t.Fatalf("diagnostics = %v, want self outside a class", program.Diagnostics)
 	}
-	if !strings.Contains(joined, "not assignable to self &") {
+	if !strings.Contains(joined, "not assignable to type 'self") {
 		t.Fatalf("diagnostics = %v, want returning self rejected for the intersection", program.Diagnostics)
 	}
 }
