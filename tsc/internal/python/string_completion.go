@@ -4,7 +4,7 @@ import (
 	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/internal/checker"
-	"github.com/microsoft/TypeScript/tsc/internal/ls"
+	"github.com/microsoft/TypeScript/tsc/internal/collections"
 )
 
 type StringCompletionQuery struct {
@@ -100,7 +100,7 @@ func (p *PythonProgram) StringCompletionsAt(fileName string, query StringComplet
 	seen := map[string]bool{}
 	var entries []CompletionEntry
 	add := func(t *checker.Type) {
-		for _, literal := range ls.GetStringLiteralCompletionTypes(t, c) {
+		for _, literal := range stringLiteralCompletionTypes(t, c) {
 			label, insert, _ := formatItemCompletion(c, literal, query.Quote)
 			if query.Raw {
 				if strings.ContainsAny(label, string(query.Quote)+"\r\n") || strings.HasSuffix(label, "\\") {
@@ -127,7 +127,7 @@ func (p *PythonProgram) StringCompletionsAt(fileName string, query StringComplet
 			if _, attribute := c.GetPythonAttributeNameType(info.KeyType()); attribute {
 				continue
 			}
-			for _, literal := range ls.GetStringLiteralCompletionTypes(info.KeyType(), c) {
+			for _, literal := range stringLiteralCompletionTypes(info.KeyType(), c) {
 				used := false
 				for _, key := range context.UsedKeys {
 					if key.Range.Start != query.Offset && c.IsTypeIdenticalTo(literal, key.Type) {
@@ -186,4 +186,33 @@ func completionInsideComment(source string, offset int) bool {
 		}
 	}
 	return false
+}
+
+func stringLiteralCompletionTypes(t *checker.Type, typeChecker *checker.Checker) []*checker.StringLiteralType {
+	return stringLiteralTypes(t, nil, typeChecker)
+}
+
+func stringLiteralTypes(t *checker.Type, uniques *collections.Set[string], typeChecker *checker.Checker) []*checker.StringLiteralType {
+	if t == nil {
+		return nil
+	}
+	if uniques == nil {
+		uniques = &collections.Set[string]{}
+	}
+	if t.IsTypeParameter() {
+		if c := typeChecker.GetBaseConstraintOfType(t); c != nil {
+			t = c
+		}
+	}
+	if t.IsUnion() {
+		var types []*checker.StringLiteralType
+		for _, elementType := range t.Types() {
+			types = append(types, stringLiteralTypes(elementType, uniques, typeChecker)...)
+		}
+		return types
+	}
+	if t.IsStringLiteral() && !t.IsEnumLiteral() && uniques.AddIfAbsent(t.AsLiteralType().Value().(string)) {
+		return []*checker.StringLiteralType{t}
+	}
+	return nil
 }

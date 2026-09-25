@@ -6,7 +6,6 @@ import (
 	"github.com/microsoft/TypeScript/tsc/internal/module"
 	"github.com/microsoft/TypeScript/tsc/internal/packagejson"
 	"github.com/microsoft/TypeScript/tsc/internal/symlinks"
-	"github.com/microsoft/TypeScript/tsc/internal/tsoptions"
 	"github.com/microsoft/TypeScript/tsc/internal/tspath"
 )
 
@@ -55,7 +54,7 @@ type ModuleSpecifierGenerationHost interface {
 	UseCaseSensitiveFileNames() bool
 	GetCurrentDirectory() string
 
-	GetProjectReferenceFromSource(path tspath.Path) *tsoptions.SourceOutputAndProjectReference
+	GetProjectReferenceFromSource(path tspath.Path) core.OutputProjectReference
 	GetRedirectTargets(path tspath.Path) []string
 	GetSourceOfProjectReferenceIfOutputIncluded(file ast.HasFileName) string
 

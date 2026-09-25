@@ -10,7 +10,6 @@ import (
 	"github.com/microsoft/TypeScript/tsc/internal/debug"
 	"github.com/microsoft/TypeScript/tsc/internal/diagnostics"
 	"github.com/microsoft/TypeScript/tsc/internal/jsnum"
-	"github.com/microsoft/TypeScript/tsc/internal/parser"
 	"github.com/microsoft/TypeScript/tsc/internal/scanner"
 )
 
@@ -1432,18 +1431,8 @@ func (c *Checker) getJsxFragmentFactoryEntity(location *ast.Node) *ast.EntityNam
 	return nil
 }
 
-func (c *Checker) parseIsolatedEntityName(name string) *ast.Node {
-	result := parser.ParseIsolatedEntityName(name)
-	if result != nil {
-		markAsSynthetic(result)
-	}
-	return result
-}
-
-func markAsSynthetic(node *ast.Node) bool {
-	node.Loc = core.NewTextRange(-1, -1)
-	node.ForEachChild(markAsSynthetic)
-	return false
+func (c *Checker) parseIsolatedEntityName(string) *ast.Node {
+	return nil
 }
 
 func (c *Checker) getJsxNamespaceContainerForImplicitImport(location *ast.Node) *ast.Symbol {

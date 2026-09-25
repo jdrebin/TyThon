@@ -304,3 +304,22 @@ profile: Profile
 	assert.Assert(t, diagnosticResponse.FullDocumentDiagnosticReport != nil)
 	assert.Assert(t, len(diagnosticResponse.FullDocumentDiagnosticReport.Items) != 0)
 }
+
+func completionItems(resp lsproto.CompletionResponse) []*lsproto.CompletionItem {
+	if resp.List != nil {
+		return resp.List.Items
+	}
+	if resp.Items != nil {
+		return *resp.Items
+	}
+	return nil
+}
+
+func findCompletionItem(items []*lsproto.CompletionItem, label string) *lsproto.CompletionItem {
+	for _, item := range items {
+		if item.Label == label {
+			return item
+		}
+	}
+	return nil
+}

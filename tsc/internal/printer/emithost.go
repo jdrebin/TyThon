@@ -3,7 +3,6 @@ package printer
 import (
 	"github.com/microsoft/TypeScript/tsc/internal/ast"
 	"github.com/microsoft/TypeScript/tsc/internal/core"
-	"github.com/microsoft/TypeScript/tsc/internal/tsoptions"
 	"github.com/microsoft/TypeScript/tsc/internal/tspath"
 )
 
@@ -18,6 +17,6 @@ type EmitHost interface {
 	WriteFile(fileName string, text string) error
 	GetEmitModuleFormatOfFile(file ast.HasFileName) core.ModuleKind
 	GetEmitResolver() EmitResolver
-	GetProjectReferenceFromSource(path tspath.Path) *tsoptions.SourceOutputAndProjectReference
+	GetProjectReferenceFromSource(path tspath.Path) core.OutputProjectReference
 	IsSourceFileFromExternalLibrary(file *ast.SourceFile) bool
 }

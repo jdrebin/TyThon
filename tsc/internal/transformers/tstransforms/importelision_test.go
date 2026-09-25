@@ -15,7 +15,6 @@ import (
 	"github.com/microsoft/TypeScript/tsc/internal/testutil/parsetestutil"
 	"github.com/microsoft/TypeScript/tsc/internal/transformers"
 	"github.com/microsoft/TypeScript/tsc/internal/transformers/tstransforms"
-	"github.com/microsoft/TypeScript/tsc/internal/tsoptions"
 	"github.com/microsoft/TypeScript/tsc/internal/tspath"
 )
 
@@ -31,7 +30,7 @@ type fakeProgram struct {
 }
 
 // GetRedirectForResolution implements checker.Program.
-func (p *fakeProgram) GetRedirectForResolution(file ast.HasFileName) *tsoptions.ParsedCommandLine {
+func (p *fakeProgram) GetRedirectForResolution(file ast.HasFileName) core.ResolutionRedirect {
 	panic("unimplemented")
 }
 
@@ -94,7 +93,7 @@ func (p *fakeProgram) GetSourceOfProjectReferenceIfOutputIncluded(file ast.HasFi
 	return ""
 }
 
-func (p *fakeProgram) GetProjectReferenceFromSource(path tspath.Path) *tsoptions.SourceOutputAndProjectReference {
+func (p *fakeProgram) GetProjectReferenceFromSource(path tspath.Path) core.OutputProjectReference {
 	return nil
 }
 
@@ -106,7 +105,7 @@ func (p *fakeProgram) GetPackagesMap() map[string]bool {
 	return nil
 }
 
-func (p *fakeProgram) GetProjectReferenceFromOutputDts(path tspath.Path) *tsoptions.SourceOutputAndProjectReference {
+func (p *fakeProgram) GetProjectReferenceFromOutputDts(path tspath.Path) core.OutputProjectReference {
 	return nil
 }
 

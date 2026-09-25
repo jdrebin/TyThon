@@ -112,6 +112,20 @@ type SourceOutputAndProjectReference struct {
 	Resolved  *ParsedCommandLine
 }
 
+func (s *SourceOutputAndProjectReference) OutputDtsPath() string {
+	if s == nil {
+		return ""
+	}
+	return s.OutputDts
+}
+
+func (s *SourceOutputAndProjectReference) ResolvedCompilerOptions() *core.CompilerOptions {
+	if s == nil || s.Resolved == nil {
+		return nil
+	}
+	return s.Resolved.CompilerOptions()
+}
+
 var (
 	_ module.ResolvedProjectReference = (*ParsedCommandLine)(nil)
 	_ outputpaths.OutputPathsHost     = (*ParsedCommandLine)(nil)

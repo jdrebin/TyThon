@@ -190,17 +190,17 @@ func (r *aliasResolver) GetPackageJsonInfo(pkgJsonPath string) *packagejson.Info
 }
 
 // GetProjectReferenceFromOutputDts implements checker.Program.
-func (r *aliasResolver) GetProjectReferenceFromOutputDts(path tspath.Path) *tsoptions.SourceOutputAndProjectReference {
+func (r *aliasResolver) GetProjectReferenceFromOutputDts(path tspath.Path) core.OutputProjectReference {
 	panic("unimplemented")
 }
 
 // GetProjectReferenceFromSource implements checker.Program.
-func (r *aliasResolver) GetProjectReferenceFromSource(path tspath.Path) *tsoptions.SourceOutputAndProjectReference {
+func (r *aliasResolver) GetProjectReferenceFromSource(path tspath.Path) core.OutputProjectReference {
 	panic("unimplemented")
 }
 
 // GetRedirectForResolution implements checker.Program.
-func (r *aliasResolver) GetRedirectForResolution(file ast.HasFileName) *tsoptions.ParsedCommandLine {
+func (r *aliasResolver) GetRedirectForResolution(file ast.HasFileName) core.ResolutionRedirect {
 	panic("unimplemented")
 }
 

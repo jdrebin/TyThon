@@ -12,7 +12,6 @@ import (
 	"github.com/microsoft/TypeScript/tsc/internal/core"
 	"github.com/microsoft/TypeScript/tsc/internal/module"
 	"github.com/microsoft/TypeScript/tsc/internal/packagejson"
-	"github.com/microsoft/TypeScript/tsc/internal/tsoptions"
 	"github.com/microsoft/TypeScript/tsc/internal/tspath"
 )
 
@@ -194,12 +193,13 @@ func extensionFromPath(path string) string {
 func tryGetAnyFileFromPath(host ModuleSpecifierGenerationHost, path string) bool {
 	// !!! TODO: shouldn't this use readdir instead of fileexists for perf?
 	// We check all js, `node` and `json` extensions in addition to TS, since node module resolution would also choose those over the directory
-	extGroups := tsoptions.GetSupportedExtensions(
-		&core.CompilerOptions{
-			AllowJs: core.TSTrue,
-		},
-		[]string{".node", ".json"},
-	)
+	extGroups := tspath.AllSupportedExtensions
+	flatBuiltins := core.Flatten(extGroups)
+	for _, ext := range []string{".node", ".json"} {
+		if !slices.Contains(flatBuiltins, ext) {
+			extGroups = append(extGroups, []string{ext})
+		}
+	}
 	for _, exts := range extGroups {
 		for _, e := range exts {
 			fullPath := path + e

@@ -79,7 +79,7 @@ func (host *emitHost) GetSourceOfProjectReferenceIfOutputIncluded(file ast.HasFi
 	return host.program.GetSourceOfProjectReferenceIfOutputIncluded(file)
 }
 
-func (host *emitHost) GetProjectReferenceFromSource(path tspath.Path) *tsoptions.SourceOutputAndProjectReference {
+func (host *emitHost) GetProjectReferenceFromSource(path tspath.Path) core.OutputProjectReference {
 	return host.program.GetProjectReferenceFromSource(path)
 }
 

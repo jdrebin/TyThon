@@ -5,10 +5,7 @@ import (
 	"sync"
 
 	"github.com/microsoft/TypeScript/tsc/internal/lsp/lsproto"
-	"github.com/microsoft/TypeScript/tsc/internal/project/logging"
 )
-
-var _ logging.Logger = (*logger)(nil)
 
 type logger struct {
 	server    *Server
@@ -89,7 +86,7 @@ func (l *logger) Logf(format string, args ...any) {
 	l.sendLogMessage(lsproto.MessageTypeInfo, fmt.Sprintf(format, args...))
 }
 
-func (l *logger) Verbose() logging.Logger {
+func (l *logger) Verbose() *logger {
 	if l == nil {
 		return nil
 	}

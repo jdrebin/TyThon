@@ -8,7 +8,6 @@ import (
 	"github.com/microsoft/TypeScript/tsc/internal/module"
 	"github.com/microsoft/TypeScript/tsc/internal/packagejson"
 	"github.com/microsoft/TypeScript/tsc/internal/symlinks"
-	"github.com/microsoft/TypeScript/tsc/internal/tsoptions"
 	"github.com/microsoft/TypeScript/tsc/internal/tspath"
 )
 
@@ -48,7 +47,7 @@ func (h *mockModuleSpecifierGenerationHost) ContentMapperExtensions() []string {
 	return h.contentMapperExtensions
 }
 
-func (h *mockModuleSpecifierGenerationHost) GetProjectReferenceFromSource(path tspath.Path) *tsoptions.SourceOutputAndProjectReference {
+func (h *mockModuleSpecifierGenerationHost) GetProjectReferenceFromSource(path tspath.Path) core.OutputProjectReference {
 	return nil
 }
 

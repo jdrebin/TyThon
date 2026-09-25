@@ -11,7 +11,6 @@ import (
 	"unicode/utf8"
 
 	"github.com/microsoft/TypeScript/tsc/internal/checker"
-	"github.com/microsoft/TypeScript/tsc/internal/ls"
 	"github.com/microsoft/TypeScript/tsc/internal/ls/lsconv"
 	"github.com/microsoft/TypeScript/tsc/internal/lsp/lsproto"
 	pythonfrontend "github.com/microsoft/TypeScript/tsc/internal/python"
@@ -27,11 +26,7 @@ type pythonDocument struct {
 // declaration selection differ from the TypeScript syntax service.
 func registerPythonDefinitionHandlers(handlers handlerMap) {
 	for _, method := range []lsproto.Method{lsproto.MethodTextDocumentDefinition, lsproto.MethodCustomTextDocumentSourceDefinition} {
-		fallback := handlers[method]
 		handlers[method] = func(s *Server, ctx context.Context, req *lsproto.RequestMessage) (func() error, error) {
-			if !s.pythonMode {
-				return fallback(s, ctx, req)
-			}
 			params, err := lsproto.UnmarshalParams[*lsproto.TextDocumentPositionParams](req)
 			if err != nil {
 				return nil, err
@@ -260,7 +255,7 @@ func (s *pythonLanguageService) computeCompletion(ctx context.Context, params *l
 		if !startOK || !endOK {
 			continue
 		}
-		sortText := string(ls.SortTextLocationPriority)
+		sortText := "11"
 		if entry.Kind == pythonfrontend.CompletionKindKeyword {
 			sortText = "11"
 		} else if entry.Kind != pythonfrontend.CompletionKindKeywordArgument {
@@ -273,13 +268,13 @@ func (s *pythonLanguageService) computeCompletion(ctx context.Context, params *l
 		if entry.Kind == pythonfrontend.CompletionKindKeywordArgument {
 			// Use the language service's existing local-declaration tier so named
 			// parameters sort before ordinary visible names inside a call.
-			sortText = string(ls.SortTextLocalDeclarationPriority)
+			sortText = "10"
 		} else if len(entry.Label) >= 2 && entry.Label[:2] == "__" && !definitionOK {
 			// Keep Python's common object dunders discoverable without allowing
 			// them to outrank ordinary members in clients that re-sort results.
-			sortText = string(ls.SortTextOptionalMember)
+			sortText = "12"
 		} else if definitionOK && entry.Label == "__init__" {
-			sortText = string(ls.SortTextLocalDeclarationPriority)
+			sortText = "10"
 		}
 		var filterText *string
 		if entry.Kind == pythonfrontend.CompletionKindItem {

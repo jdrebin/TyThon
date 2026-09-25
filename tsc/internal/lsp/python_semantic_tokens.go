@@ -5,18 +5,13 @@ import (
 	"path/filepath"
 
 	"github.com/microsoft/TypeScript/tsc/internal/ast"
-	"github.com/microsoft/TypeScript/tsc/internal/ls"
 	"github.com/microsoft/TypeScript/tsc/internal/lsp/lsproto"
 	pythonfrontend "github.com/microsoft/TypeScript/tsc/internal/python"
 )
 
 func registerPythonSemanticTokenHandlers(handlers handlerMap) {
 	for _, method := range []lsproto.Method{lsproto.MethodTextDocumentSemanticTokensFull, lsproto.MethodTextDocumentSemanticTokensRange} {
-		fallback := handlers[method]
 		handlers[method] = func(s *Server, ctx context.Context, req *lsproto.RequestMessage) (func() error, error) {
-			if !s.pythonMode {
-				return fallback(s, ctx, req)
-			}
 			params, err := lsproto.UnmarshalParams[*lsproto.SemanticTokensParams](req)
 			if err != nil {
 				return nil, err
@@ -57,7 +52,7 @@ func (s *pythonLanguageService) computeSemanticTokens(ctx context.Context, uri l
 	if len(program.Modules) == 0 {
 		return lsproto.SemanticTokensOrNull{}, nil
 	}
-	entries := []ls.FrontendSemanticToken{}
+	entries := []FrontendSemanticToken{}
 	for _, info := range program.SemanticIdentifiers(fileName, source) {
 		start, startOK := pythonPositionAt(source, info.Range.Start, encoding)
 		end, endOK := pythonPositionAt(source, info.Range.End, encoding)
@@ -88,8 +83,8 @@ func (s *pythonLanguageService) computeSemanticTokens(ctx context.Context, uri l
 		case pythonfrontend.QuickInfoTypeParameter:
 			kind = ast.KindTypeParameter
 		}
-		entries = append(entries, ls.FrontendSemanticToken{Range: lsproto.Range{Start: start, End: end}, DeclarationKind: kind, Type: info.Type, Readonly: info.Readonly, Async: info.Async})
+		entries = append(entries, FrontendSemanticToken{Range: lsproto.Range{Start: start, End: end}, DeclarationKind: kind, Type: info.Type, Readonly: info.Readonly, Async: info.Async})
 	}
-	data := ls.SemanticTokensForFrontend(ctx, program.Modules[0].Types.Checker(), entries)
+	data := SemanticTokensForFrontend(ctx, program.Modules[0].Types.Checker(), entries)
 	return lsproto.SemanticTokensOrNull{SemanticTokens: &lsproto.SemanticTokens{Data: data}}, nil
 }

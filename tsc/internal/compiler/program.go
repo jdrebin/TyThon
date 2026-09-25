@@ -185,7 +185,7 @@ func (p *Program) GetSourceOfProjectReferenceIfOutputIncluded(file ast.HasFileNa
 }
 
 // GetProjectReferenceFromSource implements checker.Program.
-func (p *Program) GetProjectReferenceFromSource(path tspath.Path) *tsoptions.SourceOutputAndProjectReference {
+func (p *Program) GetProjectReferenceFromSource(path tspath.Path) core.OutputProjectReference {
 	return p.projectReferenceFileMapper.getProjectReferenceFromSource(path)
 }
 
@@ -194,7 +194,7 @@ func (p *Program) IsSourceFromProjectReference(path tspath.Path) bool {
 	return p.projectReferenceFileMapper.isSourceFromProjectReference(path)
 }
 
-func (p *Program) GetProjectReferenceFromOutputDts(path tspath.Path) *tsoptions.SourceOutputAndProjectReference {
+func (p *Program) GetProjectReferenceFromOutputDts(path tspath.Path) core.OutputProjectReference {
 	return p.projectReferenceFileMapper.getProjectReferenceFromOutputDts(path)
 }
 
@@ -202,7 +202,7 @@ func (p *Program) GetResolvedProjectReferenceFor(path tspath.Path) (*tsoptions.P
 	return p.projectReferenceFileMapper.getResolvedReferenceFor(path)
 }
 
-func (p *Program) GetRedirectForResolution(file ast.HasFileName) *tsoptions.ParsedCommandLine {
+func (p *Program) GetRedirectForResolution(file ast.HasFileName) core.ResolutionRedirect {
 	redirect, _ := p.projectReferenceFileMapper.getRedirectForResolution(file)
 	return redirect
 }
