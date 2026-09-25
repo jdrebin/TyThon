@@ -12,6 +12,8 @@ type—all using the adapted TypeScript checker, not a new inference engine.
 ordinary `.py` files. No replacement runtime, injected validation, or dispatch
 machinery.
 
+**[Color guide](docs/guide.html)** — open in a browser. Full color, hovers, and the TypeScript comparison. GitHub's README renderer cannot do that.
+
 [Try it](#try-it) · [Language guide](#language-guide) · [Library possibilities](#what-this-could-unlock-for-libraries) · [Current limitations](#current-limitations) · [Help shape tython](#help-shape-tython)
 
 > **Development preview.** The checker and editor integration are working, but
