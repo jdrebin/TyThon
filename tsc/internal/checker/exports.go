@@ -3,9 +3,9 @@
 package checker
 
 import (
-	"github.com/microsoft/TypeScript/tsc/internal/ast"
-	"github.com/microsoft/TypeScript/tsc/internal/diagnostics"
-	"github.com/microsoft/TypeScript/tsc/internal/jsnum"
+	"github.com/jdrebin/TyThon/tsc/internal/ast"
+	"github.com/jdrebin/TyThon/tsc/internal/diagnostics"
+	"github.com/jdrebin/TyThon/tsc/internal/jsnum"
 )
 
 func (c *Checker) GetStringType() *Type {

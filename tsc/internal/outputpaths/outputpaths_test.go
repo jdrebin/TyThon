@@ -3,7 +3,7 @@ package outputpaths_test
 import (
 	"testing"
 
-	"github.com/microsoft/TypeScript/tsc/internal/outputpaths"
+	"github.com/jdrebin/TyThon/tsc/internal/outputpaths"
 	"gotest.tools/v3/assert"
 )
 

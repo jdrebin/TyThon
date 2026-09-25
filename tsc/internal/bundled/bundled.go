@@ -7,8 +7,8 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/microsoft/TypeScript/tsc/internal/tspath"
-	"github.com/microsoft/TypeScript/tsc/internal/vfs"
+	"github.com/jdrebin/TyThon/tsc/internal/tspath"
+	"github.com/jdrebin/TyThon/tsc/internal/vfs"
 )
 
 //go:generate go run generate.go

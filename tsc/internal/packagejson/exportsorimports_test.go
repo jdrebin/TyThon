@@ -3,8 +3,8 @@ package packagejson_test
 import (
 	"testing"
 
-	"github.com/microsoft/TypeScript/tsc/internal/json"
-	"github.com/microsoft/TypeScript/tsc/internal/packagejson"
+	"github.com/jdrebin/TyThon/tsc/internal/json"
+	"github.com/jdrebin/TyThon/tsc/internal/packagejson"
 	"gotest.tools/v3/assert"
 )
 

@@ -26,11 +26,11 @@ for (const name of changed) {
     assert(read(name).slice(0, 4096).includes("Modified for tython"), `Missing prominent change notice: ${name}`);
 }
 for (const name of ["licenses/LICENSE.vscode.txt", "licenses/LICENSE.pyright.txt", "syntaxes/LICENSE.magicpython"]) {
-    const text = read(`packages/vscode-python-typescript/${name}`);
+    const text = read(`packages/vscode-tython/${name}`);
     assert(text.includes("Permission is hereby granted") && text.includes("Copyright"), `Missing component license: ${name}`);
 }
-assert(read("packages/vscode-python-typescript/src/hover.ts").includes("Copyright (c) Microsoft Corporation"));
-assert(read("packages/vscode-python-typescript/src/hover.ts").includes("Modified for tython"));
-assert(read("packages/vscode-python-typescript/src/vendor/pyrightTypeServerProtocol.ts").includes("Copyright (c) Microsoft Corporation"));
+assert(read("packages/vscode-tython/src/hover.ts").includes("Copyright (c) Microsoft Corporation"));
+assert(read("packages/vscode-tython/src/hover.ts").includes("Modified for tython"));
+assert(read("packages/vscode-tython/src/vendor/pyrightTypeServerProtocol.ts").includes("Copyright (c) Microsoft Corporation"));
 assert(existsSync(new URL("../../docs/LICENSING.md", import.meta.url)));
 console.log(`Reuse notices checked: ${inheritedLegal.length} upstream legal files, ${changed.length} modified inherited files, and known copied components. Manual review still required for new copies/dependencies.`);

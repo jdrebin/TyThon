@@ -273,7 +273,7 @@ export const lib = task({
 function getReleaseBuildFlags(versionOverride) {
     let ldflags = "-ldflags=-s -w";
     if (versionOverride) {
-        ldflags += ` -X github.com/microsoft/TypeScript/tsc/internal/core.version=${versionOverride}`;
+        ldflags += ` -X github.com/jdrebin/TyThon/tsc/internal/core.version=${versionOverride}`;
     }
     return ["-trimpath", ldflags];
 }
@@ -305,7 +305,7 @@ export const tscBuild = task({
 });
 
 export const tsgo = task({
-    name: "tsgo",
+    name: "tython",
     dependencies: [lib, tscBuild],
 });
 
@@ -351,7 +351,7 @@ export const buildWatch = task({
             }
 
             if (goChanged) {
-                console.log("Building tsgo...");
+                console.log("Building tython...");
                 await buildTsc({ abortSignal });
             }
         }, {
@@ -780,7 +780,7 @@ async function computeGoGroundTruth(generatedEnums) {
      */
     function getPackageName(def) {
         const dir = path.dirname(def.goFile);
-        const importPath = `github.com/microsoft/TypeScript/tsc/${dir.replace(/^tsc[\\/]/, "")}`.replace(/\\/g, "/");
+        const importPath = `github.com/jdrebin/TyThon/tsc/${dir.replace(/^tsc[\\/]/, "")}`.replace(/\\/g, "/");
         let info = packagesByDir.get(dir);
         if (info === undefined) {
             info = { importPath, pkgName: path.basename(dir) };
@@ -2443,7 +2443,7 @@ export const signNativePreviewPackages = task({
  * @param {string} nodeOs
  */
 function nativePreviewExeName(nodeOs) {
-    const baseName = publishAsTypescript ? "tsc" : "tsgo";
+    const baseName = "tython";
     return nodeOs === "win32" ? `${baseName}.exe` : baseName;
 }
 

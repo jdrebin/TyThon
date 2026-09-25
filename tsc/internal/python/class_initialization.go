@@ -3,7 +3,7 @@ package python
 import (
 	"fmt"
 
-	"github.com/microsoft/TypeScript/tsc/internal/checker"
+	"github.com/jdrebin/TyThon/tsc/internal/checker"
 )
 
 // Constructor presence uses the same references and native TS flow joins as

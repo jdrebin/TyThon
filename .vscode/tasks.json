@@ -89,7 +89,7 @@
             "type": "process",
             "command": "node",
             "args": [
-                "${workspaceFolder}/packages/vscode-python-typescript/scripts/prepare-demo.mjs"
+                "${workspaceFolder}/packages/vscode-tython/scripts/prepare-demo.mjs"
             ],
             "problemMatcher": [],
             "presentation": {

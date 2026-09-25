@@ -22,7 +22,7 @@ npm run -w tython demo:prepare
 Then launch an Extension Development Host with this directory already open:
 
 ```bash
-code --extensionDevelopmentPath="$PWD/packages/vscode-python-typescript" "$PWD/vscode-extension-demo/python-typescript-demo.code-workspace"
+code --extensionDevelopmentPath="$PWD/packages/vscode-tython" "$PWD/vscode-extension-demo/python-typescript-demo.code-workspace"
 ```
 
 In the new window:
@@ -101,8 +101,8 @@ that service rather than replacing its checker.
 Jedi and Ruff now supplement the native `.ty` checker. In the repository root:
 
 ```sh
-npm run tools:prepare --workspace packages/vscode-python-typescript
-npm run demo:prepare --workspace packages/vscode-python-typescript
+npm run tools:prepare --workspace packages/vscode-tython
+npm run demo:prepare --workspace packages/vscode-tython
 ```
 
 Restart the extension development host, then open `python_tools.ty` for library

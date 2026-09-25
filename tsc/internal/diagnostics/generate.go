@@ -23,8 +23,8 @@ import (
 	"unicode"
 
 	"github.com/klauspost/compress/gzip"
-	"github.com/microsoft/TypeScript/tsc/internal/collections"
-	"github.com/microsoft/TypeScript/tsc/internal/json"
+	"github.com/jdrebin/TyThon/tsc/internal/collections"
+	"github.com/jdrebin/TyThon/tsc/internal/json"
 	"golang.org/x/text/language"
 )
 
@@ -186,7 +186,7 @@ func generateLocalizations(knownKeys map[string]bool, locDir string) *bytes.Buff
 	buf.WriteString("\t\"strings\"\n")
 	buf.WriteString("\t\"sync\"\n")
 	buf.WriteString("\t\"golang.org/x/text/language\"\n")
-	buf.WriteString("\t\"github.com/microsoft/TypeScript/tsc/internal/json\"\n")
+	buf.WriteString("\t\"github.com/jdrebin/TyThon/tsc/internal/json\"\n")
 	buf.WriteString(")\n")
 
 	// Remove and recreate the loc directory for a clean state

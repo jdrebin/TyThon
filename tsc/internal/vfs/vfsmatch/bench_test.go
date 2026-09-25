@@ -3,9 +3,9 @@ package vfsmatch
 import (
 	"testing"
 
-	"github.com/microsoft/TypeScript/tsc/internal/vfs"
-	"github.com/microsoft/TypeScript/tsc/internal/vfs/cachedvfs"
-	"github.com/microsoft/TypeScript/tsc/internal/vfs/vfstest"
+	"github.com/jdrebin/TyThon/tsc/internal/vfs"
+	"github.com/jdrebin/TyThon/tsc/internal/vfs/cachedvfs"
+	"github.com/jdrebin/TyThon/tsc/internal/vfs/vfstest"
 )
 
 // Benchmark test cases using the same hosts as the unit tests

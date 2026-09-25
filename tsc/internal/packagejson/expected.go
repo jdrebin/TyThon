@@ -3,7 +3,7 @@ package packagejson
 import (
 	"reflect"
 
-	"github.com/microsoft/TypeScript/tsc/internal/json"
+	"github.com/jdrebin/TyThon/tsc/internal/json"
 )
 
 type Expected[T any] struct {

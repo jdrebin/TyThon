@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/microsoft/TypeScript/tsc/internal/lsp/lsproto"
+	"github.com/jdrebin/TyThon/tsc/internal/lsp/lsproto"
 )
 
 func TestPythonRequestsCancelOnDocumentChange(t *testing.T) {

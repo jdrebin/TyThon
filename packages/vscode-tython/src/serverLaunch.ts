@@ -36,7 +36,7 @@ export function createContainedLaunch(command: string, args: string[], extension
     if (platform !== "linux" || !limits.linuxContainment) {
         return { command, args, unit: undefined, managerArgs: [] };
     }
-    const unit = `typed-python-${randomUUID()}.service`;
+    const unit = `tython-${randomUUID()}.service`;
     const managerArgs = root ? [] : ["--user"];
     const memoryBytes = String(limits.memoryMiB * 1024 * 1024);
     const swapBytes = String(limits.swapMiB * 1024 * 1024);

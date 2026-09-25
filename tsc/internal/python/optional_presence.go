@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/microsoft/TypeScript/tsc/internal/checker"
+	"github.com/jdrebin/TyThon/tsc/internal/checker"
 )
 
 const presencePrefix = "#presence:"

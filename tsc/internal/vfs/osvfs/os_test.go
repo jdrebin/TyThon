@@ -7,9 +7,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/microsoft/TypeScript/tsc/internal/repo"
-	"github.com/microsoft/TypeScript/tsc/internal/tspath"
-	"github.com/microsoft/TypeScript/tsc/internal/vfs/osvfs"
+	"github.com/jdrebin/TyThon/tsc/internal/repo"
+	"github.com/jdrebin/TyThon/tsc/internal/tspath"
+	"github.com/jdrebin/TyThon/tsc/internal/vfs/osvfs"
 	"gotest.tools/v3/assert"
 )
 

@@ -4,8 +4,8 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/microsoft/TypeScript/tsc/internal/vfs"
-	"github.com/microsoft/TypeScript/tsc/internal/vfs/vfstest"
+	"github.com/jdrebin/TyThon/tsc/internal/vfs"
+	"github.com/jdrebin/TyThon/tsc/internal/vfs/vfstest"
 	"gotest.tools/v3/assert"
 )
 

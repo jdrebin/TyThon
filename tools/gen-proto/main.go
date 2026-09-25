@@ -492,29 +492,29 @@ func (r *typeRenderer) namedType(named *types.Named) string {
 	case r.apiPackagePath + ".DocumentIdentifier":
 		r.documentIdentifier = obj
 		return "DocumentIdentifier"
-	case "github.com/microsoft/TypeScript/tsc/internal/packagejson.JSONValue":
+	case "github.com/jdrebin/TyThon/tsc/internal/packagejson.JSONValue":
 		return "unknown"
-	case "github.com/microsoft/TypeScript/tsc/internal/json.Value":
+	case "github.com/jdrebin/TyThon/tsc/internal/json.Value":
 		return "unknown"
 	case "github.com/go-json-experiment/json/jsontext.Value": // multiple ways to refer to this type depending on `go` version
 		return "unknown"
 	case "encoding/json/jsontext.Value":
 		return "unknown"
-	case "github.com/microsoft/TypeScript/tsc/internal/core.Tristate":
+	case "github.com/jdrebin/TyThon/tsc/internal/core.Tristate":
 		return "boolean"
-	case "github.com/microsoft/TypeScript/tsc/internal/core.JsxEmit":
+	case "github.com/jdrebin/TyThon/tsc/internal/core.JsxEmit":
 		return r.importType("JsxEmit", "#enums/jsxEmit")
-	case "github.com/microsoft/TypeScript/tsc/internal/core.ModuleDetectionKind":
+	case "github.com/jdrebin/TyThon/tsc/internal/core.ModuleDetectionKind":
 		return r.importType("ModuleDetectionKind", "#enums/moduleDetectionKind")
-	case "github.com/microsoft/TypeScript/tsc/internal/core.ModuleKind":
+	case "github.com/jdrebin/TyThon/tsc/internal/core.ModuleKind":
 		return r.importType("ModuleKind", "#enums/moduleKind")
-	case "github.com/microsoft/TypeScript/tsc/internal/core.ModuleResolutionKind":
+	case "github.com/jdrebin/TyThon/tsc/internal/core.ModuleResolutionKind":
 		return r.importType("ModuleResolutionKind", "#enums/moduleResolutionKind")
-	case "github.com/microsoft/TypeScript/tsc/internal/core.NewLineKind":
+	case "github.com/jdrebin/TyThon/tsc/internal/core.NewLineKind":
 		return r.importType("NewLineKind", "#enums/newLineKind")
-	case "github.com/microsoft/TypeScript/tsc/internal/core.ScriptTarget":
+	case "github.com/jdrebin/TyThon/tsc/internal/core.ScriptTarget":
 		return r.importType("ScriptTarget", "#enums/scriptTarget")
-	case "github.com/microsoft/TypeScript/tsc/internal/collections.OrderedMap":
+	case "github.com/jdrebin/TyThon/tsc/internal/collections.OrderedMap":
 		if named.TypeArgs().Len() != 2 {
 			return "Record<string, unknown>"
 		}

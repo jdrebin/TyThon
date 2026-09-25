@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/microsoft/TypeScript/tsc/internal/checker"
+	"github.com/jdrebin/TyThon/tsc/internal/checker"
 )
 
 type moduleState struct {

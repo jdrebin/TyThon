@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 // Optional argument also checks the manifest/assets in an extracted VSIX.
 const extension = process.argv[2] ?? fileURLToPath(new URL("..", import.meta.url));
 const manifest = JSON.parse(await readFile(path.join(extension, "package.json"), "utf8"));
-const language = manifest.contributes.languages.find(language => language.id === "typed-python");
+const language = manifest.contributes.languages.find(language => language.id === "tython");
 assert(language.extensions.includes(".ty") && language.extensions.includes(".d.ty"));
 for (const variant of ["light", "dark"]) {
     assert.equal(language.icon[variant], `./icons/tython-${variant}.svg`);

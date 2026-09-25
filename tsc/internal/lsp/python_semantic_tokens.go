@@ -4,9 +4,9 @@ import (
 	"context"
 	"path/filepath"
 
-	"github.com/microsoft/TypeScript/tsc/internal/ast"
-	"github.com/microsoft/TypeScript/tsc/internal/lsp/lsproto"
-	pythonfrontend "github.com/microsoft/TypeScript/tsc/internal/python"
+	"github.com/jdrebin/TyThon/tsc/internal/ast"
+	"github.com/jdrebin/TyThon/tsc/internal/lsp/lsproto"
+	pythonfrontend "github.com/jdrebin/TyThon/tsc/internal/python"
 )
 
 func registerPythonSemanticTokenHandlers(handlers handlerMap) {

@@ -3,7 +3,7 @@ package checker
 import (
 	"slices"
 
-	"github.com/microsoft/TypeScript/tsc/internal/core"
+	"github.com/jdrebin/TyThon/tsc/internal/core"
 )
 
 // TypeMapperKind

@@ -12,12 +12,12 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/microsoft/TypeScript/tsc/internal/core"
-	"github.com/microsoft/TypeScript/tsc/internal/json"
-	"github.com/microsoft/TypeScript/tsc/internal/jsonrpc"
-	"github.com/microsoft/TypeScript/tsc/internal/locale"
-	"github.com/microsoft/TypeScript/tsc/internal/lsp/lsproto"
-	"github.com/microsoft/TypeScript/tsc/internal/vfs"
+	"github.com/jdrebin/TyThon/tsc/internal/core"
+	"github.com/jdrebin/TyThon/tsc/internal/json"
+	"github.com/jdrebin/TyThon/tsc/internal/jsonrpc"
+	"github.com/jdrebin/TyThon/tsc/internal/locale"
+	"github.com/jdrebin/TyThon/tsc/internal/lsp/lsproto"
+	"github.com/jdrebin/TyThon/tsc/internal/vfs"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -731,7 +731,7 @@ func (s *Server) handleInitialize(ctx context.Context, params *lsproto.Initializ
 			HoverProvider:      &lsproto.BooleanOrHoverOptions{Boolean: new(true)},
 			DefinitionProvider: &lsproto.BooleanOrDefinitionOptions{Boolean: new(true)},
 			DiagnosticProvider: &lsproto.DiagnosticOptionsOrRegistrationOptions{
-				Options: &lsproto.DiagnosticOptions{Identifier: new("typed-python"), InterFileDependencies: true},
+				Options: &lsproto.DiagnosticOptions{Identifier: new("tython"), InterFileDependencies: true},
 			},
 			CompletionProvider: &lsproto.CompletionOptions{
 				TriggerCharacters: &pythonCompletionTriggers,

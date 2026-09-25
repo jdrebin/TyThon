@@ -26,8 +26,8 @@ The existing release-license audit remains mandatory before distribution.
 From the repository root (Python 3.12+, pip, Go, and Node available):
 
 ```sh
-node tools/black-formatter-spike/prepare.mjs
-python3 -B tools/black-formatter-spike/test_spike.py
+node tools/black-formatter/prepare.mjs
+python3 -B tools/black-formatter/test_spike.py
 ```
 
 Preparation installs checksum-pinned **pure-Python** wheels only into
@@ -42,7 +42,7 @@ files in `built/local/black-spike/results/` to inspect the actual output.
 For a one-off experiment after preparation:
 
 ```sh
-python3 -B tools/black-formatter-spike/adapter.py < example.ty
+python3 -B tools/black-formatter/adapter.py < example.ty
 ```
 
 This command only prints a result after the safety checks pass. It never edits

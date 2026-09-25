@@ -22,9 +22,9 @@ files are not automatically claimed to be copied from upstream.
 
 ## Other included code
 
-- `packages/vscode-python-typescript/src/hover.ts` adapts VS Code's MIT-licensed
+- `packages/vscode-tython/src/hover.ts` adapts VS Code's MIT-licensed
   hover provider. Its existing copyright remains; the accompanying license is
-  `packages/vscode-python-typescript/licenses/LICENSE.vscode.txt`.
+  `packages/vscode-tython/licenses/LICENSE.vscode.txt`.
   The text is published in [VS Code's license](https://github.com/microsoft/vscode/blob/main/LICENSE.txt).
 - The Pyright Type Server Protocol copy in `src/vendor/` retains its header;
   its MIT license is in `licenses/LICENSE.pyright.txt`. The packaged resolver

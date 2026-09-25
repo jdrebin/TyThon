@@ -1,10 +1,10 @@
 package declarations
 
 import (
-	"github.com/microsoft/TypeScript/tsc/internal/ast"
-	"github.com/microsoft/TypeScript/tsc/internal/diagnostics"
-	"github.com/microsoft/TypeScript/tsc/internal/printer"
-	"github.com/microsoft/TypeScript/tsc/internal/scanner"
+	"github.com/jdrebin/TyThon/tsc/internal/ast"
+	"github.com/jdrebin/TyThon/tsc/internal/diagnostics"
+	"github.com/jdrebin/TyThon/tsc/internal/printer"
+	"github.com/jdrebin/TyThon/tsc/internal/scanner"
 )
 
 type GetSymbolAccessibilityDiagnostic = func(symbolAccessibilityResult printer.SymbolAccessibilityResult) *SymbolAccessibilityDiagnostic

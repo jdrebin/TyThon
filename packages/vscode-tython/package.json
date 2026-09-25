@@ -7,7 +7,7 @@
     "repository": {
         "type": "git",
         "url": "https://github.com/jdrebin/TyThon.git",
-        "directory": "packages/vscode-python-typescript"
+        "directory": "packages/vscode-tython"
     },
     "homepage": "https://github.com/jdrebin/TyThon#readme",
     "bugs": { "url": "https://github.com/jdrebin/TyThon/issues" },
@@ -23,12 +23,12 @@
         "workspace"
     ],
     "activationEvents": [
-        "onLanguage:typed-python"
+        "onLanguage:tython"
     ],
     "main": "./dist/extension.bundle.js",
     "contributes": {
         "configurationDefaults": {
-            "[typed-python]": {
+            "[tython]": {
                 "editor.semanticHighlighting.enabled": true,
                 "editor.defaultFormatter": "tython-local.tython",
                 "editor.wordBasedSuggestions": "off",
@@ -50,7 +50,7 @@
         ],
         "languages": [
             {
-                "id": "typed-python",
+                "id": "tython",
                 "aliases": [
                     "TyThon",
                     "ty"
@@ -68,13 +68,13 @@
         ],
         "grammars": [
             {
-                "language": "typed-python",
+                "language": "tython",
                 "scopeName": "source.python.typed",
                 "path": "./syntaxes/MagicTypedPython.tmLanguage.json"
             },
             {
-                "scopeName": "typed-python.injection",
-                "path": "./syntaxes/typed-python.injection.tmLanguage.json",
+                "scopeName": "tython.injection",
+                "path": "./syntaxes/tython.injection.tmLanguage.json",
                 "injectTo": [
                     "source.python.typed"
                 ]
@@ -82,8 +82,8 @@
         ],
         "snippets": [
             {
-                "language": "typed-python",
-                "path": "./snippets/typed-python.json"
+                "language": "tython",
+                "path": "./snippets/tython.json"
             }
         ],
         "configuration": {

@@ -8,7 +8,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/microsoft/TypeScript/tsc/internal/json"
+	"github.com/jdrebin/TyThon/tsc/internal/json"
 	"golang.org/x/text/language"
 )
 

@@ -4,7 +4,7 @@ import (
 	"context"
 	"sync"
 
-	"github.com/microsoft/TypeScript/tsc/internal/checker"
+	"github.com/jdrebin/TyThon/tsc/internal/checker"
 )
 
 // NewChecker creates the checker used by a Python frontend query.

@@ -7,15 +7,15 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/microsoft/TypeScript/tsc/internal/ast"
-	"github.com/microsoft/TypeScript/tsc/internal/checker"
-	"github.com/microsoft/TypeScript/tsc/internal/jsnum"
+	"github.com/jdrebin/TyThon/tsc/internal/ast"
+	"github.com/jdrebin/TyThon/tsc/internal/checker"
+	"github.com/jdrebin/TyThon/tsc/internal/jsnum"
 )
 
 //go:embed lib/builtins.d.ty
 var builtinDeclarationSource string
 
-const BuiltinDeclarationURI = "typed-python:/builtins.d.ty"
+const BuiltinDeclarationURI = "tython:/builtins.d.ty"
 
 func isBuiltinIntrinsicAlias(declaration *TypeAliasDeclaration) bool {
 	if declaration == nil || len(declaration.Parameters) != 0 {

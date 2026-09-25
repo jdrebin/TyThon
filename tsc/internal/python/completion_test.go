@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	pythonfrontend "github.com/microsoft/TypeScript/tsc/internal/python"
+	pythonfrontend "github.com/jdrebin/TyThon/tsc/internal/python"
 )
 
 func TestTypeCompletionAfterOptionalModifier(t *testing.T) {

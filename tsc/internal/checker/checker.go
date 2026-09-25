@@ -15,20 +15,20 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/microsoft/TypeScript/tsc/internal/ast"
-	"github.com/microsoft/TypeScript/tsc/internal/binder"
-	"github.com/microsoft/TypeScript/tsc/internal/collections"
-	"github.com/microsoft/TypeScript/tsc/internal/core"
-	"github.com/microsoft/TypeScript/tsc/internal/debug"
-	"github.com/microsoft/TypeScript/tsc/internal/diagnostics"
-	"github.com/microsoft/TypeScript/tsc/internal/evaluator"
-	"github.com/microsoft/TypeScript/tsc/internal/jsnum"
-	"github.com/microsoft/TypeScript/tsc/internal/module"
-	"github.com/microsoft/TypeScript/tsc/internal/modulespecifiers"
-	"github.com/microsoft/TypeScript/tsc/internal/scanner"
-	"github.com/microsoft/TypeScript/tsc/internal/stringutil"
-	"github.com/microsoft/TypeScript/tsc/internal/tracing"
-	"github.com/microsoft/TypeScript/tsc/internal/tspath"
+	"github.com/jdrebin/TyThon/tsc/internal/ast"
+	"github.com/jdrebin/TyThon/tsc/internal/binder"
+	"github.com/jdrebin/TyThon/tsc/internal/collections"
+	"github.com/jdrebin/TyThon/tsc/internal/core"
+	"github.com/jdrebin/TyThon/tsc/internal/debug"
+	"github.com/jdrebin/TyThon/tsc/internal/diagnostics"
+	"github.com/jdrebin/TyThon/tsc/internal/evaluator"
+	"github.com/jdrebin/TyThon/tsc/internal/jsnum"
+	"github.com/jdrebin/TyThon/tsc/internal/module"
+	"github.com/jdrebin/TyThon/tsc/internal/modulespecifiers"
+	"github.com/jdrebin/TyThon/tsc/internal/scanner"
+	"github.com/jdrebin/TyThon/tsc/internal/stringutil"
+	"github.com/jdrebin/TyThon/tsc/internal/tracing"
+	"github.com/jdrebin/TyThon/tsc/internal/tspath"
 	"github.com/zeebo/xxh3"
 )
 
@@ -1328,7 +1328,7 @@ func (c *Checker) initializeChecker() {
 			}
 			for _, symbol := range file.Locals {
 				// We defer merging of global ambient module declarations since they may require other global symbols
-				// and types to be resolved. See https://github.com/microsoft/TypeScript/tsc/issues/2953.
+				// and types to be resolved. See https://github.com/jdrebin/TyThon/tsc/issues/2953.
 				if symbol.Flags&ast.SymbolFlagsModule != 0 && ast.IsAmbientModuleSymbolName(symbol.Name) {
 					ambientModuleSymbols = append(ambientModuleSymbols, symbol)
 				} else {
@@ -18627,7 +18627,7 @@ func (c *Checker) isGlobalSymbolConstructor(node *ast.Node) bool {
 func (c *Checker) widenTypeForVariableLikeDeclaration(t *Type, declaration *ast.Node, reportErrors bool) *Type {
 	if t != nil {
 		// This special case is required for backwards compatibility with libraries that merge a `symbol` property into `SymbolConstructor`.
-		// See https://github.com/microsoft/TypeScript/tsc/issues/1212
+		// See https://github.com/jdrebin/TyThon/tsc/issues/1212
 		if t.flags&TypeFlagsESSymbol != 0 && c.isGlobalSymbolConstructor(declaration.Parent) {
 			t = c.getESSymbolLikeTypeForNode(declaration)
 		}
@@ -22611,7 +22611,7 @@ func (c *Checker) getNamedMembers(members ast.SymbolTable, container *ast.Symbol
 	}
 	// For classes and interfaces, we store explicitly declared members ahead of inherited members. This ensures we process
 	// explicitly declared members first in type relations, which is beneficial because explicitly declared members are more
-	// likely to contain discriminating differences. See for example https://github.com/microsoft/TypeScript/tsc/issues/1968.
+	// likely to contain discriminating differences. See for example https://github.com/jdrebin/TyThon/tsc/issues/1968.
 	result := make([]*ast.Symbol, 0, len(members))
 	var containedCount int
 	if container != nil && container.Flags&(ast.SymbolFlagsClass|ast.SymbolFlagsInterface) != 0 {

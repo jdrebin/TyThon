@@ -14,8 +14,8 @@ import (
 	"sort"
 	"sync"
 
-	"github.com/microsoft/TypeScript/tsc/internal/core"
-	"github.com/microsoft/TypeScript/tsc/internal/json"
+	"github.com/jdrebin/TyThon/tsc/internal/core"
+	"github.com/jdrebin/TyThon/tsc/internal/json"
 )
 
 // Kind describes how positions inside a segment relate the virtual span to the original span.

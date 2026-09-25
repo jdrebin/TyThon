@@ -62,7 +62,7 @@ def main():
             )
             assert checksum == "sha256=" + actual, name
         assert (
-            digest(archive.read("tython_cli/bin/typed-python"))
+            digest(archive.read("tython_cli/bin/tython"))
             == editor["compilerSHA256"]
         )
         assert (
@@ -121,7 +121,7 @@ def main():
         assert Path(location).is_relative_to(venv)
         installed = Path(location).parent
         assert (
-            digest((installed / "bin/typed-python").read_bytes())
+            digest((installed / "bin/tython").read_bytes())
             == editor["compilerSHA256"]
         )
         assert (

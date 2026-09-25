@@ -11,7 +11,7 @@ export class BundledFormatter implements vscode.Disposable {
 
     constructor(private readonly context: vscode.ExtensionContext,
         private readonly output: vscode.OutputChannel) {
-        const selector = { language: "typed-python", scheme: "file", pattern: "**/*.ty" };
+        const selector = { language: "tython", scheme: "file", pattern: "**/*.ty" };
         this.subscriptions = [
             vscode.languages.registerDocumentFormattingEditProvider(selector, {
                 provideDocumentFormattingEdits: (document, _options, token) => this.format(document, token),

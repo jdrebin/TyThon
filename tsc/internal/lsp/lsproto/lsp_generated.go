@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/microsoft/TypeScript/tsc/internal/json"
+	"github.com/jdrebin/TyThon/tsc/internal/json"
 )
 
 // Meta model version 3.18.0

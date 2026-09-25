@@ -7,9 +7,9 @@ import (
 	"testing/synctest"
 	"time"
 
-	"github.com/microsoft/TypeScript/tsc/internal/diagnostics"
-	"github.com/microsoft/TypeScript/tsc/internal/locale"
-	"github.com/microsoft/TypeScript/tsc/internal/lsp/lsproto"
+	"github.com/jdrebin/TyThon/tsc/internal/diagnostics"
+	"github.com/jdrebin/TyThon/tsc/internal/locale"
+	"github.com/jdrebin/TyThon/tsc/internal/lsp/lsproto"
 )
 
 type progressCall struct {

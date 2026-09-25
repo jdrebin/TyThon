@@ -6,14 +6,14 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/microsoft/TypeScript/tsc/internal/ast"
-	"github.com/microsoft/TypeScript/tsc/internal/collections"
-	"github.com/microsoft/TypeScript/tsc/internal/core"
-	"github.com/microsoft/TypeScript/tsc/internal/diagnostics"
-	"github.com/microsoft/TypeScript/tsc/internal/packagejson"
-	"github.com/microsoft/TypeScript/tsc/internal/stringutil"
-	"github.com/microsoft/TypeScript/tsc/internal/tspath"
-	"github.com/microsoft/TypeScript/tsc/internal/vfs/vfsmatch"
+	"github.com/jdrebin/TyThon/tsc/internal/ast"
+	"github.com/jdrebin/TyThon/tsc/internal/collections"
+	"github.com/jdrebin/TyThon/tsc/internal/core"
+	"github.com/jdrebin/TyThon/tsc/internal/diagnostics"
+	"github.com/jdrebin/TyThon/tsc/internal/packagejson"
+	"github.com/jdrebin/TyThon/tsc/internal/stringutil"
+	"github.com/jdrebin/TyThon/tsc/internal/tspath"
+	"github.com/jdrebin/TyThon/tsc/internal/vfs/vfsmatch"
 )
 
 type resolved struct {
@@ -1059,7 +1059,7 @@ func (r *resolutionState) loadModuleFromSpecificNodeModulesDirectory(ext extensi
 	// inserts, an entry whose `PackageDirectory` doesn't match `candidate`,
 	// causing `loadNodeModuleFromDirectoryWorker`'s `ComparePaths(candidate, ...)`
 	// check to fail and skip loading the package's `main`/`types` entry.
-	// https://github.com/microsoft/TypeScript/tsc/issues/3526
+	// https://github.com/jdrebin/TyThon/tsc/issues/3526
 	candidate := tspath.RemoveTrailingDirectorySeparator(tspath.NormalizePath(tspath.CombinePaths(nodeModulesDirectory, moduleName)))
 	packageName, rest := ParsePackageName(moduleName)
 	packageDirectory := tspath.CombinePaths(nodeModulesDirectory, packageName)

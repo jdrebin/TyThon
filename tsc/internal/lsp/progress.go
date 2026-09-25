@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/microsoft/TypeScript/tsc/internal/collections"
-	"github.com/microsoft/TypeScript/tsc/internal/core"
-	"github.com/microsoft/TypeScript/tsc/internal/diagnostics"
-	"github.com/microsoft/TypeScript/tsc/internal/lsp/lsproto"
+	"github.com/jdrebin/TyThon/tsc/internal/collections"
+	"github.com/jdrebin/TyThon/tsc/internal/core"
+	"github.com/jdrebin/TyThon/tsc/internal/diagnostics"
+	"github.com/jdrebin/TyThon/tsc/internal/lsp/lsproto"
 )
 
 type progressEvent struct {
@@ -139,7 +139,7 @@ func (p *projectLoadingProgress) run() {
 				loading.Set(text, count+1)
 				if token == "" {
 					tokenID++
-					token = fmt.Sprintf("tsgo-loading-%d", tokenID)
+					token = fmt.Sprintf("tython-loading-%d", tokenID)
 					begun = false
 					if p.delay <= 0 {
 						delayFired = true

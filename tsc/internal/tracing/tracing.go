@@ -11,11 +11,11 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/microsoft/TypeScript/tsc/internal/ast"
-	"github.com/microsoft/TypeScript/tsc/internal/json"
-	"github.com/microsoft/TypeScript/tsc/internal/scanner"
-	"github.com/microsoft/TypeScript/tsc/internal/tspath"
-	"github.com/microsoft/TypeScript/tsc/internal/vfs"
+	"github.com/jdrebin/TyThon/tsc/internal/ast"
+	"github.com/jdrebin/TyThon/tsc/internal/json"
+	"github.com/jdrebin/TyThon/tsc/internal/scanner"
+	"github.com/jdrebin/TyThon/tsc/internal/tspath"
+	"github.com/jdrebin/TyThon/tsc/internal/vfs"
 	"github.com/zeebo/xxh3"
 )
 
@@ -170,7 +170,7 @@ func StartTracing(fs vfs.FS, traceDir string, configFilePath string, determinist
 	// Write metadata events (matching TypeScript's format)
 	metaTs := tr.timestamp()
 	tr.metadataTS = metaTs
-	tr.writeEvent(traceEvent{PID: 1, TID: mainThreadID, PH: "M", Cat: "__metadata", TS: metaTs, Name: "process_name", Args: map[string]any{"name": "tsgo"}})
+	tr.writeEvent(traceEvent{PID: 1, TID: mainThreadID, PH: "M", Cat: "__metadata", TS: metaTs, Name: "process_name", Args: map[string]any{"name": "tython"}})
 	tr.traceContent.WriteString(",\n")
 	tr.writeEvent(traceEvent{PID: 1, TID: mainThreadID, PH: "M", Cat: "__metadata", TS: metaTs, Name: "thread_name", Args: map[string]any{"name": "Main"}})
 	tr.traceContent.WriteString(",\n")

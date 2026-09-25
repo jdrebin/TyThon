@@ -78,7 +78,7 @@ try {
     send({ method: "initialized", params: {} });
     const colorsUri = pathToFileURL(path.join(workspace, "semantic-colors-smoke.ty")).href;
     const colorsSource = 'type Label = "😀"\ninterface Named:\n    name: str\nclass User:\n    kind = "user"\n    def greet(self, message: str) -> str:\n        return message\ndef identity<T>(value: T) -> T:\n    return value\nuser = User()\nresult = identity("hello")\nitems = {"😀": result}\n';
-    send({ method: "textDocument/didOpen", params: { textDocument: { uri: colorsUri, languageId: "typed-python", version: 1, text: colorsSource } } });
+    send({ method: "textDocument/didOpen", params: { textDocument: { uri: colorsUri, languageId: "tython", version: 1, text: colorsSource } } });
     function decodeColors(response) {
         let line = 0, column = 0;
         const tokens = [];
@@ -99,7 +99,7 @@ try {
     assert.deepEqual(ranged, colors.filter(token => token.line >= 9));
     send({ method: "textDocument/didClose", params: { textDocument: { uri: colorsUri } } });
     const uri = pathToFileURL(path.join(workspace, "containment-smoke.ty")).href;
-    send({ method: "textDocument/didOpen", params: { textDocument: { uri, languageId: "typed-python", version: 1, text: "value: Some = 1\nvalue\n" } } });
+    send({ method: "textDocument/didOpen", params: { textDocument: { uri, languageId: "tython", version: 1, text: "value: Some = 1\nvalue\n" } } });
     const diagnostics = await request("textDocument/diagnostic", { textDocument: { uri } });
     assert.equal(diagnostics.items.length, 0);
     const hover = await request("textDocument/hover", { textDocument: { uri }, position: { line: 1, character: 2 } });
@@ -113,7 +113,7 @@ try {
     // not a separately constructed erased fixture.
     const toolsUri = pathToFileURL(path.join(workspace, "python-tools-smoke.ty")).href;
     const toolsSource = 'type Label = "😀"\nfrom pathlib import Path\nvalue: str = "ok"\nPath\nrecord = {"id": 1, "id": 2}\n';
-    send({ method: "textDocument/didOpen", params: { textDocument: { uri: toolsUri, languageId: "typed-python", version: 7, text: toolsSource } } });
+    send({ method: "textDocument/didOpen", params: { textDocument: { uri: toolsUri, languageId: "tython", version: 7, text: toolsSource } } });
     const toolsProjection = await request("typedPython/project", { textDocument: { uri: toolsUri } });
     assert.equal(toolsProjection.version, 7);
     assert.equal(toolsProjection.text.length, toolsSource.length);
@@ -166,7 +166,7 @@ try {
     send({ method: "textDocument/didChange", params: { textDocument: { uri, version: version++ }, contentChanges: [{ text: asserted }] } });
     const assertionDiagnostics = await request("textDocument/diagnostic", { textDocument: { uri } });
     assert.equal(assertionDiagnostics.items.length, 0, JSON.stringify(assertionDiagnostics.items));
-    const dir = await mkdtemp(path.join(tmpdir(), "typed-python-profile-smoke-"));
+    const dir = await mkdtemp(path.join(tmpdir(), "tython-profile-smoke-"));
     const profile = await request("custom/saveHeapProfile", { dir });
     assert((await stat(profile.file)).size > 0);
     await request("shutdown");

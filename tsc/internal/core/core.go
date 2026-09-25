@@ -17,10 +17,10 @@ import (
 	"unicode/utf16"
 	"unicode/utf8"
 
-	"github.com/microsoft/TypeScript/tsc/internal/debug"
-	"github.com/microsoft/TypeScript/tsc/internal/json"
-	"github.com/microsoft/TypeScript/tsc/internal/stringutil"
-	"github.com/microsoft/TypeScript/tsc/internal/tspath"
+	"github.com/jdrebin/TyThon/tsc/internal/debug"
+	"github.com/jdrebin/TyThon/tsc/internal/json"
+	"github.com/jdrebin/TyThon/tsc/internal/stringutil"
+	"github.com/jdrebin/TyThon/tsc/internal/tspath"
 )
 
 func ApplyDebugStackLimit() {

@@ -1,6 +1,6 @@
 package checker
 
-import "github.com/microsoft/TypeScript/tsc/internal/ast"
+import "github.com/jdrebin/TyThon/tsc/internal/ast"
 
 // The hierarchy consists of ordinary declaration types. This adapter supplies
 // implicit bases for Python values, as the native checker supplies wrapper

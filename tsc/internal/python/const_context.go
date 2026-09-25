@@ -1,8 +1,8 @@
 package python
 
 import (
-	"github.com/microsoft/TypeScript/tsc/internal/ast"
-	"github.com/microsoft/TypeScript/tsc/internal/checker"
+	"github.com/jdrebin/TyThon/tsc/internal/ast"
+	"github.com/jdrebin/TyThon/tsc/internal/checker"
 )
 
 // Only the syntax classification is Python-specific. Eligibility is decided

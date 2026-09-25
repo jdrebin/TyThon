@@ -18,7 +18,7 @@ const vscode = {
     ExtensionMode: { Development: 2 }, Range,
     TextEdit: { replace: (range, text) => ({ range, text }) },
     languages: { registerDocumentFormattingEditProvider(selector, value) {
-        assert.deepEqual(selector, { language: "typed-python", scheme: "file", pattern: "**/*.ty" });
+        assert.deepEqual(selector, { language: "tython", scheme: "file", pattern: "**/*.ty" });
         provider = value;
         return { dispose() { unregistered = true; } };
     } },

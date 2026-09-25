@@ -5,8 +5,8 @@ import (
 	"sort"
 	"strconv"
 
-	"github.com/microsoft/TypeScript/tsc/internal/ast"
-	"github.com/microsoft/TypeScript/tsc/internal/jsnum"
+	"github.com/jdrebin/TyThon/tsc/internal/ast"
+	"github.com/jdrebin/TyThon/tsc/internal/jsnum"
 )
 
 type ObjectCallArgumentKind uint8

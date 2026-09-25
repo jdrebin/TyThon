@@ -8,11 +8,11 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/microsoft/TypeScript/tsc/internal/core"
-	"github.com/microsoft/TypeScript/tsc/internal/json"
-	"github.com/microsoft/TypeScript/tsc/internal/jsonrpc"
-	"github.com/microsoft/TypeScript/tsc/internal/lsp"
-	"github.com/microsoft/TypeScript/tsc/internal/lsp/lsproto"
+	"github.com/jdrebin/TyThon/tsc/internal/core"
+	"github.com/jdrebin/TyThon/tsc/internal/json"
+	"github.com/jdrebin/TyThon/tsc/internal/jsonrpc"
+	"github.com/jdrebin/TyThon/tsc/internal/lsp"
+	"github.com/jdrebin/TyThon/tsc/internal/lsp/lsproto"
 	"golang.org/x/sync/errgroup"
 	"gotest.tools/v3/assert"
 )

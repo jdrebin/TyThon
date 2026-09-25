@@ -6,10 +6,10 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/microsoft/TypeScript/tsc/internal/ast"
-	"github.com/microsoft/TypeScript/tsc/internal/checker"
-	"github.com/microsoft/TypeScript/tsc/internal/diagnosticwriter"
-	"github.com/microsoft/TypeScript/tsc/internal/locale"
+	"github.com/jdrebin/TyThon/tsc/internal/ast"
+	"github.com/jdrebin/TyThon/tsc/internal/checker"
+	"github.com/jdrebin/TyThon/tsc/internal/diagnosticwriter"
+	"github.com/jdrebin/TyThon/tsc/internal/locale"
 )
 
 // FormatType presents checker types using the Python-facing primitive

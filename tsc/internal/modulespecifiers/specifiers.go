@@ -5,15 +5,15 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/microsoft/TypeScript/tsc/internal/ast"
-	"github.com/microsoft/TypeScript/tsc/internal/collections"
-	"github.com/microsoft/TypeScript/tsc/internal/core"
-	"github.com/microsoft/TypeScript/tsc/internal/debug"
-	"github.com/microsoft/TypeScript/tsc/internal/module"
-	"github.com/microsoft/TypeScript/tsc/internal/outputpaths"
-	"github.com/microsoft/TypeScript/tsc/internal/packagejson"
-	"github.com/microsoft/TypeScript/tsc/internal/stringutil"
-	"github.com/microsoft/TypeScript/tsc/internal/tspath"
+	"github.com/jdrebin/TyThon/tsc/internal/ast"
+	"github.com/jdrebin/TyThon/tsc/internal/collections"
+	"github.com/jdrebin/TyThon/tsc/internal/core"
+	"github.com/jdrebin/TyThon/tsc/internal/debug"
+	"github.com/jdrebin/TyThon/tsc/internal/module"
+	"github.com/jdrebin/TyThon/tsc/internal/outputpaths"
+	"github.com/jdrebin/TyThon/tsc/internal/packagejson"
+	"github.com/jdrebin/TyThon/tsc/internal/stringutil"
+	"github.com/jdrebin/TyThon/tsc/internal/tspath"
 )
 
 func GetModuleSpecifiers(

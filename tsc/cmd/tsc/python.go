@@ -10,9 +10,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/microsoft/TypeScript/tsc/internal/outputpaths"
-	pythonfrontend "github.com/microsoft/TypeScript/tsc/internal/python"
-	"github.com/microsoft/TypeScript/tsc/internal/tspath"
+	"github.com/jdrebin/TyThon/tsc/internal/outputpaths"
+	pythonfrontend "github.com/jdrebin/TyThon/tsc/internal/python"
+	"github.com/jdrebin/TyThon/tsc/internal/tspath"
 )
 
 func isPythonInput(fileName string) bool {
@@ -21,7 +21,7 @@ func isPythonInput(fileName string) bool {
 
 func runPython(args []string) int {
 	if len(args) == 0 || len(args) == 1 && (args[0] == "-h" || args[0] == "--help") {
-		fmt.Fprintln(os.Stderr, "usage: tsgo --python [--emit] [--out-dir=dist] [--root-dir=PATH] [--type-at=BYTE_OFFSET] [--stdin-file=PATH] <module.ty|module.d.ty> [...]")
+		fmt.Fprintln(os.Stderr, "usage: tython [--emit] [--out-dir=dist] [--root-dir=PATH] [--type-at=BYTE_OFFSET] [--stdin-file=PATH] <module.ty|module.d.ty> [...]")
 		return 2
 	}
 	emit := false

@@ -7,13 +7,13 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/microsoft/TypeScript/tsc/internal/bundled"
-	"github.com/microsoft/TypeScript/tsc/internal/ls/lsconv"
-	"github.com/microsoft/TypeScript/tsc/internal/lsp"
-	"github.com/microsoft/TypeScript/tsc/internal/lsp/lsproto"
-	pythonfrontend "github.com/microsoft/TypeScript/tsc/internal/python"
-	"github.com/microsoft/TypeScript/tsc/internal/testutil/lsptestutil"
-	"github.com/microsoft/TypeScript/tsc/internal/vfs/vfstest"
+	"github.com/jdrebin/TyThon/tsc/internal/bundled"
+	"github.com/jdrebin/TyThon/tsc/internal/ls/lsconv"
+	"github.com/jdrebin/TyThon/tsc/internal/lsp"
+	"github.com/jdrebin/TyThon/tsc/internal/lsp/lsproto"
+	pythonfrontend "github.com/jdrebin/TyThon/tsc/internal/python"
+	"github.com/jdrebin/TyThon/tsc/internal/testutil/lsptestutil"
+	"github.com/jdrebin/TyThon/tsc/internal/vfs/vfstest"
 	"gotest.tools/v3/assert"
 )
 
@@ -45,7 +45,7 @@ func TestPythonLSPAttributeInterfaceDefinition(t *testing.T) {
 	<-client.Server.InitComplete()
 	uri := lsconv.FileNameToDocumentURI(fileName)
 	lsptestutil.SendNotification(t, client, lsproto.TextDocumentDidOpenInfo, &lsproto.DidOpenTextDocumentParams{
-		TextDocument: &lsproto.TextDocumentItem{Uri: uri, LanguageId: "typed-python", Version: 1, Text: source},
+		TextDocument: &lsproto.TextDocumentItem{Uri: uri, LanguageId: "tython", Version: 1, Text: source},
 	})
 	message, definition, ok := lsptestutil.SendRequest(t, client, lsproto.TextDocumentDefinitionInfo, &lsproto.DefinitionParams{
 		TextDocument: lsproto.TextDocumentIdentifier{Uri: uri},
@@ -109,7 +109,7 @@ def show(user: User(str)):
 
 	uri := lsconv.FileNameToDocumentURI(fileName)
 	lsptestutil.SendNotification(t, client, lsproto.TextDocumentDidOpenInfo, &lsproto.DidOpenTextDocumentParams{
-		TextDocument: &lsproto.TextDocumentItem{Uri: uri, LanguageId: "typed-python", Version: 1, Text: source},
+		TextDocument: &lsproto.TextDocumentItem{Uri: uri, LanguageId: "tython", Version: 1, Text: source},
 	})
 	message, response, ok := lsptestutil.SendRequest(t, client, lsproto.TextDocumentCompletionInfo, &lsproto.CompletionParams{
 		TextDocument: lsproto.TextDocumentIdentifier{Uri: uri},
@@ -214,7 +214,7 @@ profile: Profile
 	<-client.Server.InitComplete()
 	uri := lsconv.FileNameToDocumentURI(fileName)
 	lsptestutil.SendNotification(t, client, lsproto.TextDocumentDidOpenInfo, &lsproto.DidOpenTextDocumentParams{
-		TextDocument: &lsproto.TextDocumentItem{Uri: uri, LanguageId: "typed-python", Version: 1, Text: source},
+		TextDocument: &lsproto.TextDocumentItem{Uri: uri, LanguageId: "tython", Version: 1, Text: source},
 	})
 	hoverMessage, hoverResponse, hoverOK := lsptestutil.SendRequest(t, client, lsproto.TextDocumentHoverInfo, &lsproto.HoverParams{
 		TextDocument: lsproto.TextDocumentIdentifier{Uri: uri}, Position: lsproto.Position{Line: 2, Character: 5},

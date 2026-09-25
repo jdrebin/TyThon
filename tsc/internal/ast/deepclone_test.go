@@ -3,8 +3,8 @@ package ast_test
 import (
 	"testing"
 
-	"github.com/microsoft/TypeScript/tsc/internal/ast"
-	"github.com/microsoft/TypeScript/tsc/internal/testutil/parsetestutil"
+	"github.com/jdrebin/TyThon/tsc/internal/ast"
+	"github.com/jdrebin/TyThon/tsc/internal/testutil/parsetestutil"
 	"gotest.tools/v3/assert"
 )
 

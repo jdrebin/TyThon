@@ -5,7 +5,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/microsoft/TypeScript/tsc/internal/json"
+	"github.com/jdrebin/TyThon/tsc/internal/json"
 )
 
 // This file provides a single reflection-driven object decoder that replaces

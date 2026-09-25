@@ -3,8 +3,8 @@ package spanmap_test
 import (
 	"testing"
 
-	"github.com/microsoft/TypeScript/tsc/internal/core"
-	"github.com/microsoft/TypeScript/tsc/internal/spanmap"
+	"github.com/jdrebin/TyThon/tsc/internal/core"
+	"github.com/jdrebin/TyThon/tsc/internal/spanmap"
 	"gotest.tools/v3/assert"
 )
 

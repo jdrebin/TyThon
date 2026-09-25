@@ -13,7 +13,7 @@ const vendor = path.join(output, "vendor");
 const python = process.env.TYPED_PYTHON_BOOTSTRAP ?? "python3";
 const env = { ...process.env, PYTHONPATH: vendor, PYTHONNOUSERSITE: "1", PYTHONDONTWRITEBYTECODE: "1",
     BLACK_CACHE_DIR: path.join(output, "cache"), GOMAXPROCS: "2",
-    GOCACHE: process.env.GOCACHE ?? path.join(tmpdir(), "typed-python-go-cache") };
+    GOCACHE: process.env.GOCACHE ?? path.join(tmpdir(), "tython-go-cache") };
 const run = (command, args, cwd = root) => {
     const result = spawnSync(command, args, { cwd, env, stdio: "inherit", timeout: 300000 });
     if (result.error || result.status !== 0) throw result.error ?? new Error(`${command} exited ${result.status}`);

@@ -5,9 +5,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/microsoft/TypeScript/tsc/internal/lsp/lsproto"
-	pythonfrontend "github.com/microsoft/TypeScript/tsc/internal/python"
-	"github.com/microsoft/TypeScript/tsc/internal/vfs/vfstest"
+	"github.com/jdrebin/TyThon/tsc/internal/lsp/lsproto"
+	pythonfrontend "github.com/jdrebin/TyThon/tsc/internal/python"
+	"github.com/jdrebin/TyThon/tsc/internal/vfs/vfstest"
 )
 
 func TestPythonLibraryAuthoringUsesEditedSource(t *testing.T) {

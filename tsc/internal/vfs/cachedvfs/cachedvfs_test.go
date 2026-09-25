@@ -3,10 +3,10 @@ package cachedvfs_test
 import (
 	"testing"
 
-	"github.com/microsoft/TypeScript/tsc/internal/vfs"
-	"github.com/microsoft/TypeScript/tsc/internal/vfs/cachedvfs"
-	"github.com/microsoft/TypeScript/tsc/internal/vfs/vfsmock"
-	"github.com/microsoft/TypeScript/tsc/internal/vfs/vfstest"
+	"github.com/jdrebin/TyThon/tsc/internal/vfs"
+	"github.com/jdrebin/TyThon/tsc/internal/vfs/cachedvfs"
+	"github.com/jdrebin/TyThon/tsc/internal/vfs/vfsmock"
+	"github.com/jdrebin/TyThon/tsc/internal/vfs/vfstest"
 	"gotest.tools/v3/assert"
 )
 

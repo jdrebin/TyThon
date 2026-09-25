@@ -28,7 +28,7 @@ async function compiled(relative) {
 const { resolveCompilerPath } = await compiled("../src/compilerPath.ts");
 const { createServerLaunch } = await compiled("../src/serverLaunch.ts");
 const compiler = resolveCompilerPath(installed, false);
-assert.equal(compiler, path.join(installed, "bin/typed-python"));
+assert.equal(compiler, path.join(installed, "bin/tython"));
 await access(compiler, constants.X_OK);
 const workspace = await mkdtemp(path.join(tmpdir(), "ty-installed-preview-"));
 const { resolveFormatterPath, runFormatter } = await compiled("../src/formatterProcess.ts");
@@ -64,7 +64,7 @@ async function request(method, params) {
 const notify = (method, params) => params === undefined ? connection.sendNotification(method) : connection.sendNotification(method, params);
 const open = async (name, text) => {
     const uri = pathToFileURL(path.join(workspace, name)).href;
-    await notify("textDocument/didOpen", { textDocument: { uri, languageId: "typed-python", version: 1, text } });
+    await notify("textDocument/didOpen", { textDocument: { uri, languageId: "tython", version: 1, text } });
     return uri;
 };
 let importProjection;

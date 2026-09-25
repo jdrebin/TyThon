@@ -3,19 +3,19 @@ package tstransforms_test
 import (
 	"testing"
 
-	"github.com/microsoft/TypeScript/tsc/internal/ast"
-	"github.com/microsoft/TypeScript/tsc/internal/binder"
-	"github.com/microsoft/TypeScript/tsc/internal/checker"
-	"github.com/microsoft/TypeScript/tsc/internal/core"
-	"github.com/microsoft/TypeScript/tsc/internal/module"
-	"github.com/microsoft/TypeScript/tsc/internal/packagejson"
-	"github.com/microsoft/TypeScript/tsc/internal/printer"
-	"github.com/microsoft/TypeScript/tsc/internal/symlinks"
-	"github.com/microsoft/TypeScript/tsc/internal/testutil/emittestutil"
-	"github.com/microsoft/TypeScript/tsc/internal/testutil/parsetestutil"
-	"github.com/microsoft/TypeScript/tsc/internal/transformers"
-	"github.com/microsoft/TypeScript/tsc/internal/transformers/tstransforms"
-	"github.com/microsoft/TypeScript/tsc/internal/tspath"
+	"github.com/jdrebin/TyThon/tsc/internal/ast"
+	"github.com/jdrebin/TyThon/tsc/internal/binder"
+	"github.com/jdrebin/TyThon/tsc/internal/checker"
+	"github.com/jdrebin/TyThon/tsc/internal/core"
+	"github.com/jdrebin/TyThon/tsc/internal/module"
+	"github.com/jdrebin/TyThon/tsc/internal/packagejson"
+	"github.com/jdrebin/TyThon/tsc/internal/printer"
+	"github.com/jdrebin/TyThon/tsc/internal/symlinks"
+	"github.com/jdrebin/TyThon/tsc/internal/testutil/emittestutil"
+	"github.com/jdrebin/TyThon/tsc/internal/testutil/parsetestutil"
+	"github.com/jdrebin/TyThon/tsc/internal/transformers"
+	"github.com/jdrebin/TyThon/tsc/internal/transformers/tstransforms"
+	"github.com/jdrebin/TyThon/tsc/internal/tspath"
 )
 
 type fakeProgram struct {

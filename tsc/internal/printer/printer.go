@@ -23,13 +23,13 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"github.com/microsoft/TypeScript/tsc/internal/ast"
-	"github.com/microsoft/TypeScript/tsc/internal/core"
-	"github.com/microsoft/TypeScript/tsc/internal/debug"
-	"github.com/microsoft/TypeScript/tsc/internal/scanner"
-	"github.com/microsoft/TypeScript/tsc/internal/sourcemap"
-	"github.com/microsoft/TypeScript/tsc/internal/stringutil"
-	"github.com/microsoft/TypeScript/tsc/internal/tspath"
+	"github.com/jdrebin/TyThon/tsc/internal/ast"
+	"github.com/jdrebin/TyThon/tsc/internal/core"
+	"github.com/jdrebin/TyThon/tsc/internal/debug"
+	"github.com/jdrebin/TyThon/tsc/internal/scanner"
+	"github.com/jdrebin/TyThon/tsc/internal/sourcemap"
+	"github.com/jdrebin/TyThon/tsc/internal/stringutil"
+	"github.com/jdrebin/TyThon/tsc/internal/tspath"
 )
 
 type PrinterOptions struct {

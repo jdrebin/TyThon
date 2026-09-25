@@ -3,7 +3,7 @@ package symlinks
 import (
 	"testing"
 
-	"github.com/microsoft/TypeScript/tsc/internal/tspath"
+	"github.com/jdrebin/TyThon/tsc/internal/tspath"
 )
 
 func BenchmarkPopulateSymlinksFromResolutions(b *testing.B) {

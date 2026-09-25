@@ -4,8 +4,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/microsoft/TypeScript/tsc/internal/ast"
-	"github.com/microsoft/TypeScript/tsc/internal/printer"
+	"github.com/jdrebin/TyThon/tsc/internal/ast"
+	"github.com/jdrebin/TyThon/tsc/internal/printer"
 )
 
 // printPythonTypeNode is a syntax printer, not a type formatter. The native

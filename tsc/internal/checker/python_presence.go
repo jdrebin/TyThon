@@ -3,8 +3,8 @@ package checker
 import (
 	"fmt"
 
-	"github.com/microsoft/TypeScript/tsc/internal/ast"
-	"github.com/microsoft/TypeScript/tsc/internal/collections"
+	"github.com/jdrebin/TyThon/tsc/internal/ast"
+	"github.com/jdrebin/TyThon/tsc/internal/collections"
 )
 
 // pythonItemProperty projects a Python key onto a native property symbol.

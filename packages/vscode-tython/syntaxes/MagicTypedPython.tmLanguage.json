@@ -1283,10 +1283,10 @@
                     "begin": "(<)",
                     "end": "(>)",
                     "beginCaptures": {
-                        "1": { "name": "punctuation.definition.typeparameters.begin.typed-python" }
+                        "1": { "name": "punctuation.definition.typeparameters.begin.tython" }
                     },
                     "endCaptures": {
-                        "1": { "name": "punctuation.definition.typeparameters.end.typed-python" }
+                        "1": { "name": "punctuation.definition.typeparameters.end.tython" }
                     },
                     "patterns": [
                         { "include": "#expression" }

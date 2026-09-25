@@ -6,13 +6,13 @@ import (
 	"fmt"
 	"slices"
 
-	"github.com/microsoft/TypeScript/tsc/internal/ast"
-	"github.com/microsoft/TypeScript/tsc/internal/checker"
-	"github.com/microsoft/TypeScript/tsc/internal/core"
-	"github.com/microsoft/TypeScript/tsc/internal/ls/lsconv"
-	"github.com/microsoft/TypeScript/tsc/internal/lsp/lsproto"
-	"github.com/microsoft/TypeScript/tsc/internal/scanner"
-	"github.com/microsoft/TypeScript/tsc/internal/spanmap"
+	"github.com/jdrebin/TyThon/tsc/internal/ast"
+	"github.com/jdrebin/TyThon/tsc/internal/checker"
+	"github.com/jdrebin/TyThon/tsc/internal/core"
+	"github.com/jdrebin/TyThon/tsc/internal/ls/lsconv"
+	"github.com/jdrebin/TyThon/tsc/internal/lsp/lsproto"
+	"github.com/jdrebin/TyThon/tsc/internal/scanner"
+	"github.com/jdrebin/TyThon/tsc/internal/spanmap"
 )
 
 // tokenTypes defines the order of token types for encoding

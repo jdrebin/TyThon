@@ -5,7 +5,7 @@ export function resolveCompilerPath(extensionPath: string, development: boolean,
     if (configured) return configured;
     const compiler = development
         ? path.resolve(extensionPath, "../../built/local", platform === "win32" ? "tsc.exe" : "tsc")
-        : path.join(extensionPath, "bin", platform === "win32" ? "typed-python.exe" : "typed-python");
+        : path.join(extensionPath, "bin", platform === "win32" ? "tython.exe" : "tython");
     if (!existsSync(compiler)) {
         throw new Error(development
             ? "tython compiler is missing. Run the Prepare tython demo task."

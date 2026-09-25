@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/microsoft/TypeScript/tsc/internal/checker"
+	"github.com/jdrebin/TyThon/tsc/internal/checker"
 )
 
 func TestUtilitiesAndDictAreLibraryDeclarations(t *testing.T) {

@@ -8,7 +8,7 @@ import (
 // This fixture is also checked against real CPython AST conversion by the
 // extension suite. Imported declarations use exactly the normal native checker.
 func TestImportedPythonDeclarationsUseNativeChecking(t *testing.T) {
-	declarations, err := os.ReadFile("../../../packages/vscode-python-typescript/test/fixtures/python-declarations/advanced.d.ty")
+	declarations, err := os.ReadFile("../../../packages/vscode-tython/test/fixtures/python-declarations/advanced.d.ty")
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -75,8 +75,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         options: { cwd: vscode.workspace.workspaceFolders?.[0]?.uri.fsPath, env: { ...process.env, GOMEMLIMIT: launch.softLimit } },
     };
     const documentSelector = [
-        { language: "typed-python", scheme: "file" },
-        { language: "typed-python", scheme: "typed-python" },
+        { language: "tython", scheme: "file" },
+        { language: "tython", scheme: "tython" },
     ];
     let pythonTools: PythonTools | undefined;
     const clientOptions: LanguageClientOptions = {
@@ -134,7 +134,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         },
     };
     languageClient = new LanguageClient(
-        "typed-python",
+        "tython",
         "TyThon",
         serverOptions,
         clientOptions,
@@ -160,18 +160,18 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         output.show(true);
     }));
     context.subscriptions.push(vscode.workspace.onDidOpenTextDocument(document => {
-        if (document.uri.scheme === "typed-python" && document.languageId !== "typed-python") {
-            void vscode.languages.setTextDocumentLanguage(document, "typed-python");
+        if (document.uri.scheme === "tython" && document.languageId !== "tython") {
+            void vscode.languages.setTextDocumentLanguage(document, "tython");
         }
     }));
-    context.subscriptions.push(vscode.workspace.registerTextDocumentContentProvider("typed-python", {
+    context.subscriptions.push(vscode.workspace.registerTextDocumentContentProvider("tython", {
         async provideTextDocumentContent(uri: vscode.Uri): Promise<string> {
             if (!uri.path.endsWith("/builtins.d.ty") || !languageClient?.isRunning()) return "";
             return languageClient.sendRequest<string>("typedPython/builtinSource", {});
         },
     }));
     context.subscriptions.push(vscode.languages.registerDefinitionProvider(
-        [{ language: "typed-python", scheme: "file" }, { language: "typed-python", scheme: "typed-python" }],
+        [{ language: "tython", scheme: "file" }, { language: "tython", scheme: "tython" }],
         {
             async provideDefinition(document, position, token) {
                 if (!languageClient?.isRunning()) return undefined;

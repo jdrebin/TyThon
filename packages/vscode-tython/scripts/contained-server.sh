@@ -5,7 +5,7 @@ unit=$1
 memory_bytes=$2
 swap_bytes=$3
 shift 3
-case "$unit" in typed-python-*.service) ;; *) echo 'Invalid tython containment unit' >&2; exit 1 ;; esac
+case "$unit" in tython-*.service) ;; *) echo 'Invalid tython containment unit' >&2; exit 1 ;; esac
 case "$memory_bytes:$swap_bytes" in *[!0-9:]*|:*) exit 1 ;; esac
 
 legacy_path=$(awk -F: '$2 ~ /(^|,)memory(,|$)/ { print $3 }' /proc/self/cgroup)

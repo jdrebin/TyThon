@@ -6,8 +6,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/microsoft/TypeScript/tsc/internal/repo"
-	"github.com/microsoft/TypeScript/tsc/internal/stringutil"
+	"github.com/jdrebin/TyThon/tsc/internal/repo"
+	"github.com/jdrebin/TyThon/tsc/internal/stringutil"
 	"github.com/peter-evans/patience"
 )
 

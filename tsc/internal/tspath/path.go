@@ -8,7 +8,7 @@ import (
 	"unicode/utf8"
 	"unsafe"
 
-	"github.com/microsoft/TypeScript/tsc/internal/stringutil"
+	"github.com/jdrebin/TyThon/tsc/internal/stringutil"
 )
 
 type Path string

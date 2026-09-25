@@ -11,12 +11,12 @@ import (
 	"time"
 	"unicode"
 
-	"github.com/microsoft/TypeScript/tsc/internal/core"
-	"github.com/microsoft/TypeScript/tsc/internal/nativepath"
-	"github.com/microsoft/TypeScript/tsc/internal/osutil"
-	"github.com/microsoft/TypeScript/tsc/internal/tspath"
-	"github.com/microsoft/TypeScript/tsc/internal/vfs"
-	"github.com/microsoft/TypeScript/tsc/internal/vfs/internal"
+	"github.com/jdrebin/TyThon/tsc/internal/core"
+	"github.com/jdrebin/TyThon/tsc/internal/nativepath"
+	"github.com/jdrebin/TyThon/tsc/internal/osutil"
+	"github.com/jdrebin/TyThon/tsc/internal/tspath"
+	"github.com/jdrebin/TyThon/tsc/internal/vfs"
+	"github.com/jdrebin/TyThon/tsc/internal/vfs/internal"
 )
 
 var (

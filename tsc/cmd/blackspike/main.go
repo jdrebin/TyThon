@@ -10,7 +10,7 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/microsoft/TypeScript/tsc/internal/python"
+	"github.com/jdrebin/TyThon/tsc/internal/python"
 )
 
 type request struct {

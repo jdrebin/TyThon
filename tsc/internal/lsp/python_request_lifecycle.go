@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 
-	"github.com/microsoft/TypeScript/tsc/internal/lsp/lsproto"
+	"github.com/jdrebin/TyThon/tsc/internal/lsp/lsproto"
 )
 
 // Called with s.mu held. Every open document can be an imported dependency.

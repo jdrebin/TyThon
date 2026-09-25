@@ -1,7 +1,7 @@
 package ast
 
 import (
-	"github.com/microsoft/TypeScript/tsc/internal/core"
+	"github.com/jdrebin/TyThon/tsc/internal/core"
 )
 
 type SubtreeFacts uint32

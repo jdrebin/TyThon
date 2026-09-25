@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/microsoft/TypeScript/tsc/internal/core"
-	"github.com/microsoft/TypeScript/tsc/internal/osutil"
+	"github.com/jdrebin/TyThon/tsc/internal/core"
+	"github.com/jdrebin/TyThon/tsc/internal/osutil"
 )
 
 func main() {

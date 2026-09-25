@@ -1,10 +1,10 @@
 package printer
 
 import (
-	"github.com/microsoft/TypeScript/tsc/internal/ast"
-	"github.com/microsoft/TypeScript/tsc/internal/binder"
-	"github.com/microsoft/TypeScript/tsc/internal/evaluator"
-	"github.com/microsoft/TypeScript/tsc/internal/nodebuilder"
+	"github.com/jdrebin/TyThon/tsc/internal/ast"
+	"github.com/jdrebin/TyThon/tsc/internal/binder"
+	"github.com/jdrebin/TyThon/tsc/internal/evaluator"
+	"github.com/jdrebin/TyThon/tsc/internal/nodebuilder"
 )
 
 type SymbolAccessibility int32

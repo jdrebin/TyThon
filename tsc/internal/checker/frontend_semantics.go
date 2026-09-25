@@ -2,8 +2,8 @@ package checker
 
 import (
 	"context"
-	"github.com/microsoft/TypeScript/tsc/internal/ast"
-	"github.com/microsoft/TypeScript/tsc/internal/core"
+	"github.com/jdrebin/TyThon/tsc/internal/ast"
+	"github.com/jdrebin/TyThon/tsc/internal/core"
 )
 
 // These entry points expose shared checker setup, not alternate inference or

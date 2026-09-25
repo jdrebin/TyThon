@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/microsoft/TypeScript/tsc/internal/lsp/lsproto"
+	"github.com/jdrebin/TyThon/tsc/internal/lsp/lsproto"
 )
 
 func TestPythonStringCompletionEdits(t *testing.T) {

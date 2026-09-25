@@ -3,13 +3,13 @@ package checker
 import (
 	"fmt"
 
-	"github.com/microsoft/TypeScript/tsc/internal/ast"
-	"github.com/microsoft/TypeScript/tsc/internal/collections"
-	"github.com/microsoft/TypeScript/tsc/internal/core"
-	"github.com/microsoft/TypeScript/tsc/internal/jsnum"
-	"github.com/microsoft/TypeScript/tsc/internal/nodebuilder"
-	"github.com/microsoft/TypeScript/tsc/internal/printer"
-	"github.com/microsoft/TypeScript/tsc/internal/scanner"
+	"github.com/jdrebin/TyThon/tsc/internal/ast"
+	"github.com/jdrebin/TyThon/tsc/internal/collections"
+	"github.com/jdrebin/TyThon/tsc/internal/core"
+	"github.com/jdrebin/TyThon/tsc/internal/jsnum"
+	"github.com/jdrebin/TyThon/tsc/internal/nodebuilder"
+	"github.com/jdrebin/TyThon/tsc/internal/printer"
+	"github.com/jdrebin/TyThon/tsc/internal/scanner"
 )
 
 // isExpanding returns whether the node builder context is operating in hover-expansion mode.

@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/microsoft/TypeScript/tsc/internal/vfs"
+	"github.com/jdrebin/TyThon/tsc/internal/vfs"
 )
 
 const embedded = true

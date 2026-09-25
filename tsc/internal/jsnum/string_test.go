@@ -9,8 +9,8 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/microsoft/TypeScript/tsc/internal/json"
-	"github.com/microsoft/TypeScript/tsc/internal/testutil/jstest"
+	"github.com/jdrebin/TyThon/tsc/internal/json"
+	"github.com/jdrebin/TyThon/tsc/internal/testutil/jstest"
 	"gotest.tools/v3/assert"
 )
 

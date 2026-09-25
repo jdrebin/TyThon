@@ -3,12 +3,12 @@ package tstransforms_test
 import (
 	"testing"
 
-	"github.com/microsoft/TypeScript/tsc/internal/core"
-	"github.com/microsoft/TypeScript/tsc/internal/printer"
-	"github.com/microsoft/TypeScript/tsc/internal/testutil/emittestutil"
-	"github.com/microsoft/TypeScript/tsc/internal/testutil/parsetestutil"
-	"github.com/microsoft/TypeScript/tsc/internal/transformers"
-	"github.com/microsoft/TypeScript/tsc/internal/transformers/tstransforms"
+	"github.com/jdrebin/TyThon/tsc/internal/core"
+	"github.com/jdrebin/TyThon/tsc/internal/printer"
+	"github.com/jdrebin/TyThon/tsc/internal/testutil/emittestutil"
+	"github.com/jdrebin/TyThon/tsc/internal/testutil/parsetestutil"
+	"github.com/jdrebin/TyThon/tsc/internal/transformers"
+	"github.com/jdrebin/TyThon/tsc/internal/transformers/tstransforms"
 )
 
 func TestTypeEraser(t *testing.T) {

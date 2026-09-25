@@ -8,7 +8,7 @@ import (
 )
 
 func TestPreviewCorpus(t *testing.T) {
-	root := filepath.Join("..", "..", "..", "packages", "vscode-python-typescript", "preview")
+	root := filepath.Join("..", "..", "..", "packages", "vscode-tython", "preview")
 	entries, err := os.ReadDir(root)
 	if err != nil {
 		t.Fatal(err)

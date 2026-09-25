@@ -5,7 +5,7 @@ package ast
 import (
 	"sync/atomic"
 
-	"github.com/microsoft/TypeScript/tsc/internal/core"
+	"github.com/jdrebin/TyThon/tsc/internal/core"
 )
 
 var (

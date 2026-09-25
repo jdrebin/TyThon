@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/microsoft/TypeScript/tsc/internal/lsp/lsproto"
+	"github.com/jdrebin/TyThon/tsc/internal/lsp/lsproto"
 )
 
 type logger struct {

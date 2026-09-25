@@ -34,7 +34,7 @@ regression run. No package is approved for deletion solely by a text search.
 | `tools/scripts/post-vsts-artifact-comment.mjs` | Retire | Azure artifact-comment integration, not a language feature. Check remaining pipeline references in the cleanup commit. |
 | `.git-blame-ignore-revs` | Retire or regenerate | Contains upstream commit hashes absent from the fresh history. It no longer describes this repository's history. |
 | `docs/upstream/` (13 files) | Optional documentation cleanup | Historical README, contribution/security/support/code-of-conduct documents and issue templates. Not runtime inputs. Keep useful provenance in `docs/LICENSING.md`; retain any applicable attribution before removing archive material. Update README archive links. |
-| `packages/vscode-typescript/` (34 files) | Detach first, then retire as a shipped extension | Old native-preview JS/TS extension, separate from `packages/vscode-python-typescript/`. `Herebyfile.mjs` still targets its workspace for extension tests, localization and packaging. Some language-feature files are useful reference implementations for remaining ports; preserve access to the pinned upstream source. |
+| `packages/vscode-typescript/` (34 files) | Detach first, then retire as a shipped extension | Old native-preview JS/TS extension, separate from `packages/vscode-tython/`. `Herebyfile.mjs` still targets its workspace for extension tests, localization and packaging. Some language-feature files are useful reference implementations for remaining ports; preserve access to the pinned upstream source. |
 | `packages/vscode-typescript-nightly/` (4 files) | Detach first, then retire | TypeScript Team nightly product manifest and release assets. Still selected by the old Hereby release configuration. |
 | `packages/typescript/` (182 files) | Decision needed; not used as the tython extension package | Contains the upstream native compiler's public JS API, CLI packaging, generated TS AST/enums and vendored dependencies. The tython extension uses LSP, but build/API tests and generators still reference this workspace. Decide whether tython will expose this JS API before retiring it; do not confuse this directory with the Go checker. |
 | TypeScript release/package tasks inside `Herebyfile.mjs` | Detach first | Release profiles, TypeScript npm/platform packages, legacy VSIX packaging and signing remain. Remove the old product tasks while retaining shared build/test/generation functions. The whole file is not disposable. |
@@ -75,7 +75,7 @@ JS-specific branch in those packages is necessary forever.
   to delete; partial areas are identified below.
 - `tsc/internal/python/lib/builtins.d.ty` and `check_library.ty`: actual library
   source and its authoring exercise, not copies of a separate canonical library.
-- `packages/vscode-python-typescript/`: current tython extension, its package
+- `packages/vscode-tython/`: current tython extension, its package
   script, tests, grammar and Python-tool bridges. The directory name is a
   compatibility/organization detail, not a second old TS extension.
 - `tools/customlint/`, shared Go tools/configuration, hooks and required
@@ -87,8 +87,8 @@ JS-specific branch in those packages is necessary forever.
   not inherited TS clutter. Consolidation with the packaged `preview/` would
   require a separate decision; preserve authored examples.
 
-Do not mechanically replace `github.com/microsoft/TypeScript/tsc` import paths,
-`pythonTypeScript.*` settings/commands or `typed-python` IDs during removal.
+Do not mechanically replace `github.com/jdrebin/TyThon/tsc` import paths,
+`pythonTypeScript.*` settings/commands or `tython` IDs during removal.
 Renaming public/configuration identifiers needs a compatibility migration;
 Go module renaming needs generators and all imports updated together.
 
@@ -127,7 +127,7 @@ service from an intentional Python difference or a deliberately deferred feature
 | Project ownership: `tsc/internal/python/checker_factory.go`, `program.go`, `project_sources.go`; `tsc/internal/lsp/python_language_service.go` | Unchanged Python snapshots reuse a cached program. Changed sources call `BuildProgram` again; native `UpdateProgram` currently operates around the synthetic TS bootstrap. Import discovery searches explicit roots and paired `.d.ty`/`.ty`/`.py` files. | Deeper per-module native incremental integration and Python environment/package discovery. Existing caching is real, but not complete native Python project parity. |
 | Native editor surface: `tsc/internal/lsp/server.go`, `python_language_service.go`; extension `src/extension.ts`, `pythonTools.ts` | Python supports diagnostics, hover, completion, signature help, semantic tokens and custom definition/source-definition routing. Its capability set is narrower than the TS server's; completion resolve is disabled. Ruff supplies selected quick fixes/formatting and Jedi supplies supplementary Python results. | References, rename, broader refactors/import edits, inlay hints and other desired native services need explicit wiring and source mapping. Do not assume the presence of TS handlers proves Python support. Preserve existing definition support. |
 | Library: `tsc/internal/python/lib/builtins.d.ty`, `checker_environment.go` | One declaration file provides the intrinsic identities, utilities and partial built-in protocols. For example mapping views currently return `Iterator`, `get` lacks its default-value overload, list methods are sparse, and set operator contracts use `any`. Several generic constructors remain explicitly recognized by the environment. | Finish ordinary declarations and Python stdlib module coverage; identify only genuinely necessary intrinsic hooks. Keep canonical library ownership and avoid reinstating `dict<K,V>` as a separate builtin design. |
-| Stub ingestion: `packages/vscode-python-typescript/scripts/python_declarations.py`, `src/pythonTypeServer.ts`, `src/pythonTools.ts` | CPython AST conversion supports a subset and rejects unsupported input. Generic/type-comment function declarations, class bases/generics/decorators/nesting, wildcard/class-local imports and missing annotations are explicitly rejected. | Reuse the resolver/CPython AST and native checker; expand syntax conversion and declaration dependency ingestion. Current failure cases are bridge gaps, not proof those types cannot be represented in tython. |
+| Stub ingestion: `packages/vscode-tython/scripts/python_declarations.py`, `src/pythonTypeServer.ts`, `src/pythonTools.ts` | CPython AST conversion supports a subset and rejects unsupported input. Generic/type-comment function declarations, class bases/generics/decorators/nesting, wildcard/class-local imports and missing annotations are explicitly rejected. | Reuse the resolver/CPython AST and native checker; expand syntax conversion and declaration dependency ingestion. Current failure cases are bridge gaps, not proof those types cannot be represented in tython. |
 | Python formatting/lint mapping: `tsc/internal/python/erasure.go`, `runtime_syntax.go`; extension `scripts/python-provider.py`, `src/pythonTools.ts` | Existing Ruff/Jedi integration works through erased projections and protected typed spans. The plan explicitly limits whole-document typed formatting and arbitrary rewrites through typed syntax. | Safely map provider edits across typed syntax. Preserve type declarations and assertions; do not introduce another formatter or accept erased output as a replacement source file. |
 | CLI/build identity: `tsc/cmd/tsc/main.go`, `python.go`; `Herebyfile.mjs`, root `package.json` | Python mode works, but TS default dispatch, old help naming and legacy root test/release tasks remain. | Finish tython product entry points and build/test commands using the existing compiler/tooling. Decide retained compatibility modes before removal. |
 | Distribution: extension `scripts/package-preview.mjs`, `src/serverLaunch.ts`, `scripts/contained-server.sh` | VSIX packaging explicitly supports only Linux x64; cgroup containment is intentional. | Additional platform packaging, verification and protections are separate work. Do not remove containment or switch to an unverified old TS publisher to expand platforms. |
@@ -225,8 +225,8 @@ completion, navigation and embedded-library checks.
 - [Python snapshot ownership](../tsc/internal/lsp/python_language_service.go)
 - [Hover formatter](../tsc/internal/python/format.go)
 - [Canonical declarations](../tsc/internal/python/lib/builtins.d.ty)
-- [Python declaration importer](../packages/vscode-python-typescript/scripts/python_declarations.py)
-- [Current packaging allowlist and checks](../packages/vscode-python-typescript/scripts/package-preview.mjs)
+- [Python declaration importer](../packages/vscode-tython/scripts/python_declarations.py)
+- [Current packaging allowlist and checks](../packages/vscode-tython/scripts/package-preview.mjs)
 - [Design and deferred work](../TYTHON_PLAN.md)
 
 Local evidence commands used included `git ls-files`, targeted `rg` searches,

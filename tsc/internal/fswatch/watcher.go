@@ -11,7 +11,7 @@ import (
 	"sync"
 	"syscall"
 
-	"github.com/microsoft/TypeScript/tsc/internal/nativepath"
+	"github.com/jdrebin/TyThon/tsc/internal/nativepath"
 )
 
 var errNilCallback = errors.New("fswatch: callback must not be nil")

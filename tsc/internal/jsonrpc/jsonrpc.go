@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/microsoft/TypeScript/tsc/internal/json"
+	"github.com/jdrebin/TyThon/tsc/internal/json"
 )
 
 // JSONRPCVersion represents the JSON-RPC version field, always "2.0".

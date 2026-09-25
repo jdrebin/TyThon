@@ -3,8 +3,8 @@ package python
 import (
 	"strings"
 
-	"github.com/microsoft/TypeScript/tsc/internal/checker"
-	"github.com/microsoft/TypeScript/tsc/internal/collections"
+	"github.com/jdrebin/TyThon/tsc/internal/checker"
+	"github.com/jdrebin/TyThon/tsc/internal/collections"
 )
 
 type StringCompletionQuery struct {

@@ -1,6 +1,6 @@
 {
     "name": "tython syntax additions",
-    "scopeName": "typed-python.injection",
+    "scopeName": "tython.injection",
     "injectionSelector": "L:source.python.typed -comment -string",
     "patterns": [
         {
@@ -54,14 +54,14 @@
     ],
     "repository": {
         "type-alias-declaration": {
-            "name": "meta.type.declaration.typed-python",
+            "name": "meta.type.declaration.tython",
             "begin": "^(\\s*)(type)\\s+([[:alpha:]_]\\w*)",
             "beginCaptures": {
                 "2": {
-                    "name": "storage.type.type.typed-python"
+                    "name": "storage.type.type.tython"
                 },
                 "3": {
-                    "name": "entity.name.type.alias.typed-python"
+                    "name": "entity.name.type.alias.tython"
                 }
             },
             "end": "(?=#|$)",
@@ -72,20 +72,20 @@
             ]
         },
         "interface-declaration": {
-            "name": "meta.interface.typed-python",
+            "name": "meta.interface.tython",
             "begin": "^(\\s*)(interface)\\s+([[:alpha:]_]\\w*|\\*)",
             "beginCaptures": {
                 "2": {
-                    "name": "storage.type.interface.typed-python"
+                    "name": "storage.type.interface.tython"
                 },
                 "3": {
-                    "name": "entity.name.type.interface.typed-python"
+                    "name": "entity.name.type.interface.tython"
                 }
             },
             "end": "(:)",
             "endCaptures": {
                 "1": {
-                    "name": "punctuation.section.interface.begin.typed-python"
+                    "name": "punctuation.section.interface.begin.tython"
                 }
             },
             "patterns": [
@@ -97,11 +97,11 @@
         "declaration-modifiers": {
             "patterns": [
                 {
-                    "name": "storage.modifier.declaration.typed-python",
+                    "name": "storage.modifier.declaration.tython",
                     "match": "^(\\s*)(declare)\\b"
                 },
                 {
-                    "name": "storage.modifier.typed-python",
+                    "name": "storage.modifier.tython",
                     "match": "(?<![\\w.])(readonly|static|optional)\\b(?=\\s+[^\\s:=])"
                 }
             ]
@@ -113,7 +113,7 @@
                     "name": "keyword.control.import.python"
                 },
                 "2": {
-                    "name": "storage.modifier.type-only.typed-python"
+                    "name": "storage.modifier.type-only.tython"
                 }
             }
         },
@@ -153,20 +153,20 @@
                     "match": "\\b(for)\\s+([[:alpha:]_]\\w*)\\s+(in)\\b",
                     "captures": {
                         "1": { "name": "keyword.control.flow.python" },
-                        "2": { "name": "entity.name.type.parameter.typed-python" },
+                        "2": { "name": "entity.name.type.parameter.tython" },
                         "3": { "name": "keyword.operator.logical.python" }
                     }
                 },
                 {
-                    "name": "entity.name.type.typed-python",
+                    "name": "entity.name.type.tython",
                     "match": "\\b(?!(?:if|else|for|in|True|False|None|readonly|static)\\b)[[:alpha:]_]\\w*\\b"
                 },
                 {
-                    "name": "keyword.operator.assignment.typed-python",
+                    "name": "keyword.operator.assignment.tython",
                     "match": "=(?!=)"
                 },
                 {
-                    "name": "keyword.operator.type.typed-python",
+                    "name": "keyword.operator.type.tython",
                     "match": "(\\||&)"
                 },
                 {
@@ -179,17 +179,17 @@
             ]
         },
         "type-parameters": {
-            "name": "meta.type.parameters.typed-python",
+            "name": "meta.type.parameters.tython",
             "begin": "(?<=[[:alnum:]_*])(<)(?=\\s*[[:alpha:]_])",
             "beginCaptures": {
                 "1": {
-                    "name": "punctuation.definition.typeparameters.begin.typed-python"
+                    "name": "punctuation.definition.typeparameters.begin.tython"
                 }
             },
             "end": "(>)",
             "endCaptures": {
                 "1": {
-                    "name": "punctuation.definition.typeparameters.end.typed-python"
+                    "name": "punctuation.definition.typeparameters.end.tython"
                 }
             },
             "patterns": [
@@ -206,11 +206,11 @@
                     "include": "#attribute-key"
                 },
                 {
-                    "name": "punctuation.separator.type-parameters.typed-python",
+                    "name": "punctuation.separator.type-parameters.tython",
                     "match": ","
                 },
                 {
-                    "name": "entity.name.type.typed-python",
+                    "name": "entity.name.type.tython",
                     "match": "\\b[[:alpha:]_]\\w*\\b"
                 }
             ]
@@ -238,44 +238,44 @@
         "type-keywords": {
             "patterns": [
                 {
-                    "name": "keyword.operator.expression.$1.typed-python",
+                    "name": "keyword.operator.expression.$1.tython",
                     "match": "(?<![\\w.])(keyof|typeof|infer|extends)\\b"
                 },
                 {
-                    "name": "keyword.control.satisfies.typed-python",
+                    "name": "keyword.control.satisfies.tython",
                     "match": "(?<![\\w.])satisfies\\b"
                 },
                 {
-                    "name": "storage.modifier.typed-python",
+                    "name": "storage.modifier.tython",
                     "match": "\\bconst\\b"
                 },
                 {
-                    "name": "support.type.builtin.typed-python",
+                    "name": "support.type.builtin.tython",
                     "match": "\\b(any|never|unknown)\\b"
                 }
             ]
         },
         "type-utilities": {
-            "name": "support.function.type-utility.typed-python",
+            "name": "support.function.type-utility.tython",
             "match": "\\b(Exclude|Extract)\\b(?=\\s*\\()"
         },
         "attribute-key": {
             "patterns": [
                 {
-                    "name": "meta.type.attribute-key.typed-python",
+                    "name": "meta.type.attribute-key.tython",
                     "begin": "(\\*)(<)",
                     "beginCaptures": {
                         "1": {
-                            "name": "entity.name.type.interface.typed-python"
+                            "name": "entity.name.type.interface.tython"
                         },
                         "2": {
-                            "name": "punctuation.definition.typeparameters.begin.typed-python"
+                            "name": "punctuation.definition.typeparameters.begin.tython"
                         }
                     },
                     "end": "(>)",
                     "endCaptures": {
                         "1": {
-                            "name": "punctuation.definition.typeparameters.end.typed-python"
+                            "name": "punctuation.definition.typeparameters.end.tython"
                         }
                     },
                     "patterns": [
@@ -285,7 +285,7 @@
                     ]
                 },
                 {
-                    "name": "entity.name.type.interface.typed-python",
+                    "name": "entity.name.type.interface.tython",
                     "match": "\\*(?![\\w*(\\[])"
                 }
             ]
@@ -295,15 +295,15 @@
                 {
                     "begin": "(\\*)(<)",
                     "beginCaptures": {
-                        "1": { "name": "entity.name.type.interface.typed-python" },
-                        "2": { "name": "punctuation.definition.typeparameters.begin.typed-python" }
+                        "1": { "name": "entity.name.type.interface.tython" },
+                        "2": { "name": "punctuation.definition.typeparameters.begin.tython" }
                     },
                     "end": ">",
                     "patterns": [{ "include": "#type-expression" }]
                 },
                 {
                     "match": "(?<=[:\\[,(=|&])\\s*(\\*)(?=\\s*(?:[,>\\]})=:]|$))",
-                    "captures": { "1": { "name": "entity.name.type.interface.typed-python" } }
+                    "captures": { "1": { "name": "entity.name.type.interface.tython" } }
                 }
             ]
         },
@@ -326,11 +326,11 @@
         "collection-shorthand": {
             "patterns": [
                 {
-                    "name": "meta.type.list.typed-python punctuation.definition.type.list.typed-python",
+                    "name": "meta.type.list.tython punctuation.definition.type.list.tython",
                     "match": "\\[\\](?=\\s*(?:[[:alpha:]_(]|$))"
                 },
                 {
-                    "name": "meta.type.tuple.typed-python punctuation.definition.type.tuple.typed-python",
+                    "name": "meta.type.tuple.tython punctuation.definition.type.tuple.tython",
                     "match": "\\(\\)(?=\\s*(?:[[:alpha:]_(]|$))"
                 }
             ]

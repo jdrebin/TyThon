@@ -1,8 +1,8 @@
 package ast
 
 import (
-	"github.com/microsoft/TypeScript/tsc/internal/core"
-	"github.com/microsoft/TypeScript/tsc/internal/tspath"
+	"github.com/jdrebin/TyThon/tsc/internal/core"
+	"github.com/jdrebin/TyThon/tsc/internal/tspath"
 )
 
 type SourceFileParseOptions struct {

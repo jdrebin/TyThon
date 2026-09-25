@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/microsoft/TypeScript/tsc/internal/checker"
+	"github.com/jdrebin/TyThon/tsc/internal/checker"
 )
 
 func newPythonChecker(t *testing.T) *checker.Checker {
@@ -18,7 +18,7 @@ func newPythonChecker(t *testing.T) *checker.Checker {
 
 func TestPreviewDeclarationsParseAndBindToChecker(t *testing.T) {
 	c := newPythonChecker(t)
-	paths, err := filepath.Glob(filepath.Join("..", "..", "..", "packages", "vscode-python-typescript", "preview", "*.d.ty"))
+	paths, err := filepath.Glob(filepath.Join("..", "..", "..", "packages", "vscode-tython", "preview", "*.d.ty"))
 	if err != nil || len(paths) == 0 {
 		t.Fatalf("find example declarations: %v, %v", paths, err)
 	}
@@ -49,7 +49,7 @@ func TestPreviewDeclarationsParseAndBindToChecker(t *testing.T) {
 }
 
 func TestPreviewModulesTypeCheckEndToEnd(t *testing.T) {
-	declarations, err := filepath.Glob(filepath.Join("..", "..", "..", "packages", "vscode-python-typescript", "preview", "*.d.ty"))
+	declarations, err := filepath.Glob(filepath.Join("..", "..", "..", "packages", "vscode-tython", "preview", "*.d.ty"))
 	if err != nil || len(declarations) == 0 {
 		t.Fatalf("find examples: %v, %v", declarations, err)
 	}

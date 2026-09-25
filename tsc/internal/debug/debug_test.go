@@ -3,8 +3,8 @@ package debug_test
 import (
 	"testing"
 
-	"github.com/microsoft/TypeScript/tsc/internal/debug"
-	"github.com/microsoft/TypeScript/tsc/internal/testutil"
+	"github.com/jdrebin/TyThon/tsc/internal/debug"
+	"github.com/jdrebin/TyThon/tsc/internal/testutil"
 )
 
 func TestFailEmptyReason(t *testing.T) {

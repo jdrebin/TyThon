@@ -4,8 +4,8 @@ import (
 	"slices"
 	"sync"
 
-	"github.com/microsoft/TypeScript/tsc/internal/ast"
-	"github.com/microsoft/TypeScript/tsc/internal/debug"
+	"github.com/jdrebin/TyThon/tsc/internal/ast"
+	"github.com/jdrebin/TyThon/tsc/internal/debug"
 )
 
 func getRules(context *FormattingContext, rules []*ruleImpl) []*ruleImpl {

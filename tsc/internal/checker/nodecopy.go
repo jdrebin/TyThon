@@ -3,10 +3,10 @@ package checker
 import (
 	"strings"
 
-	"github.com/microsoft/TypeScript/tsc/internal/ast"
-	"github.com/microsoft/TypeScript/tsc/internal/core"
-	"github.com/microsoft/TypeScript/tsc/internal/nodebuilder"
-	"github.com/microsoft/TypeScript/tsc/internal/printer"
+	"github.com/jdrebin/TyThon/tsc/internal/ast"
+	"github.com/jdrebin/TyThon/tsc/internal/core"
+	"github.com/jdrebin/TyThon/tsc/internal/nodebuilder"
+	"github.com/jdrebin/TyThon/tsc/internal/printer"
 )
 
 func (b *NodeBuilderImpl) reuseNode(node *ast.Node) *ast.Node {

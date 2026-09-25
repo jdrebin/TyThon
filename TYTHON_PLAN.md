@@ -8,7 +8,7 @@ registered Marketplace account. Source extensions remain `.ty` and `.d.ty`.
 
 Public documentation, command titles, output labels, npm entry points and future
 artifact names use tython. Existing `pythonTypeScript.*` settings/command IDs,
-`typed-python` language IDs, internal protocol identifiers, Go module paths and
+`tython` language IDs, internal protocol identifiers, Go module paths and
 source directory names remain compatible in this pass. They should not be
 blindly renamed inside the reused TypeScript engine or its test fixtures.
 
@@ -39,7 +39,7 @@ projection formatter. Ruff remains the optional Python linter.
 Implemented:
 
 - Format Document for file-backed `.ty` and `.d.ty` documents, registered as
-  the default formatter for the typed-python language. Ordinary Python editor
+  the default formatter for the tython language. Ordinary Python editor
   formatting is not intercepted. Selection formatting is deliberately not
   advertised until typed ranges have independent validation.
 - A pinned Black/Python bundle plus the existing native parser/erasure helper.
@@ -79,7 +79,7 @@ typed selection formatting, upstream Black regressions, cross-platform runtime
 compatibility, and end-to-end VSIX release verification. Process-local internal
 Black adaptations run only in an isolated one-request formatter process; this is
 not a public Black plugin or a new Python layout engine. Source and formatting
-rules remain in `tools/black-formatter-spike/` (historical directory name).
+rules remain in `tools/black-formatter/` (historical directory name).
 
 The pre-existing release license audit still references an upstream Git object
 lost during history reset. That gate has not been bypassed: release provenance
@@ -324,7 +324,7 @@ Standard-library declarations:
 
 ### Hands-on preview distribution
 
-- Use `packages/vscode-python-typescript/preview` for a small, maintained
+- Use `packages/vscode-tython/preview` for a small, maintained
   consumer workspace: exact shapes and dictionary methods, optional keys,
   mapped/conditional utilities, generics and callbacks, classes and declaration
   imports. Put intentional diagnostics in a separate `negative` directory.
@@ -960,7 +960,7 @@ Implemented boundaries:
   Full typed-syntax formatting and mapping arbitrary formatter
   rewrites through type syntax are **not implemented**. No formatting operation
   replaces a typed document with its erased view.
-- Tools run only on trusted, file-backed `typed-python` documents, excluding
+- Tools run only on trusted, file-backed `tython` documents, excluding
   `.d.ty`. Ordinary `.py` remains with its existing Python extension providers.
 - Microsoft's public Python extension environment API supplies the selected
   interpreter when installed. The tools runtime is separate and configurable;
@@ -971,9 +971,9 @@ Implemented boundaries:
   CPU/address-space limits and process-group cancellation. Windows does not yet
   have equivalent hard tree/memory containment for these Python helpers.
 
-Development setup: `npm run tools:prepare --workspace packages/vscode-python-typescript`
+Development setup: `npm run tools:prepare --workspace packages/vscode-tython`
 installs pinned Jedi/Ruff into `built/local/python-tools`, without changing the
-system interpreter. `npm run demo:prepare --workspace packages/vscode-python-typescript`
+system interpreter. `npm run demo:prepare --workspace packages/vscode-tython`
 rebuilds the server and extension. Configurations are `pythonTypeScript.tools.enabled`,
 `pythonTypeScript.tools.pythonPath`, and `pythonTypeScript.tools.interpreterPath`.
 No dependencies are downloaded automatically on editor activation.
@@ -993,7 +993,7 @@ callable/constructor reclassification, semantic-token legend negotiation,
 sorting and relative encoding are shared. No regex color classifier or second
 symbol/type inference system is introduced. Quoted item keys retain grammar
 coloring rather than becoming attribute tokens. Theme colors remain user-owned;
-semantic highlighting defaults to enabled for `typed-python`.
+semantic highlighting defaults to enabled for `tython`.
 
 Coverage follows the frontend's current named-span records; unmodeled symbols
 still fall back to grammar highlighting rather than guessed classifications.
@@ -1259,7 +1259,7 @@ Anything kept only to read later goes to `local/`, which is untracked. The TypeS
 
 `tsc/testdata` and fourslash move to `local/` with the TypeScript parser. `go test` does not run them. A failure that only exists through the TypeScript parser is not a Tython failure.
 
-Rename (`github.com/microsoft/typescript-go`, `tsgo`, `packages/vscode-python-typescript`, `typed-python`, `tools/black-formatter-spike`) is its own pass after the language input is gone.
+The rename landed: module `github.com/jdrebin/TyThon/tsc`, hereby task `tython`, `packages/vscode-tython`, language id `tython`, `tools/black-formatter`. `pythonTypeScript.*` command and setting ids stay.
 
 ### Completion call rows
 

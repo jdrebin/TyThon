@@ -1,6 +1,6 @@
 package format
 
-import "github.com/microsoft/TypeScript/tsc/internal/ast"
+import "github.com/jdrebin/TyThon/tsc/internal/ast"
 
 type ruleImpl struct {
 	debugName string

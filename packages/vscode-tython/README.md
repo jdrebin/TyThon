@@ -18,7 +18,7 @@ Windows and macOS packages are not included in this preview.
    navigation in the numbered examples.
 
 The matching compiler and library are bundled. You do **not** need Go, Node,
-this repository, or another `tsgo` installation to use native `.ty` features.
+this repository, or another compiler installation to use native `.ty` features.
 Use **Developer: Reload Window** after installing an updated VSIX.
 
 TyThon owns only `.ty` and `.d.ty` documents. Ordinary `.py` files are neither

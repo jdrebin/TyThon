@@ -1,8 +1,8 @@
 package packagejson
 
 import (
-	"github.com/microsoft/TypeScript/tsc/internal/collections"
-	json "github.com/microsoft/TypeScript/tsc/internal/json"
+	"github.com/jdrebin/TyThon/tsc/internal/collections"
+	json "github.com/jdrebin/TyThon/tsc/internal/json"
 )
 
 type HeaderFields struct {

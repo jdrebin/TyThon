@@ -101,8 +101,8 @@ npm ci
 npm run -w tython demo:prepare
 
 code --new-window \
-  --extensionDevelopmentPath="$PWD/packages/vscode-python-typescript" \
-  "$PWD/packages/vscode-python-typescript/preview"
+  --extensionDevelopmentPath="$PWD/packages/vscode-tython" \
+  "$PWD/packages/vscode-tython/preview"
 ```
 
 In the new Extension Development Host window:
@@ -122,7 +122,7 @@ If you have a packaged tython `.vsix`, use **Extensions: Install from VSIX…**,
 then **tython: Open Preview Examples**. The compiler and declarations are bundled;
 native typing features do not require Go, Node, or this checkout.
 
-See the [extension guide](packages/vscode-python-typescript/README.md) for optional
+See the [extension guide](packages/vscode-tython/README.md) for optional
 Jedi documentation/navigation, Ruff linting, bundled Black-based formatting, interpreter selection,
 memory limits, and installation details. Those integrations complement the
 tython checker; they do not replace it.
@@ -950,12 +950,12 @@ inferred types. The pandas illustration is deliberately outside that claim.
 
 ## Built on TypeScript
 
-tython adapts Microsoft's TypeScript implementation and retains its shared
-checker and regression infrastructure. This is an independent project, not an
-official Microsoft product or an implementation built from scratch.
+tython adapts Microsoft's TypeScript checker. The TypeScript language itself
+is not part of this tree. This is an independent project, not an official
+Microsoft product or an implementation built from scratch.
 
 The compiler lives in `tsc/`; the Python frontend and canonical declarations are
-in `tsc/internal/python/`; the editor is in `packages/vscode-python-typescript/`.
+in `tsc/internal/python/`; the editor is in `packages/vscode-tython/`.
 Some internal names remain unchanged for compatibility.
 
 Upstream licenses, copyright and third-party notices are retained in

@@ -16,7 +16,7 @@ assert(legacy.args.includes("--setenv=GOMEMLIMIT=3072MiB"));
 assert(legacy.args.includes("/a path/tsc"));
 assert(legacy.args.includes("/extension path/scripts/contained-server.sh"));
 assert(!legacy.args.includes("--user"));
-assert.match(legacy.unit, /^typed-python-[\da-f-]+\.service$/);
+assert.match(legacy.unit, /^tython-[\da-f-]+\.service$/);
 const unified = createServerLaunch("/tsc", "/extension", "/workspace", limits, "linux", false, false);
 assert(unified.args.includes("--user"));
 assert(unified.args.includes("--property=MemoryMax=4294967296"));
@@ -29,7 +29,7 @@ assert.throws(() => createServerLaunch("tsc", "/e", "/w", { ...limits, swapMiB: 
 const script = fileURLToPath(new URL("../scripts/contained-server.sh", import.meta.url));
 if (process.platform === "linux") {
     // Fail closed before running the supplied command if not in our cgroup.
-    const result = spawnSync("/bin/sh", [script, "typed-python-not-running.service", "67108864", "0", "/bin/echo", "UNSAFE"], { encoding: "utf8" });
+    const result = spawnSync("/bin/sh", [script, "tython-not-running.service", "67108864", "0", "/bin/echo", "UNSAFE"], { encoding: "utf8" });
     assert.notEqual(result.status, 0);
     assert(!result.stdout.includes("UNSAFE"));
     assert.match(result.stderr, /not in its dedicated memory cgroup/);

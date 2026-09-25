@@ -1,4 +1,4 @@
-module github.com/microsoft/TypeScript/tools
+module github.com/jdrebin/TyThon/tools
 
 go 1.26
 

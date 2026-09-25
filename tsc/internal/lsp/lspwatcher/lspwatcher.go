@@ -11,12 +11,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/microsoft/TypeScript/tsc/internal/fswatch"
-	"github.com/microsoft/TypeScript/tsc/internal/ls/lsconv"
-	"github.com/microsoft/TypeScript/tsc/internal/lsp/lsproto"
-	"github.com/microsoft/TypeScript/tsc/internal/project/logging"
-	"github.com/microsoft/TypeScript/tsc/internal/tspath"
-	"github.com/microsoft/TypeScript/tsc/internal/vfs"
+	"github.com/jdrebin/TyThon/tsc/internal/fswatch"
+	"github.com/jdrebin/TyThon/tsc/internal/ls/lsconv"
+	"github.com/jdrebin/TyThon/tsc/internal/lsp/lsproto"
+	"github.com/jdrebin/TyThon/tsc/internal/project/logging"
+	"github.com/jdrebin/TyThon/tsc/internal/tspath"
+	"github.com/jdrebin/TyThon/tsc/internal/vfs"
 )
 
 // throttleWindow mirrors VS Code's parcel watcher integration: give the

@@ -15,7 +15,7 @@ const extension = fileURLToPath(new URL("..", import.meta.url));
 const root = path.resolve(extension, "../..");
 const require = createRequire(import.meta.url);
 assert(process.platform === "linux" && process.arch === "x64", "Only Linux x64 has a verified preview target.");
-const goEnv = { ...process.env, GOCACHE: process.env.GOCACHE || path.join(tmpdir(), "typed-python-go-cache"), GOMAXPROCS: "2" };
+const goEnv = { ...process.env, GOCACHE: process.env.GOCACHE || path.join(tmpdir(), "tython-go-cache"), GOMAXPROCS: "2" };
 function run(command, args, cwd = extension, capture = false, env = process.env) {
     console.log(`\n> ${command} ${args.join(" ")}`);
     const result = spawnSync(command, args, { cwd, env, stdio: capture ? "pipe" : "inherit", encoding: "utf8", timeout: 600000 });
@@ -56,7 +56,7 @@ manifest.files = ["README.md", "LICENSE.txt", "NOTICE.txt", "LICENSING.md", "THI
     "bin/**", "dist/**", "icons/**", "library/**", "licenses/**", "preview/**", "scripts/**", "syntaxes/**", "vendor/**"];
 await writeFile(path.join(stage, "package.json"), JSON.stringify(manifest, null, 2) + "\n");
 await mkdir(path.join(stage, "bin"));
-run("go", ["build", "-trimpath", "-buildvcs=false", "-o", path.join(stage, "bin/typed-python"), "./cmd/tsc"], path.join(root, "tsc"), false, goEnv);
+run("go", ["build", "-trimpath", "-buildvcs=false", "-o", path.join(stage, "bin/tython"), "./cmd/tsc"], path.join(root, "tsc"), false, goEnv);
 const formatter = path.join(root, "built/local/black-formatter");
 await copy(formatter, "bin/formatter");
 const formatterInfo = JSON.parse(await readFile(path.join(formatter, "build-info.json"), "utf8"));
@@ -123,7 +123,7 @@ for (const line of modules.split("\n")) {
 }
 await writeFile(path.join(stage, "THIRD_PARTY_NOTICES.md"), notices.join("\n") + "\n");
 const sha = async file => createHash("sha256").update(await readFile(file)).digest("hex");
-const compilerHash = await sha(path.join(stage, "bin/typed-python"));
+const compilerHash = await sha(path.join(stage, "bin/tython"));
 const extensionHash = await sha(path.join(stage, "dist/extension.bundle.js"));
 // Fingerprint every staged payload file, including docs, examples and vendor
 // contents. build-info itself is added afterwards to avoid a circular hash.
@@ -164,7 +164,7 @@ for (const entry of zip.getEntries()) {
 }
 zip.extractAllTo(extracted, false, true);
 const installed = path.join(extracted, "extension");
-assert.equal(await sha(path.join(installed, "bin/typed-python")), info.compilerSHA256);
+assert.equal(await sha(path.join(installed, "bin/tython")), info.compilerSHA256);
 assert.equal(await sha(path.join(installed, "bin/formatter/black-formatter")), info.formatterSHA256);
 assert.equal(await sha(path.join(installed, "dist/extension.bundle.js")), info.extensionSHA256);
 assert.equal(await sha(path.join(installed, "library/builtins.d.ty")), info.librarySHA256);

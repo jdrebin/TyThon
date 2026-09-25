@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 
-	"github.com/microsoft/TypeScript/tsc/internal/json"
+	"github.com/jdrebin/TyThon/tsc/internal/json"
 )
 
 var (

@@ -1,6 +1,6 @@
 package python
 
-import "github.com/microsoft/TypeScript/tsc/internal/checker"
+import "github.com/jdrebin/TyThon/tsc/internal/checker"
 
 func (e *CheckerTypeEnvironment) newTypeParameter(parameter TypeParameterExpr, constraint, defaultType *checker.Type) *checker.Type {
 	t := e.checker.NewSyntheticTypeParameter(parameter.Name, constraint, defaultType)

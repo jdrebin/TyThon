@@ -1,6 +1,6 @@
 package sourcemap
 
-import "github.com/microsoft/TypeScript/tsc/internal/core"
+import "github.com/jdrebin/TyThon/tsc/internal/core"
 
 type Source interface {
 	Text() string

@@ -3,8 +3,8 @@ package printer
 import (
 	"strings"
 
-	"github.com/microsoft/TypeScript/tsc/internal/ast"
-	"github.com/microsoft/TypeScript/tsc/internal/core"
+	"github.com/jdrebin/TyThon/tsc/internal/ast"
+	"github.com/jdrebin/TyThon/tsc/internal/core"
 )
 
 // PrintAndPositionNode prints a synthesized node to text using the standard

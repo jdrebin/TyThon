@@ -3,7 +3,7 @@ package python
 import (
 	"strings"
 
-	"github.com/microsoft/TypeScript/tsc/internal/checker"
+	"github.com/jdrebin/TyThon/tsc/internal/checker"
 )
 
 // QuickInfoKind is the language-neutral declaration category used by the

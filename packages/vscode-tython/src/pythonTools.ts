@@ -15,7 +15,7 @@ interface Completion { label: string; kind: string; prefixLength: number; }
 
 export class PythonTools implements vscode.Disposable {
     private readonly subscriptions: vscode.Disposable[] = [];
-    private readonly diagnostics = vscode.languages.createDiagnosticCollection("typed-python-ruff");
+    private readonly diagnostics = vscode.languages.createDiagnosticCollection("tython-ruff");
     private readonly jobs = new Map<string, AbortController>();
     private readonly active = new Set<AbortController>();
     private readonly timers = new Map<string, ReturnType<typeof setTimeout>>();
@@ -28,7 +28,7 @@ export class PythonTools implements vscode.Disposable {
 
     constructor(private readonly context: vscode.ExtensionContext, private readonly client: LanguageClient,
         private readonly output: vscode.OutputChannel) {
-        const selector = { language: "typed-python", scheme: "file", pattern: "**/*.ty" };
+        const selector = { language: "tython", scheme: "file", pattern: "**/*.ty" };
         this.subscriptions.push(this.diagnostics,
             vscode.commands.registerCommand("pythonTypeScript.importDeclarations", () => this.importDeclarations()),
             vscode.workspace.onDidOpenTextDocument(document => this.schedule(document)),
@@ -58,7 +58,7 @@ export class PythonTools implements vscode.Disposable {
     }
 
     private enabled(document: vscode.TextDocument): boolean {
-        return !this.disposed && vscode.workspace.isTrusted && document.languageId === "typed-python"
+        return !this.disposed && vscode.workspace.isTrusted && document.languageId === "tython"
             && document.uri.scheme === "file" && document.fileName.endsWith(".ty") && !document.fileName.endsWith(".d.ty")
             && vscode.workspace.getConfiguration("pythonTypeScript", document.uri).get<boolean>("tools.enabled", true);
     }
@@ -186,7 +186,7 @@ export class PythonTools implements vscode.Disposable {
                         }, controller.signal);
                     if (result.errors.length) throw new Error(`${uri.fsPath}\n${result.errors.join("\n")}`);
                     if (controller.signal.aborted || this.disposed) return;
-                    const preview = await vscode.workspace.openTextDocument({ language: "typed-python",
+                    const preview = await vscode.workspace.openTextDocument({ language: "tython",
                         content: `# Imported from ${uri.fsPath.replace(/[\r\n]/g, " ")}\n# Save as a .d.ty declaration file to use in your project.\n${result.text}` });
                     await vscode.window.showTextDocument(preview);
                 } finally { subscription.dispose(); this.active.delete(controller); }

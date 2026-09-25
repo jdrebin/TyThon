@@ -3,8 +3,8 @@ package packagejson
 import (
 	"fmt"
 
-	"github.com/microsoft/TypeScript/tsc/internal/collections"
-	"github.com/microsoft/TypeScript/tsc/internal/json"
+	"github.com/jdrebin/TyThon/tsc/internal/collections"
+	"github.com/jdrebin/TyThon/tsc/internal/json"
 )
 
 type JSONValueType int8

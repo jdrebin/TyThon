@@ -1,6 +1,6 @@
 package core
 
-import "github.com/microsoft/TypeScript/tsc/internal/tspath"
+import "github.com/jdrebin/TyThon/tsc/internal/tspath"
 
 type ProjectReference struct {
 	// Path is a normalized path on disk.

@@ -3,7 +3,7 @@ package python
 import (
 	"strings"
 
-	"github.com/microsoft/TypeScript/tsc/internal/checker"
+	"github.com/jdrebin/TyThon/tsc/internal/checker"
 )
 
 // Like TS's no-default-lib directive, this marks library source that must be

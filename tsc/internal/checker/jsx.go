@@ -1,6 +1,6 @@
 package checker
 
-import "github.com/microsoft/TypeScript/tsc/internal/ast"
+import "github.com/jdrebin/TyThon/tsc/internal/ast"
 
 func (c *Checker) inferJsxTypeArguments(*ast.Node, *Signature, CheckMode, *InferenceContext) []*Type {
 	return nil

@@ -4,10 +4,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/microsoft/TypeScript/tsc/internal/ast"
-	"github.com/microsoft/TypeScript/tsc/internal/core"
-	"github.com/microsoft/TypeScript/tsc/internal/printer"
-	"github.com/microsoft/TypeScript/tsc/internal/testutil/parsetestutil"
+	"github.com/jdrebin/TyThon/tsc/internal/ast"
+	"github.com/jdrebin/TyThon/tsc/internal/core"
+	"github.com/jdrebin/TyThon/tsc/internal/printer"
+	"github.com/jdrebin/TyThon/tsc/internal/testutil/parsetestutil"
 	"gotest.tools/v3/assert"
 )
 

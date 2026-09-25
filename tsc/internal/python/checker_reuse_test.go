@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/microsoft/TypeScript/tsc/internal/checker"
+	"github.com/jdrebin/TyThon/tsc/internal/checker"
 )
 
 func TestConditionalInferUsesCheckerInference(t *testing.T) {

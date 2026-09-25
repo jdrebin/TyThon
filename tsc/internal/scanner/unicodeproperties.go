@@ -1,6 +1,6 @@
 package scanner
 
-import "github.com/microsoft/TypeScript/tsc/internal/collections"
+import "github.com/jdrebin/TyThon/tsc/internal/collections"
 
 // Table 66: Non-binary Unicode property aliases and their canonical property names
 // https://tc39.es/ecma262/#table-nonbinary-unicode-properties

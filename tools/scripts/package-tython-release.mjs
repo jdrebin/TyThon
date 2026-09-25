@@ -20,7 +20,7 @@ assert(process.platform === "linux" && process.arch === "x64", "Only Linux x64 i
 // --vsix reuses an explicitly selected, previously verified local artifact.
 // Omit it to rebuild and verify the editor/server first.
 const vsix = values.vsix ? path.resolve(values.vsix)
-    : (await import("../../packages/vscode-python-typescript/scripts/package-preview.mjs")).verifiedArtifact;
+    : (await import("../../packages/vscode-tython/scripts/package-preview.mjs")).verifiedArtifact;
 run("npm", ["run", "licenses:check"]);
 const sha = bytes => createHash("sha256").update(bytes).digest("hex");
 const bytes = await readFile(vsix);
@@ -50,14 +50,14 @@ const payload = path.join(stage, "tython_cli");
 for (const entry of archive.getEntries()) {
     const name = entry.entryName.replace(/^extension\//, "");
     assert(!name.startsWith("/") && !name.split("/").includes(".."), "Unsafe archive path");
-    const include = ["bin/typed-python", "library/builtins.d.ty", "LICENSE.txt", "NOTICE.txt", "LICENSING.md"].includes(name)
+    const include = ["bin/tython", "library/builtins.d.ty", "LICENSE.txt", "NOTICE.txt", "LICENSING.md"].includes(name)
         || name.startsWith("licenses/go/") || name.startsWith("licenses/go-toolchain/") || name.startsWith("licenses/fswatch/");
     if (!include || entry.isDirectory) continue;
     const destination = path.join(payload, name);
     await mkdir(path.dirname(destination), { recursive: true });
-    await writeFile(destination, entry.getData(), { mode: name === "bin/typed-python" ? 0o755 : 0o644 });
+    await writeFile(destination, entry.getData(), { mode: name === "bin/tython" ? 0o755 : 0o644 });
 }
-assert.equal(sha(await readFile(path.join(payload, "bin/typed-python"))), info.compilerSHA256);
+assert.equal(sha(await readFile(path.join(payload, "bin/tython"))), info.compilerSHA256);
 assert.equal(sha(await readFile(path.join(payload, "library/builtins.d.ty"))), info.librarySHA256);
 await writeFile(path.join(payload, "build-info.json"), JSON.stringify({
     version: info.version, buildID: info.buildID, target: info.target,

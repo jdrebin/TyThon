@@ -9,7 +9,7 @@ import (
 	"runtime"
 	"testing"
 
-	"github.com/microsoft/TypeScript/tsc/internal/collections"
+	"github.com/jdrebin/TyThon/tsc/internal/collections"
 )
 
 var (

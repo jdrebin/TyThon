@@ -8,9 +8,9 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/microsoft/TypeScript/tsc/internal/json"
-	"github.com/microsoft/TypeScript/tsc/internal/repo"
-	"github.com/microsoft/TypeScript/tsc/internal/tspath"
+	"github.com/jdrebin/TyThon/tsc/internal/json"
+	"github.com/jdrebin/TyThon/tsc/internal/repo"
+	"github.com/jdrebin/TyThon/tsc/internal/tspath"
 )
 
 const loaderScript = `import script from "./script.mjs";

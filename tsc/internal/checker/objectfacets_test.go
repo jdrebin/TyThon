@@ -3,9 +3,9 @@ package checker_test
 import (
 	"testing"
 
-	"github.com/microsoft/TypeScript/tsc/internal/checker"
-	"github.com/microsoft/TypeScript/tsc/internal/jsnum"
-	"github.com/microsoft/TypeScript/tsc/internal/python"
+	"github.com/jdrebin/TyThon/tsc/internal/checker"
+	"github.com/jdrebin/TyThon/tsc/internal/jsnum"
+	"github.com/jdrebin/TyThon/tsc/internal/python"
 )
 
 func newFacetChecker(t *testing.T) *checker.Checker {

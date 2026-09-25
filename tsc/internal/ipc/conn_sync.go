@@ -9,8 +9,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/microsoft/TypeScript/tsc/internal/json"
-	"github.com/microsoft/TypeScript/tsc/internal/jsonrpc"
+	"github.com/jdrebin/TyThon/tsc/internal/json"
+	"github.com/jdrebin/TyThon/tsc/internal/jsonrpc"
 )
 
 // SyncConn manages bidirectional communication with synchronous request handling.

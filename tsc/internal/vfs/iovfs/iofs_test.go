@@ -5,9 +5,9 @@ import (
 	"testing"
 	"testing/fstest"
 
-	"github.com/microsoft/TypeScript/tsc/internal/testutil"
-	"github.com/microsoft/TypeScript/tsc/internal/vfs"
-	"github.com/microsoft/TypeScript/tsc/internal/vfs/iovfs"
+	"github.com/jdrebin/TyThon/tsc/internal/testutil"
+	"github.com/jdrebin/TyThon/tsc/internal/vfs"
+	"github.com/jdrebin/TyThon/tsc/internal/vfs/iovfs"
 	"gotest.tools/v3/assert"
 )
 
