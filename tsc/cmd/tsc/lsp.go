@@ -33,6 +33,10 @@ func runLSP(args []string) int {
 		return 2
 	}
 
+	if !*python {
+		fmt.Fprintln(os.Stderr, "the language server only checks .ty and .d.ty files")
+		return 2
+	}
 	if !*stdio {
 		fmt.Fprintln(os.Stderr, "only stdio is supported")
 		return 1

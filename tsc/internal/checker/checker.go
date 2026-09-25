@@ -1371,6 +1371,9 @@ func (c *Checker) initializeChecker() {
 	c.valueSymbolLinks.Get(c.globalThisSymbol).resolvedType = c.newObjectType(ObjectFlagsAnonymous, c.globalThisSymbol)
 	// Initialize special types
 	c.globalArrayType = c.getGlobalType("Array", 1 /*arity*/, true /*reportErrors*/)
+	if c.globalArrayType == c.emptyGenericType {
+		c.globalArrayType = c.syntheticGenericGlobal("Array")
+	}
 	c.globalObjectType = c.getGlobalType("Object", 0 /*arity*/, true /*reportErrors*/)
 	c.globalFunctionType = c.getGlobalType("Function", 0 /*arity*/, true /*reportErrors*/)
 	c.globalCallableFunctionType = c.getGlobalStrictFunctionType("CallableFunction")
@@ -1387,7 +1390,7 @@ func (c *Checker) initializeChecker() {
 	}
 	c.globalReadonlyArrayType = c.getGlobalType("ReadonlyArray", 1 /*arity*/, false /*reportErrors*/)
 	if c.globalReadonlyArrayType == c.emptyGenericType {
-		c.globalReadonlyArrayType = c.globalArrayType
+		c.globalReadonlyArrayType = c.syntheticGenericGlobal("ReadonlyArray")
 	}
 	c.anyReadonlyArrayType = c.createTypeFromGenericGlobalType(c.globalReadonlyArrayType, []*Type{c.anyType})
 	c.globalThisType = c.getGlobalType("ThisType", 1 /*arity*/, false /*reportErrors*/)
@@ -25378,6 +25381,16 @@ func (c *Checker) getGlobalImportMetaExpressionType() *Type {
 
 func (c *Checker) createIterableType(iteratedType *Type) *Type {
 	return c.createTypeFromGenericGlobalType(c.getGlobalIterableTypeChecked(), []*Type{iteratedType, c.voidType, c.undefinedType})
+}
+
+func (c *Checker) syntheticGenericGlobal(name string) *Type {
+	parameter := c.NewSyntheticTypeParameter("T", nil, nil)
+	t := c.NewSyntheticInterfaceObjectType(name, []*Type{parameter})
+	c.varianceLinks.Get(t.symbol).variances = []VarianceFlags{VarianceFlagsCovariant}
+	info := c.newIndexInfo(c.numberType, parameter, false, nil, nil)
+	c.setStructuredTypeMembers(t, nil, nil, nil, []*IndexInfo{info})
+	t.AsInterfaceType().declaredIndexInfos = []*IndexInfo{info}
+	return t
 }
 
 func (c *Checker) createArrayType(elementType *Type) *Type {

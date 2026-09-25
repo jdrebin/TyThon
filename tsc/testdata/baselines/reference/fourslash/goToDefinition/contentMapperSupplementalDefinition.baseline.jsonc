@@ -1,6 +1,0 @@
-// === goToDefinition ===
-// === /globals.astro ===
-// <|const [|supplementalValue|] = 1;|>
-// supplemental/*GOTO DEF*/Value;
-// supplementalV;
-// 

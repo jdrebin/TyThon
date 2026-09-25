@@ -1,7 +1,0 @@
-//// [tests/cases/compiler/jsDocOverloadNamedDefaultExport.ts] ////
-
-=== jsDocOverloadNamedDefaultExport.js ===
-/** @overload */
-export default function foo() {}
->foo : () => any
-

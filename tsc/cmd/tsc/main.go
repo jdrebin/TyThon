@@ -3,13 +3,10 @@
 package main
 
 import (
-	"context"
+	"fmt"
 	"os"
-	"os/signal"
-	"syscall"
 
 	"github.com/microsoft/TypeScript/tsc/internal/core"
-	"github.com/microsoft/TypeScript/tsc/internal/execute"
 	"github.com/microsoft/TypeScript/tsc/internal/osutil"
 )
 
@@ -24,8 +21,6 @@ func runMain() int {
 		switch args[0] {
 		case "--lsp":
 			return runLSP(args[1:])
-		case "--api":
-			return runAPI(args[1:])
 		case "--python":
 			return runPython(args[1:])
 		}
@@ -33,8 +28,6 @@ func runMain() int {
 			return runPython(args)
 		}
 	}
-	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
-	defer stop()
-	result := execute.CommandLine(ctx, newSystem(), args, nil)
-	return int(result.Status)
+	fmt.Fprintln(os.Stderr, "TyThon only checks .ty and .d.ty files")
+	return 2
 }

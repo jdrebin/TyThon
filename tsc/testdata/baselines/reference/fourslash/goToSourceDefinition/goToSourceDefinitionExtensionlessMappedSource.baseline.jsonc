@@ -1,7 +1,0 @@
-// === goToSourceDefinition ===
-// === /lib/helper ===
-// <|export function [|helper|](): string { return ""; }|>
-
-// === /index.ts ===
-// import { /*GOTO SOURCE DEF*/helper } from "./lib/helper";
-// helper();

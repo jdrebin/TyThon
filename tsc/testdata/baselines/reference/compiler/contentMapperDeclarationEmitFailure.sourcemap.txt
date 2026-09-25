@@ -1,7 +1,0 @@
-===================================================================
-JsFile: component.d.vue.ts
-mapUrl: component.d.vue.ts.map
-sourceRoot: 
-sources: component.vue
-===================================================================
->>>//# sourceMappingURL=component.d.vue.ts.map

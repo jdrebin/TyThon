@@ -54,7 +54,7 @@ value[0] = "hello"
 `, "cannot assign item"},
 		{"const array method", `value = [1, 2] as const
 value.append(1)
-`, "no attribute"},
+`, "does not exist"},
 		{"const array delete", `value = [1, 2] as const
 del value[:]
 `, "cannot delete"},

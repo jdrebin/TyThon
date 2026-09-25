@@ -1251,6 +1251,16 @@ These are deferred because none should compromise the core rule: Python syntax
 and runtime semantics at the boundary, existing TypeScript type machinery at
 the center.
 
+## Removing the TypeScript language
+
+The checker stays. The TypeScript language does not. A `.ts`, `.tsx`, `.js`, or `.d.ts` input must fail immediately. The checker does not parse it, bind it, or recover. `lib*.d.ts`, the dummy `/__python_checker__.ts` program, the TypeScript language-service branch, and the TypeScript parser on the Tython path are construction leftovers, not a dependency. Replace the `Program` bootstrap so `NewChecker` starts from `builtins.d.ty`.
+
+Anything kept only to read later goes to `local/`, which is untracked. The TypeScript repository on GitHub is the archive. If a file is not the port source for the tests and not a reference someone still wants on this machine, delete it.
+
+`tsc/testdata` and fourslash move to `local/` with the TypeScript parser. `go test` does not run them. A failure that only exists through the TypeScript parser is not a Tython failure.
+
+Rename (`github.com/microsoft/typescript-go`, `tsgo`, `packages/vscode-python-typescript`, `typed-python`, `tools/black-formatter-spike`) is its own pass after the language input is gone.
+
 ### Completion call rows
 
 Not implemented. An open completion may later offer `call_me()` as its own row when the bare function is not assignable to the hole and a signature can be called with no required arguments whose return type is. The bare name stays the function and is not treated as valid just because its return type matches. Required arguments, unresolved generics, and overloads that do not instantiate against the hole do not get a call row.
@@ -1258,6 +1268,8 @@ Not implemented. An open completion may later offer `call_me()` as its own row w
 ## Phase 2 and later
 
 Not current work. Recorded so the behavior is not relitigated from scratch.
+
+The first job when phase 2 starts is porting the TypeScript test corpus onto Tython. The inputs live in `local/` and are not a running suite. Each ported case is a `.ty` test that checks Tython code. That is the coverage win: the checker is exercised through the language we ship. A ported case leaves `local/`. Do not convert a file in place so that one failure mixes a frontend bug with a checker bug.
 
 ### Tython types as Python annotations
 
@@ -1429,3 +1441,51 @@ lacks this metadata. Native candidates and edits remain authoritative; existing
 Jedi module/import suggestions and safe Ruff edits remain supplementary.
 Reject stale completion results after a document edit. Disable VS Code's generic
 word suggestions by default for TyThon, while enabling string quick suggestions.
+
+### Full standard-library coverage
+
+Phase 1 ships a partial builtin surface. Phase 2 covers the Python standard
+library as `.d.ty` contracts: the modules a normal program imports, not a
+handful of protocols in `builtins`. Authored `.d.ty` still wins over anything
+generated or imported from stubs.
+
+### Library types match runtime reality
+
+Matching CPython's own annotations is not the goal. A declaration is tightened
+to what the function actually accepts and returns. Where the stdlib stub, the
+docs, and the implementation disagree, the implementation wins. A wider stub
+that exists only to keep old callers quiet is not copied in.
+
+### `**kwargs`: dict parameter or auto-converted bag
+
+Undecided. A `**kwargs` parameter is either a real `dict` the caller must
+already have, or a bag the checker builds by collecting keyword arguments and
+presenting that dict to the callee. The choice has to be one rule for every
+call, including `super().__init__(**kwargs)`. Do not invent a third packing
+type.
+
+### Positional parameters against `__init__`
+
+Positional binding can satisfy a different parameter than the keyword contract
+the initializer was written against. That breaks cooperative `super().__init__`
+and `Base.__init__(self, ...)`: an argument lines up by position, the assertion
+still talks about names, and a child silently initializes the wrong field.
+Phase 2 tightens positional matching on initializers so a positional argument
+cannot discharge a different parameter's contract. Ordinary calls keep the
+current binder until that rule is explicit.
+
+### `super().__init__` when the next method is `object.__init__`
+
+`object.__init__` takes no arguments. A cooperative forward that always passes
+`id=id, **kwargs` is wrong when the next initializer is `object`. The terminal
+case needs a check, not only the runtime guard recorded under initializer
+assertions. Calling `super().__init__` with arguments when the MRO ends at
+`object` is an error. Calling it with none is fine.
+
+### Hover on operator syntax
+
+Hovering `+`, `==`, and the other operator spellings shows the method that
+implements the operation, with the same signature and documentation as hovering
+the call. `a + b` presents `__add__` / `__radd__` the way `a.__add__(b)` would.
+The buffer is not rewritten. The hover is the resolved method, not a restatement
+of the operator token.

@@ -1,7 +1,0 @@
-//// [tests/cases/compiler/jsDocOverloadAnonDefaultExport.ts] ////
-
-=== jsDocOverloadAnonDefaultExport.js ===
-
-/** @overload */
-export default function () {}
-

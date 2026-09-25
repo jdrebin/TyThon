@@ -12,13 +12,7 @@ func TestCheckerProjectUsesNativeLibraryReuse(t *testing.T) {
 	if first == second {
 		t.Fatal("reused mutable checker across snapshots")
 	}
-	shared := 0
-	for _, file := range files {
-		if file.FileName() != "/__python_checker__.ts" && project.program.GetSourceFile(file.FileName()) == file {
-			shared++
-		}
-	}
-	if shared == 0 {
-		t.Fatal("native library source files were not reused")
+	if len(files) != 0 || len(project.program.GetSourceFiles()) != 0 {
+		t.Fatalf("checker program parsed TypeScript source: %d then %d", len(files), len(project.program.GetSourceFiles()))
 	}
 }

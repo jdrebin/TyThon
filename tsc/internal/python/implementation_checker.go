@@ -3452,6 +3452,12 @@ func (s *implementationChecker) objectCallMessage(diagnostic checker.ObjectCallD
 	c := s.types.checker
 	detail := FormatAssignability(c, diagnostic.Source, diagnostic.Target)
 	head := fmt.Sprintf("Argument of type '%s' is not assignable to parameter of type '%s'.", FormatType(c, diagnostic.Source), FormatType(c, diagnostic.Target))
+	if name, ok := strings.CutPrefix(diagnostic.Message, "argument is not assignable to parameter "); ok {
+		name = strings.Trim(name, `"`)
+		head = fmt.Sprintf("Argument of type '%s' is not assignable to parameter %q of type '%s'.", FormatType(c, diagnostic.Source), name, FormatType(c, diagnostic.Target))
+	} else if strings.HasPrefix(diagnostic.Message, "keyword arguments are not assignable") {
+		head = diagnostic.Message + "."
+	}
 	if newline := strings.IndexByte(detail, '\n'); newline >= 0 {
 		head += detail[newline:]
 	}

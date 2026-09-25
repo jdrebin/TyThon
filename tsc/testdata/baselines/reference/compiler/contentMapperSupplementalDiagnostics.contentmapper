@@ -1,9 +1,0 @@
-//// [/component.astro] (ScriptKind: ScriptKindTS, ContentMapper: [.astro])
---- Original ---
-const mappedError: number = "not a number";
---- Transformed ---
-export {};
-
-=== Diagnostics ===
-
-<no content>

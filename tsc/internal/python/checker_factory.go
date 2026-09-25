@@ -3,12 +3,10 @@ package python
 import (
 	"context"
 
-	"github.com/microsoft/TypeScript/tsc/internal/bundled"
 	"github.com/microsoft/TypeScript/tsc/internal/checker"
 	"github.com/microsoft/TypeScript/tsc/internal/compiler"
 	"github.com/microsoft/TypeScript/tsc/internal/core"
 	"github.com/microsoft/TypeScript/tsc/internal/tsoptions"
-	"github.com/microsoft/TypeScript/tsc/internal/tspath"
 	"github.com/microsoft/TypeScript/tsc/internal/vfs/vfstest"
 )
 
@@ -34,22 +32,21 @@ type CheckerProject struct {
 
 func (p *CheckerProject) NextChecker(ctx context.Context) (*checker.Checker, func()) {
 	if p.host == nil {
+		// No root file and noLib. A TypeScript root would make the program
+		// parser load lib.es2025.full.d.ts and accept TypeScript syntax.
 		fs := vfstest.FromMap(map[string]string{
-			"/__python_checker__.ts": "export {};",
-			"/tsconfig.json":         `{"compilerOptions": {"strict": true}, "files": ["__python_checker__.ts"]}`,
+			"/tsconfig.json": `{"compilerOptions": {"strict": true, "noLib": true}, "files": []}`,
 		}, true)
-		fs = bundled.WrapFS(fs)
-		host := compiler.NewCompilerHost("/", fs, bundled.LibPath(), nil, nil, nil)
+		host := compiler.NewCompilerHost("/", fs, "/", nil, nil, nil)
 		parsed, errors := tsoptions.GetParsedCommandLineOfConfigFile("/tsconfig.json", &core.CompilerOptions{}, nil, host, nil)
 		if len(errors) != 0 {
 			panic("unable to initialize Python checker")
 		}
 		p.host, p.config = host, parsed
 	}
-	if p.program == nil {
-		p.program = compiler.NewProgram(compiler.ProgramOptions{Config: p.config, Host: p.host})
-	} else {
-		p.program, _, _ = p.program.UpdateProgram(tspath.Path("/__python_checker__.ts"), p.host, nil)
+	p.program = compiler.NewProgram(compiler.ProgramOptions{Config: p.config, Host: p.host})
+	if files := p.program.GetSourceFiles(); len(files) != 0 {
+		panic("Python checker was given TypeScript source")
 	}
 	p.program.BindSourceFiles()
 	c, done := p.program.GetTypeChecker(ctx)

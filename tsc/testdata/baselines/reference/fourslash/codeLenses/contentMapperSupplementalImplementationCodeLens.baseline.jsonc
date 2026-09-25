@@ -1,5 +1,0 @@
-// === Code Lenses ===
-// === /codelens-implementation.astro ===
-// interface /*CODELENS: 1 implementation*/Service { run(): void }
-// class [|Impl|] implements Service { run() {} }
-// 

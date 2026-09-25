@@ -1,5 +1,0 @@
-// === Code Lenses ===
-// === /codelens-disabled.astro ===
-// function /*CODELENS: 1 reference*/outer() {}
-// [|outer|]();
-// 
