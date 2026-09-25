@@ -8,7 +8,7 @@ user's Python interpreter. It feeds actual .ty text to Black's parser.
 import io
 import json
 import os
-from functools import lru_cache
+from functools import lru_cache, partial
 from pathlib import Path
 import subprocess
 import sys
@@ -41,7 +41,7 @@ REPLACEMENTS = {
     "vname:": "vname: NAME [TY_ANNOTATION_COLON ty_test]",
     "classdef:": "classdef: ('class' | \"interface\") (NAME | '*') [typeparams] ['(' [arglist] ')'] ':' suite",
     "test:": "test: ty_assertion ['if' or_test 'else' test] | lambdef",
-    "trailer:": "trailer: '(' [arglist] ')' | '[' subscriptlist ']' | '.' NAME | '!' | ty_call_typeargs '(' [arglist] ')'",
+    "trailer:": "trailer: '(' [arglist] ')' | '[' subscriptlist ']' | '.' NAME | '!' | ty_call_typeargs ['(' [arglist] ')']",
     "small_stmt:": "small_stmt: (ty_modified_ann | type_stmt | expr_stmt | del_stmt | pass_stmt | flow_stmt |",
     "compound_stmt:": "compound_stmt: ty_declare | if_stmt | while_stmt | for_stmt | try_stmt | with_stmt | funcdef | classdef | decorated | async_stmt | match_stmt",
 }
@@ -108,16 +108,17 @@ _classify = parse.Parser.classify
 def classify(self, kind, value, context):
     # Reuse Black's soft-keyword machinery, permitting our contextual type
     # keywords inside expressions as well as at statement boundaries.
+    if kind == token.NAME and value in {"optional", "readonly", "static"} and value in self.grammar.soft_keywords:
+        # One label. Offering the name as well makes the soft-keyword
+        # lookahead consume the attribute name and drop it.
+        return [self.grammar.soft_keywords[value]]
     if kind == token.NAME and value in {
         "keyof",
         "typeof",
         "infer",
         "extends",
         "satisfies",
-        "optional",
-        "readonly",
         "const",
-        "static",
     }:
         return [self.grammar.tokens[token.NAME], self.grammar.soft_keywords[value]]
     return _classify(self, kind, value, context)
@@ -219,6 +220,7 @@ def parse_source(source, target_versions=()):
         if (
             isinstance(node, Node)
             and node.type == syms.trailer
+            and len(node.children) > 1
             and node.children[0].type == syms.ty_call_typeargs
         ):
             # Keep the runtime call's parentheses in Black's ordinary trailer
@@ -245,6 +247,19 @@ def parse_source(source, target_versions=()):
 
 
 black.lib2to3_parse = parse_source
+_post_init = black.linegen.LineGenerator.__post_init__
+
+
+def _post_init_statements(self) -> None:
+    _post_init(self)
+    visit = self.visit_stmt
+    empty: set[str] = set()
+    self.visit_classdef = partial(visit, keywords={"class", "interface"}, parens=empty)
+    self.visit_ty_declare = partial(visit, keywords={"declare"}, parens=empty)
+    self.visit_type_stmt = partial(visit, keywords={"type"}, parens=empty)
+
+
+black.linegen.LineGenerator.__post_init__ = _post_init_statements
 _whitespace = black.lines.whitespace
 
 

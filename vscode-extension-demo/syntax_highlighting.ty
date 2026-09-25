@@ -15,7 +15,7 @@ interface Named<T>(Valued<T>):
     name: str
     "name": bytes
     (str): bytes
-    (*<"">): int
+    (*<"lkokok">): int
     def whenever(t: str) -> str
 
 declare class Box<T>:

@@ -10,6 +10,7 @@ interface Box<T>:
     readonly optional value: T
 
     def get(self) -> T
+
     def __eq__(bool) -> str
 
 
@@ -26,12 +27,9 @@ type User(T) = {
 
 
 # Computed map keys preserve whether K is an attribute key or an item key.
-type PublicAttributes(T) = {
-    (K): T[K]
-    for K in Extract(keyof T, *)
-}
+type PublicAttributes(T) = {(K): T[K] for K in Extract(keyof T, *)}
 
-type GetterSurface = { (*<f"get_{str}">): int }
+type GetterSurface = {(*<f"get_{str}">): int}
 type ItemShape(T) = {(K): T[K] for K in Exclude(keyof T, *)}
 
 type UserKeys = keyof User(str)

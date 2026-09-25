@@ -5,10 +5,12 @@ def identity<T>(value: T):
     return value
 
 
-def choose_name<E extends bool>(name: str, enabled: E) -> str if E extends True else None:
-   if enabled:
-       return name as (str if E extends True else never)
-   else:
+def choose_name<E extends bool>(
+    name: str, enabled: E
+) -> str if E extends True else None:
+    if enabled:
+        return name as (str if E extends True else never)
+    else:
         return None as (never if E extends True else None)
 
 

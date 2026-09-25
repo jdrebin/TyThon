@@ -173,7 +173,7 @@ func (c *Checker) bindObjectCallArguments(signature *Signature, arguments []Obje
 			parameterIndex := findObjectKeywordParameter(parameters, kinds, argument.Name)
 			if parameterIndex < 0 {
 				if varKeyword < 0 {
-					diagnostics = append(diagnostics, ObjectCallDiagnostic{Argument: argumentIndex, Message: fmt.Sprintf("unexpected keyword argument %q", argument.Name)})
+					diagnostics = append(diagnostics, ObjectCallDiagnostic{Argument: argumentIndex, Message: fmt.Sprintf("Unexpected keyword argument '%s'.", argument.Name)})
 					continue
 				}
 				bindings = append(bindings, objectCallBinding{argumentIndex: argumentIndex, argument: argument, parameterIndex: varKeyword})
@@ -365,7 +365,7 @@ func (c *Checker) ResolveObjectCallWithContext(callable *Type, arguments []Objec
 	}
 	signatures := c.reorderCandidates(c.getSignaturesOfType(callable, SignatureKindCall), SignatureFlagsNone)
 	if len(signatures) == 0 {
-		return ObjectCallResolution{ReturnType: c.unknownType}, []ObjectCallDiagnostic{{Argument: -1, Message: "type is not callable"}}
+		return ObjectCallResolution{ReturnType: c.unknownType}, []ObjectCallDiagnostic{{Argument: -1, Message: fmt.Sprintf("This expression is not callable. Type '%s' has no call signatures.", c.TypeToString(callable))}}
 	}
 	// Match resolveCall: with multiple candidates, prefer the first signature
 	// applicable under the subtype relation, then fall back to assignability.

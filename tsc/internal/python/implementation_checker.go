@@ -2505,7 +2505,7 @@ func (s *implementationChecker) typeOfWorker(expression RuntimeExpr) *checker.Ty
 		if intrinsic := s.types.intrinsicType(expression.Name); intrinsic != nil {
 			return intrinsic
 		}
-		s.report(expression.Range(), fmt.Sprintf("unknown runtime name %q", expression.Name))
+		s.report(expression.Range(), fmt.Sprintf("Cannot find name '%s'.", expression.Name))
 		return c.GetUnknownType()
 	case *RuntimeLiteralExpr:
 		return s.typeOfLiteral(expression)
@@ -2560,7 +2560,7 @@ func (s *implementationChecker) typeOfWorker(expression RuntimeExpr) *checker.Ty
 			s.recordNamedType(expression.NameLoc, result, kind, expression.Name)
 			return result
 		}
-		s.report(expression.Range(), fmt.Sprintf("type %s has no attribute %q", FormatType(c, target), expression.Name))
+		s.report(expression.Range(), fmt.Sprintf("Property '%s' does not exist on type '%s'.", expression.Name, FormatType(c, target)))
 		return c.GetUnknownType()
 	case *RuntimeItemExpr:
 		target := s.typeOf(expression.Target)

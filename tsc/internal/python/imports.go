@@ -82,7 +82,7 @@ func resolveImportedModule(states []*moduleState, importer *moduleState, module 
 		}
 	}
 	if len(matches) == 0 {
-		return nil, fmt.Errorf("cannot resolve import %q from the supplied Python modules", module)
+		return nil, fmt.Errorf("Cannot find module '%s'.", module)
 	}
 	if len(matches) > 1 {
 		return nil, fmt.Errorf("import %q is ambiguous across the supplied Python modules", module)
