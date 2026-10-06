@@ -2,6 +2,7 @@ package python
 
 import (
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -393,9 +394,9 @@ func TestDuplicateBaseConflictIsReportedOnce(t *testing.T) {
 }
 
 func TestDemoSurfaces(t *testing.T) {
-	root := "/home/user/projects/TypeScript/vscode-extension-demo/"
+	root := filepath.Join("..", "..", "..", "vscode-extension-demo")
 	for _, name := range []string{"core_operators.ty", "working.ty"} {
-		text, err := os.ReadFile(root + name)
+		text, err := os.ReadFile(filepath.Join(root, name))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -404,7 +405,7 @@ func TestDemoSurfaces(t *testing.T) {
 		_, erasureErrors := EraseTypedPython(string(text))
 		t.Logf("%s runtime=%v decl=%v erasure=%v", name, runtimeErrors, declErrors, erasureErrors)
 	}
-	text, err := os.ReadFile(root + "core_operators.ty")
+	text, err := os.ReadFile(filepath.Join(root, "core_operators.ty"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -418,17 +419,18 @@ func TestDemoSurfaces(t *testing.T) {
 	if strings.Contains(hover, "__add__") || !strings.Contains(hover, "*()") {
 		t.Fatalf("FirstString hover = %s", hover)
 	}
-	modules, err := os.ReadFile(root + "advanced_modules.ty")
+	moduleFile := filepath.Join(root, "advanced_modules.ty")
+	declarationFile := filepath.Join(root, "sample_package", "models.d.ty")
+	modules, err := os.ReadFile(moduleFile)
 	if err != nil {
 		t.Fatal(err)
 	}
-	declaration, err := os.ReadFile(root + "sample_package/models.d.ty")
+	declaration, err := os.ReadFile(declarationFile)
 	if err != nil {
 		t.Fatal(err)
 	}
-	moduleFile := root + "advanced_modules.ty"
 	program = BuildProgram(newPythonChecker(t), []SourceInput{
-		{FileName: root + "sample_package/models.d.ty", Text: string(declaration)},
+		{FileName: declarationFile, Text: string(declaration)},
 		{FileName: moduleFile, Text: string(modules)},
 	})
 	modSource := string(modules)
@@ -443,7 +445,7 @@ func TestDemoSurfaces(t *testing.T) {
 		}
 		t.Logf("import %s = %s", word, hover)
 	}
-	classes, err := os.ReadFile(root + "advanced_classes.ty")
+	classes, err := os.ReadFile(filepath.Join(root, "advanced_classes.ty"))
 	if err != nil {
 		t.Fatal(err)
 	}
