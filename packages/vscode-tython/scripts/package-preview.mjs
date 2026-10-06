@@ -19,6 +19,7 @@ const runnable = canRun(target);
 const extension = fileURLToPath(new URL("..", import.meta.url));
 const root = path.resolve(extension, "../..");
 const require = createRequire(import.meta.url);
+const npm = process.platform === "win32" ? "npm.cmd" : "npm";
 const goHost = { ...process.env, GOCACHE: process.env.GOCACHE || path.join(tmpdir(), "tython-go-cache"), GOMAXPROCS: "2" };
 const goBuild = { ...goHost, GOOS: target.goos, GOARCH: target.goarch, CGO_ENABLED: "0" };
 function run(command, args, cwd = extension, capture = false, env = process.env) {
@@ -28,10 +29,10 @@ function run(command, args, cwd = extension, capture = false, env = process.env)
     return result.stdout?.trim();
 }
 if (!values["skip-checks"]) {
-    run("npm", ["run", "licenses:check"], root);
-    if (runnable) run("npm", ["run", "formatter:prepare"]);
+    run(npm, ["run", "licenses:check"], root);
+    if (runnable) run(npm, ["run", "formatter:prepare"]);
     run("go", ["test", "-p", "1", "./cmd/tsc", "./internal/python", "./internal/checker", "./internal/lsp", "-count=1", "-timeout=120s"], path.join(root, "tsc"), false, goHost);
-    for (const script of ["build", "test", "tools:test"]) run("npm", ["run", script]);
+    for (const script of ["build", "test", "tools:test"]) run(npm, ["run", script]);
 }
 
 const output = path.join(root, "built/preview");

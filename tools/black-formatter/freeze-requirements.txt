@@ -1,5 +1,8 @@
-# Build tooling only; Linux x64 wheels, including all transitive dependencies.
-pyinstaller==6.22.0 --hash=sha256:b07ac9fd1d661ae4d0af6752c3941e4e5576a16cfe7e2d6504a32d57e17d0acc
+# Build tooling only. Hashes cover the wheels the platform jobs actually download.
+pyinstaller==6.22.0 \
+    --hash=sha256:b07ac9fd1d661ae4d0af6752c3941e4e5576a16cfe7e2d6504a32d57e17d0acc \
+    --hash=sha256:d7c7c5b149f7f9b37585b37e2376f774038b6a5633ba34db0de2698f75391e13 \
+    --hash=sha256:6e5f3656de100954bf5db25536c43e097e46d482843a96d03a0852bf266e4853
 pyinstaller-hooks-contrib==2026.7 --hash=sha256:24257a04c7a5a7a034cf28e39dcee20fbeeb9f043076729480f2e1b69904408a
 altgraph==0.17.5 --hash=sha256:f3a22400bce1b0c701683820ac4f3b159cd301acab067c51c653e06961600597
 packaging==26.3 --hash=sha256:d7193f7c8e4e93f444fde0262bf90af30e16fa0ad0ad44cb553c87339b23cd1c

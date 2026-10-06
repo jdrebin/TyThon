@@ -10,7 +10,7 @@ const here = fileURLToPath(new URL(".", import.meta.url));
 const root = path.resolve(here, "../..");
 const output = path.join(root, "built/local/black-spike");
 const vendor = path.join(output, "vendor");
-const python = process.env.TYPED_PYTHON_BOOTSTRAP ?? "python3";
+const python = process.env.TYPED_PYTHON_BOOTSTRAP ?? (process.platform === "win32" ? "python" : "python3");
 const env = { ...process.env, PYTHONPATH: vendor, PYTHONNOUSERSITE: "1", PYTHONDONTWRITEBYTECODE: "1",
     BLACK_CACHE_DIR: path.join(output, "cache"), GOMAXPROCS: "2",
     GOCACHE: process.env.GOCACHE ?? path.join(tmpdir(), "tython-go-cache") };

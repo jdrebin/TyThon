@@ -12,6 +12,8 @@ import { canRun, targetByName } from "./targets.mjs";
 
 const root = fileURLToPath(new URL("../..", import.meta.url));
 const { values } = parseArgs({ options: { vsix: { type: "string" } } });
+const npm = process.platform === "win32" ? "npm.cmd" : "npm";
+const python = process.platform === "win32" ? "python" : "python3";
 function run(command, args) {
     console.log(`\n> ${command} ${args.join(" ")}`);
     const result = spawnSync(command, args, { cwd: root, stdio: "inherit", timeout: 600000 });
@@ -22,7 +24,7 @@ function run(command, args) {
 // Omit it to rebuild and verify the editor/server first.
 const vsix = values.vsix ? path.resolve(values.vsix)
     : (await import("../../packages/vscode-tython/scripts/package-preview.mjs")).verifiedArtifact;
-run("npm", ["run", "licenses:check"]);
+run(npm, ["run", "licenses:check"]);
 const sha = bytes => createHash("sha256").update(bytes).digest("hex");
 const bytes = await readFile(vsix);
 const digest = sha(bytes);
@@ -76,11 +78,11 @@ await writeFile(path.join(payload, "THIRD_PARTY_NOTICES.md"),
     "and licenses/go-toolchain/. LICENSING.md describes source attribution policy; " +
     "its editor-component paths refer to the separately distributed VSIX.\n");
 const wheelhouse = path.join(work, "wheels");
-run("python3", ["-m", "pip", "wheel", "--no-build-isolation", "--no-deps", "--no-index", "--wheel-dir", wheelhouse, stage]);
+run(python, ["-m", "pip", "wheel", "--no-build-isolation", "--no-deps", "--no-index", "--wheel-dir", wheelhouse, stage]);
 const wheels = (await readdir(wheelhouse)).filter(name => name.endsWith(".whl"));
 assert.equal(wheels.length, 1);
 const wheel = path.join(wheelhouse, wheels[0]);
-run("python3", [path.join(root, "packages/tython-python/test_wheel.py"), wheel, vsix]);
+run(python, [path.join(root, "packages/tython-python/test_wheel.py"), wheel, vsix]);
 
 // Only promote a pair after testing the installed wheel outside the checkout.
 const wheelHash = sha(await readFile(wheel));

@@ -13,7 +13,7 @@ const build = path.join(root, "built/local/black-spike");
 const output = path.join(root, "built/local/black-formatter");
 const vendor = path.join(build, "vendor");
 const freezer = path.join(build, "freezer");
-const python = process.env.TYPED_PYTHON_BOOTSTRAP ?? "python3";
+const python = process.env.TYPED_PYTHON_BOOTSTRAP ?? (process.platform === "win32" ? "python" : "python3");
 const formatterTarget = {
     "linux/x64": "linux-x64", "linux/arm64": "linux-arm64",
     "darwin/x64": "darwin-x64", "darwin/arm64": "darwin-arm64",
@@ -33,7 +33,8 @@ const inputs = [];
 for (const file of ["adapter.py", "formatter_cli.py", "bundle.mjs", "prepare.mjs", "retain_licenses.py", "requirements.txt", "freeze-requirements.txt"]) {
     inputs.push([file, sha(await readFile(path.join(here, file)))]);
 }
-inputs.push(["oracle", sha(await readFile(path.join(build, "oracle")))], ["python", run(python, ["--version"], true)],
+const oracleName = process.platform === "win32" ? "oracle.exe" : "oracle";
+inputs.push(["oracle", sha(await readFile(path.join(build, oracleName)))], ["python", run(python, ["--version"], true)],
     ["vendor", await fingerprint(vendor)]);
 const inputSHA256 = sha(JSON.stringify(inputs));
 async function fingerprint(dir) {
