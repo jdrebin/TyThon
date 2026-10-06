@@ -25,5 +25,5 @@ if (!process.argv.includes("--offline")) {
         "--report", path.join(output, "install-report.json"), "-r", path.join(here, "requirements.txt")]);
 }
 run(python, ["-c", "import black; assert black.__version__ == '26.5.1'; assert black.__file__.endswith('.py'); print('Pinned pure-Python Black available')"]);
-run("go", ["build", "-o", path.join(output, "oracle"), "./cmd/blackspike"], path.join(root, "tsc"));
+run("go", ["build", "-o", path.join(output, process.platform === "win32" ? "oracle.exe" : "oracle"), "./cmd/blackspike"], path.join(root, "tsc"));
 console.log("Pinned Black source and native formatter helper are ready.");

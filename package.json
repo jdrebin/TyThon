@@ -27,7 +27,7 @@
         "tidy": "hereby tidy",
         "extension:build": "npm run -w tython build",
         "extension:watch": "npm run -w tython watch",
-        "preview:package": "npm run -w tython preview:package",
+        "preview:package": "node packages/vscode-tython/scripts/package-preview.mjs",
         "release:package": "node tools/scripts/package-tython-release.mjs",
         "setup-hooks": "node tools/scripts/link-hooks.mjs"
     },

@@ -8,6 +8,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 import AdmZip from "adm-zip";
+import { canRun, targetByName } from "./targets.mjs";
 
 const root = fileURLToPath(new URL("../..", import.meta.url));
 const { values } = parseArgs({ options: { vsix: { type: "string" } } });
@@ -16,8 +17,8 @@ function run(command, args) {
     const result = spawnSync(command, args, { cwd: root, stdio: "inherit", timeout: 600000 });
     if (result.error || result.status !== 0) throw result.error || new Error(`${command} exited ${result.status}`);
 }
-assert(process.platform === "linux" && process.arch === "x64", "Only Linux x64 is packaged.");
-// --vsix reuses an explicitly selected, previously verified local artifact.
+// --vsix reuses an explicitly selected local artifact. A cross-compiled VSIX
+// was not executed on this machine; its wheel is still packed and tagged.
 // Omit it to rebuild and verify the editor/server first.
 const vsix = values.vsix ? path.resolve(values.vsix)
     : (await import("../../packages/vscode-tython/scripts/package-preview.mjs")).verifiedArtifact;
@@ -27,13 +28,13 @@ const bytes = await readFile(vsix);
 const digest = sha(bytes);
 assert.equal((await readFile(`${vsix}.sha256`, "utf8")).split(/\s/)[0], digest, "VSIX checksum mismatch");
 const verification = JSON.parse(await readFile(`${vsix}.build-info.json`, "utf8"));
-assert.equal(verification.verified, true, "Use a verified local VSIX");
+assert(verification.verified === true || (verification.checks || []).includes("cross-compiled-compiler"), "Use a built local VSIX");
 const archive = new AdmZip(bytes);
 const info = JSON.parse(archive.readAsText("extension/build-info.json"));
 assert.equal(info.buildID, verification.buildID);
 assert.equal(info.compilerSHA256, verification.compilerSHA256);
 assert.equal(info.librarySHA256, verification.librarySHA256);
-assert.equal(info.target, "linux-x64");
+const target = targetByName(info.target);
 
 const output = path.join(root, "built/release");
 await mkdir(output, { recursive: true });
@@ -50,14 +51,14 @@ const payload = path.join(stage, "tython_cli");
 for (const entry of archive.getEntries()) {
     const name = entry.entryName.replace(/^extension\//, "");
     assert(!name.startsWith("/") && !name.split("/").includes(".."), "Unsafe archive path");
-    const include = ["bin/tython", "library/builtins.d.ty", "LICENSE.txt", "NOTICE.txt", "LICENSING.md"].includes(name)
+    const include = [target.compilerFile, "library/builtins.d.ty", "LICENSE.txt", "NOTICE.txt", "LICENSING.md"].includes(name)
         || name.startsWith("licenses/go/") || name.startsWith("licenses/go-toolchain/") || name.startsWith("licenses/fswatch/");
     if (!include || entry.isDirectory) continue;
     const destination = path.join(payload, name);
     await mkdir(path.dirname(destination), { recursive: true });
-    await writeFile(destination, entry.getData(), { mode: name === "bin/tython" ? 0o755 : 0o644 });
+    await writeFile(destination, entry.getData(), { mode: name === target.compilerFile ? 0o755 : 0o644 });
 }
-assert.equal(sha(await readFile(path.join(payload, "bin/tython"))), info.compilerSHA256);
+assert.equal(sha(await readFile(path.join(payload, target.compilerFile))), info.compilerSHA256);
 assert.equal(sha(await readFile(path.join(payload, "library/builtins.d.ty"))), info.librarySHA256);
 await writeFile(path.join(payload, "build-info.json"), JSON.stringify({
     version: info.version, buildID: info.buildID, target: info.target,
@@ -83,7 +84,7 @@ run("python3", [path.join(root, "packages/tython-python/test_wheel.py"), wheel, 
 
 // Only promote a pair after testing the installed wheel outside the checkout.
 const wheelHash = sha(await readFile(wheel));
-const final = path.join(output, `tython-${info.version}-${info.buildID}-${wheelHash.slice(0, 8)}-linux-x64`);
+const final = path.join(output, `tython-${info.version}-${info.buildID}-${wheelHash.slice(0, 8)}-${info.target}`);
 assert(!existsSync(final), `Refusing to overwrite verified release: ${final}`);
 const pending = path.join(work, "verified");
 await mkdir(pending);
@@ -95,13 +96,14 @@ const artifacts = [
 ];
 await writeFile(path.join(pending, "SHA256SUMS"), artifacts.map(a => `${a.sha256}  ${a.file}\n`).join(""));
 await writeFile(path.join(pending, "release.json"), JSON.stringify({
-    ...info, verified: true, artifacts,
-    checks: [...verification.checks, "wheel-records-and-platform", "fresh-venv-install", "cli-check-build-errors-imports", "wheel-vsix-identical-compiler-library"],
-    limitations: ["Linux x64 only", "VSIX formatter tested on Ubuntu 24.04/glibc 2.39", "VSIX requires systemd/cgroups by default", "No interactive VS Code host test", "Not published"],
+    ...info, verified: canRun(target), artifacts,
+    checks: [...verification.checks, "wheel-records-and-platform", "wheel-vsix-identical-compiler-library", ...(canRun(target) ? ["fresh-venv-install", "cli-check-build-errors-imports"] : [])],
+    limitations: [`Target ${info.target}`, info.formatterSHA256 ? "Formatter bundled for this target" : "No bundled formatter for this target", info.target.startsWith("linux") ? "VSIX requires systemd/cgroups by default" : "systemd containment is Linux-only", "No interactive VS Code host test", "Not published"],
 }, null, 2) + "\n");
 await writeFile(path.join(pending, "INSTALL.md"), `# Install this tython alpha\n\n` +
-    `Linux x64/WSL, Python 3.10+, VS Code 1.100+. Formatter tested on Ubuntu 24.04/glibc 2.39. ` +
-    `The VSIX requires working systemd/cgroup memory containment by default.\n\n` +
+    `Target \`${info.target}\`. Python 3.10+, VS Code 1.100+. ` +
+    (info.formatterSHA256 ? `A Black formatter binary is bundled.\n\n` : `No formatter binary is in this package. Checking and emit still work.\n\n`) +
+    (info.target.startsWith("linux") ? `The Linux VSIX requires working systemd/cgroup memory containment by default.\n\n` : "") +
     `1. In your Linux/WSL VS Code window, run **Extensions: Install from VSIX…** and select \`${path.basename(vsix)}\`. Reload the window.\n` +
     `2. Activate your project's Python virtual environment and run:\n\n` +
     '```sh\n' + `python -m pip install ./${path.basename(wheel)}\ntython --version\ntython check app.ty\ntython build app.ty\npython dist/app.py\n` + '```\n\n' +

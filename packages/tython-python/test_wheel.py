@@ -6,6 +6,7 @@ import hashlib
 import io
 import json
 import os
+import platform
 from pathlib import Path
 import subprocess
 import sys
@@ -38,7 +39,14 @@ def main():
         names = archive.namelist()
         metadata = next(n for n in names if n.endswith(".dist-info/WHEEL"))
         assert "Root-Is-Purelib: false" in archive.read(metadata).decode()
-        assert "Tag: py3-none-linux_x86_64" in archive.read(metadata).decode()
+        tags = {
+            "linux-x64": "py3-none-linux_x86_64",
+            "linux-arm64": "py3-none-linux_aarch64",
+            "darwin-x64": "py3-none-macosx_10_15_x86_64",
+            "darwin-arm64": "py3-none-macosx_11_0_arm64",
+            "win32-x64": "py3-none-win_amd64",
+        }
+        assert f"Tag: {tags[editor['target']]}" in archive.read(metadata).decode()
         package_metadata = archive.read(
             metadata.removesuffix("WHEEL") + "METADATA"
         ).decode()
@@ -61,8 +69,9 @@ def main():
                 .decode()
             )
             assert checksum == "sha256=" + actual, name
+        compiler = editor.get("compilerFile", "bin/tython")
         assert (
-            digest(archive.read("tython_cli/bin/tython"))
+            digest(archive.read("tython_cli/" + compiler))
             == editor["compilerSHA256"]
         )
         assert (
@@ -73,6 +82,20 @@ def main():
         assert "tython_cli/licenses/fswatch/LICENSE" in names
         assert "tython_cli/NOTICE.txt" in names
         assert all("__pycache__" not in n for n in names)
+
+    machine = platform.machine().lower()
+    system = "windows" if os.name == "nt" else platform.system().lower()
+    host = {
+        ("linux", "x86_64"): "linux-x64",
+        ("linux", "aarch64"): "linux-arm64",
+        ("darwin", "x86_64"): "darwin-x64",
+        ("darwin", "arm64"): "darwin-arm64",
+        ("windows", "amd64"): "win32-x64",
+        ("windows", "x86_64"): "win32-x64",
+    }.get((system, machine))
+    if host != editor["target"]:
+        print(f"Wheel metadata passed for {editor['target']}; execution skipped on {host}.")
+        return
 
     env = {
         k: v
@@ -88,7 +111,8 @@ def main():
             cwd=root,
             env=env,
         )
-        python = venv / "bin/python"
+        scripts = "Scripts" if os.name == "nt" else "bin"
+        python = venv / scripts / ("python.exe" if os.name == "nt" else "python")
         run(
             [
                 sys.executable,
@@ -104,9 +128,9 @@ def main():
             cwd=root,
             env=env,
         )
-        env["PATH"] = str(venv / "bin") + ":/usr/bin:/bin"
+        env["PATH"] = str(venv / scripts) + os.pathsep + env.get("PATH", "")
         env["VIRTUAL_ENV"] = str(venv)
-        cli = str(venv / "bin/tython")
+        cli = str(venv / scripts / ("tython.exe" if os.name == "nt" else "tython"))
         assert editor["buildID"] in run([cli, "--version"], cwd=root, env=env)
         assert "check" in run([cli, "--help"], cwd=root, env=env)
         assert "overwritten" in run([cli, "build", "--help"], cwd=root, env=env)
@@ -121,7 +145,7 @@ def main():
         assert Path(location).is_relative_to(venv)
         installed = Path(location).parent
         assert (
-            digest((installed / "bin/tython").read_bytes())
+            digest((installed / compiler).read_bytes())
             == editor["compilerSHA256"]
         )
         assert (

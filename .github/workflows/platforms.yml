@@ -1,0 +1,82 @@
+name: Platform packages
+
+on:
+  workflow_dispatch:
+
+jobs:
+  package:
+    name: ${{ matrix.target }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            target: linux-x64
+            also: linux-arm64
+          - os: macos-latest
+            target: darwin-arm64
+            also: darwin-x64
+          - os: windows-latest
+            target: win32-x64
+            also: ""
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.26.x"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: npm ci
+      - run: npm run licenses:prepare
+      - run: npm run preview:package -- --target ${{ matrix.target }}
+      - name: Cross-compile the other architecture
+        if: matrix.also != ''
+        run: npm run preview:package -- --target ${{ matrix.also }} --skip-checks
+      - name: Wheels
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          for vsix in built/preview/*.vsix; do
+            node tools/scripts/package-tython-release.mjs --vsix "$vsix"
+          done
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tython-${{ matrix.target }}
+          path: |
+            built/preview/*.vsix
+            built/preview/*.sha256
+            built/release/**
+          if-no-files-found: error
+  publish:
+    needs: package
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Publish the preview release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mapfile -t upload < <(find dist -type f \( -name '*.vsix' -o -name '*.whl' -o -name 'INSTALL.md' -o -name 'SHA256SUMS' -o -name '*.sha256' -o -name 'release.json' \) | sort)
+          test "${#upload[@]}" -gt 0
+          notes=$'Install the .vsix that matches your machine: Extensions → Install from VSIX.\n\nLinux x64, macOS arm64, and Windows x64 include the formatter. Linux arm64 and macOS Intel are the compiler only.\n\nThe matching tython-lang wheel is the CLI. Do not pip install tython.'
+          if gh release view preview >/dev/null 2>&1; then
+            gh release edit preview --prerelease --target "${{ github.sha }}" --notes "$notes"
+          else
+            gh release create preview --prerelease --target "${{ github.sha }}" --title "tython preview" --notes "$notes"
+          fi
+          gh release upload preview "${upload[@]}" --clobber

@@ -14,7 +14,12 @@ const output = path.join(root, "built/local/black-formatter");
 const vendor = path.join(build, "vendor");
 const freezer = path.join(build, "freezer");
 const python = process.env.TYPED_PYTHON_BOOTSTRAP ?? "python3";
-assert(process.platform === "linux" && process.arch === "x64", "Only Linux x64 formatter bundles are verified yet.");
+const formatterTarget = {
+    "linux/x64": "linux-x64", "linux/arm64": "linux-arm64",
+    "darwin/x64": "darwin-x64", "darwin/arm64": "darwin-arm64",
+    "win32/x64": "win32-x64",
+}[`${process.platform}/${process.arch}`];
+assert(formatterTarget, `No formatter target for ${process.platform}/${process.arch}`);
 const env = { ...process.env, PYTHONPATH: [vendor, freezer].join(path.delimiter),
     PYTHONNOUSERSITE: "1", PYTHONDONTWRITEBYTECODE: "1", PYINSTALLER_CONFIG_DIR: path.join(build, "freeze-cache") };
 function run(command, args, capture = false, input) {
@@ -61,19 +66,24 @@ if (installedLock !== lock) {
 }
 // A clean venv prevents optional system packages (IPython, numpy, etc.) from
 // being discovered and bundled by PyInstaller's import graph.
-const freezePython = path.join(build, "freeze-env/bin/python");
+const freezePython = process.platform === "win32"
+    ? path.join(build, "freeze-env/Scripts/python.exe")
+    : path.join(build, "freeze-env/bin/python");
 if (!existsSync(freezePython)) run(python, ["-m", "venv", "--without-pip", path.dirname(path.dirname(freezePython))]);
 run(freezePython, ["-m", "PyInstaller", "--noconfirm", "--clean", "--onedir", "--noupx", "--name", "black-formatter",
     "--distpath", path.dirname(output), "--workpath", path.join(build, "freeze-work"), "--specpath", build,
     "--paths", vendor, "--paths", here,
     "--collect-submodules", "black", "--collect-submodules", "blib2to3", "--collect-data", "blib2to3",
-    "--copy-metadata", "black", "--add-binary", `${path.join(build, "oracle")}:.`, path.join(here, "formatter_cli.py")]);
+    "--copy-metadata", "black", "--add-binary",
+    `${path.join(build, process.platform === "win32" ? "oracle.exe" : "oracle")}${process.platform === "win32" ? ";." : ":."}`,
+    path.join(here, "formatter_cli.py")]);
 await cp(path.join(here, "LICENSE.black"), path.join(output, "LICENSE.black"));
 run(python, [path.join(here, "retain_licenses.py"), build, output]);
-assert.equal(run(path.join(output, "black-formatter"), ["--version"], true), "tython formatter (Black 26.5.1)");
-assert.equal(run(path.join(output, "black-formatter"), ["-"], true, "type A=[]str\n"), "type A = []str");
-await writeFile(path.join(output, "build-info.json"), JSON.stringify({ engine: "black", version: "26.5.1", target: "linux-x64",
-    buildLibc: process.report.getReport().header.glibcVersionRuntime,
+const formatterBin = path.join(output, process.platform === "win32" ? "black-formatter.exe" : "black-formatter");
+assert.equal(run(formatterBin, ["--version"], true), "tython formatter (Black 26.5.1)");
+assert.equal(run(formatterBin, ["-"], true, "type A=[]str\n"), "type A = []str");
+await writeFile(path.join(output, "build-info.json"), JSON.stringify({ engine: "black", version: "26.5.1", target: formatterTarget,
+    buildLibc: process.platform === "linux" ? process.report.getReport().header.glibcVersionRuntime : "",
     inputSHA256, payloadSHA256: await fingerprint(output), inputs,
-    binarySHA256: sha(await readFile(path.join(output, "black-formatter"))) }, null, 2) + "\n");
+    binarySHA256: sha(await readFile(formatterBin)) }, null, 2) + "\n");
 console.log(`Bundled formatter ready: ${output}`);

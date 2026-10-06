@@ -8,24 +8,31 @@ import { createRequire, isBuiltin } from "node:module";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { parseArgs } from "node:util";
 import { createVSIX } from "@vscode/vsce";
 import AdmZip from "adm-zip";
+import { canRun, targetByName, hostTargetName } from "../../../tools/scripts/targets.mjs";
 
+const { values } = parseArgs({ options: { target: { type: "string" }, "skip-checks": { type: "boolean", default: false } } });
+const target = targetByName(values.target ?? hostTargetName());
+const runnable = canRun(target);
 const extension = fileURLToPath(new URL("..", import.meta.url));
 const root = path.resolve(extension, "../..");
 const require = createRequire(import.meta.url);
-assert(process.platform === "linux" && process.arch === "x64", "Only Linux x64 has a verified preview target.");
-const goEnv = { ...process.env, GOCACHE: process.env.GOCACHE || path.join(tmpdir(), "tython-go-cache"), GOMAXPROCS: "2" };
+const goHost = { ...process.env, GOCACHE: process.env.GOCACHE || path.join(tmpdir(), "tython-go-cache"), GOMAXPROCS: "2" };
+const goBuild = { ...goHost, GOOS: target.goos, GOARCH: target.goarch, CGO_ENABLED: "0" };
 function run(command, args, cwd = extension, capture = false, env = process.env) {
     console.log(`\n> ${command} ${args.join(" ")}`);
     const result = spawnSync(command, args, { cwd, env, stdio: capture ? "pipe" : "inherit", encoding: "utf8", timeout: 600000 });
     if (result.error || result.status !== 0) throw result.error || new Error(`${command} exited ${result.status}: ${result.stderr || ""}`);
     return result.stdout?.trim();
 }
-run("npm", ["run", "licenses:check"], root);
-run("npm", ["run", "formatter:prepare"]);
-run("go", ["test", "-p", "1", "./cmd/tsc", "./internal/python", "./internal/checker", "./internal/lsp", "-count=1", "-timeout=120s"], path.join(root, "tsc"), false, goEnv);
-for (const script of ["build", "test", "tools:test"]) run("npm", ["run", script]);
+if (!values["skip-checks"]) {
+    run("npm", ["run", "licenses:check"], root);
+    if (runnable) run("npm", ["run", "formatter:prepare"]);
+    run("go", ["test", "-p", "1", "./cmd/tsc", "./internal/python", "./internal/checker", "./internal/lsp", "-count=1", "-timeout=120s"], path.join(root, "tsc"), false, goHost);
+    for (const script of ["build", "test", "tools:test"]) run("npm", ["run", script]);
+}
 
 const output = path.join(root, "built/preview");
 await mkdir(output, { recursive: true });
@@ -56,19 +63,27 @@ manifest.files = ["README.md", "LICENSE.txt", "NOTICE.txt", "LICENSING.md", "THI
     "bin/**", "dist/**", "icons/**", "library/**", "licenses/**", "preview/**", "scripts/**", "syntaxes/**", "vendor/**"];
 await writeFile(path.join(stage, "package.json"), JSON.stringify(manifest, null, 2) + "\n");
 await mkdir(path.join(stage, "bin"));
-run("go", ["build", "-trimpath", "-buildvcs=false", "-o", path.join(stage, "bin/tython"), "./cmd/tsc"], path.join(root, "tsc"), false, goEnv);
+run("go", ["build", "-trimpath", "-buildvcs=false", "-o", path.join(stage, "bin", target.binary), "./cmd/tsc"], path.join(root, "tsc"), false, goBuild);
 const formatter = path.join(root, "built/local/black-formatter");
-await copy(formatter, "bin/formatter");
-const formatterInfo = JSON.parse(await readFile(path.join(formatter, "build-info.json"), "utf8"));
+let formatterInfo;
+if (existsSync(path.join(formatter, "build-info.json"))) {
+    formatterInfo = JSON.parse(await readFile(path.join(formatter, "build-info.json"), "utf8"));
+    if (formatterInfo.target === target.name) await copy(formatter, "bin/formatter");
+    else formatterInfo = undefined;
+}
 
 // Pyright's npm distribution is self-contained on Linux (fsevents is optional).
 const pyright = path.dirname(require.resolve("pyright-typeserver/package.json"));
 await copy(pyright, "vendor/pyright-typeserver");
 const notices = ["# Third-party notices", "", "This independent project adapts TypeScript. Its upstream Apache-2.0 license and notices are retained in LICENSE.txt and NOTICE.txt. This distribution contains modified checker, Python frontend and editor integration code. The filesystem watcher license is in licenses/fswatch/LICENSE.", "", "Grammar attribution is in syntaxes/LICENSE.magicpython. Pyright includes its MIT license and typeshed notices in vendor/pyright-typeserver. The bundled Type Server Protocol is sourced from Pyright under that MIT license.", ""];
 const dependencies = [];
-dependencies.push({ ecosystem: "binary", name: "black-tython-adaptation", version: formatterInfo.version, payloadSHA256: formatterInfo.payloadSHA256 });
-notices.push(`Bundled Black ${formatterInfo.version}, modified by tython's grammar/layout adapter: bin/formatter/LICENSE.black. Python dependency metadata, PyInstaller notices, and native runtime license/provenance records are retained in bin/formatter/licenses/.`, "");
-const goToolchain = JSON.parse(run("go", ["env", "-json", "GOROOT", "GOVERSION"], path.join(root, "tsc"), true, goEnv));
+if (formatterInfo) {
+    dependencies.push({ ecosystem: "binary", name: "black-tython-adaptation", version: formatterInfo.version, payloadSHA256: formatterInfo.payloadSHA256 });
+    notices.push(`Bundled Black ${formatterInfo.version}, modified by tython's grammar/layout adapter: bin/formatter/LICENSE.black. Python dependency metadata, PyInstaller notices, and native runtime license/provenance records are retained in bin/formatter/licenses/.`, "");
+} else {
+    notices.push("This platform package has no bundled formatter. Checking and emission still work. A formatter is included when the package is built on the matching OS.", "");
+}
+const goToolchain = JSON.parse(run("go", ["env", "-json", "GOROOT", "GOVERSION"], path.join(root, "tsc"), true, goHost));
 // The linked Go runtime is not a go.mod dependency. Retain its license and
 // patent files, including the toolchain's vendored component notices.
 for (const entry of await readdir(goToolchain.GOROOT, { recursive: true, withFileTypes: true })) {
@@ -116,14 +131,14 @@ for (const directory of [...packages].sort()) {
     const pkg = JSON.parse(await readFile(path.join(directory, "package.json"), "utf8"));
     await licenseDirectory(directory, pkg.name, pkg.version, "npm");
 }
-const modules = run("go", ["list", "-m", "-f", "{{.Path}}\t{{.Version}}\t{{.Dir}}", "all"], path.join(root, "tsc"), true, goEnv);
+const modules = run("go", ["list", "-m", "-f", "{{.Path}}\t{{.Version}}\t{{.Dir}}", "all"], path.join(root, "tsc"), true, goHost);
 for (const line of modules.split("\n")) {
     const [name, version, directory] = line.split("\t");
     if (version && directory) await licenseDirectory(directory, name, version, "go");
 }
 await writeFile(path.join(stage, "THIRD_PARTY_NOTICES.md"), notices.join("\n") + "\n");
 const sha = async file => createHash("sha256").update(await readFile(file)).digest("hex");
-const compilerHash = await sha(path.join(stage, "bin/tython"));
+const compilerHash = await sha(path.join(stage, "bin", target.binary));
 const extensionHash = await sha(path.join(stage, "dist/extension.bundle.js"));
 // Fingerprint every staged payload file, including docs, examples and vendor
 // contents. build-info itself is added afterwards to avoid a circular hash.
@@ -139,13 +154,14 @@ async function fingerprint(directory, relative = "") {
 }
 const payloadHash = createHash("sha256").update(JSON.stringify(await fingerprint(stage))).digest("hex");
 const info = {
-    version: manifest.version, publisher: manifest.publisher, target: "linux-x64",
+    version: manifest.version, publisher: manifest.publisher, target: target.name,
     buildID: payloadHash.slice(0, 16), payloadSHA256: payloadHash,
     builtAt: new Date().toISOString(),
     sourceCommit: run("git", ["rev-parse", "HEAD"], root, true),
     sourceDirty: !!run("git", ["status", "--porcelain"], root, true),
+    compilerFile: target.compilerFile,
     compilerSHA256: compilerHash,
-    formatterSHA256: await sha(path.join(stage, "bin/formatter/black-formatter")),
+    formatterSHA256: formatterInfo ? await sha(path.join(stage, "bin/formatter", target.formatter)) : "",
     extensionSHA256: extensionHash,
     librarySHA256: await sha(path.join(stage, "library/builtins.d.ty")),
     lockfileSHA256: await sha(path.join(root, "package-lock.json")), dependencies,
@@ -154,7 +170,7 @@ await writeFile(path.join(stage, "build-info.json"), JSON.stringify(info, null, 
 const pending = path.join(work, "unverified.vsix");
 const packagingProgress = setInterval(() => console.log("VSIX packaging/security scan is still running…"), 30000);
 try {
-    await createVSIX({ cwd: stage, packagePath: pending, target: "linux-x64", dependencies: false, allowMissingRepository: true, rewriteRelativeLinks: false });
+    await createVSIX({ cwd: stage, packagePath: pending, target: target.vsce, dependencies: false, allowMissingRepository: true, rewriteRelativeLinks: false });
 } finally { clearInterval(packagingProgress); }
 const extracted = path.join(work, "extracted");
 const zip = new AdmZip(pending);
@@ -164,17 +180,19 @@ for (const entry of zip.getEntries()) {
 }
 zip.extractAllTo(extracted, false, true);
 const installed = path.join(extracted, "extension");
-assert.equal(await sha(path.join(installed, "bin/tython")), info.compilerSHA256);
-assert.equal(await sha(path.join(installed, "bin/formatter/black-formatter")), info.formatterSHA256);
+assert.equal(await sha(path.join(installed, info.compilerFile)), info.compilerSHA256);
+if (info.formatterSHA256) assert.equal(await sha(path.join(installed, "bin/formatter", target.formatter)), info.formatterSHA256);
 assert.equal(await sha(path.join(installed, "dist/extension.bundle.js")), info.extensionSHA256);
 assert.equal(await sha(path.join(installed, "library/builtins.d.ty")), info.librarySHA256);
-run(process.execPath, [path.join(extension, "test/packagedPreview.test.mjs"), installed], root);
-run(process.execPath, [path.join(extension, "test/icons.test.mjs"), installed], root);
+if (runnable) {
+    run(process.execPath, [path.join(extension, "test/packagedPreview.test.mjs"), installed], root);
+    run(process.execPath, [path.join(extension, "test/icons.test.mjs"), installed], root);
+}
 // Only a passing extracted artifact gets a distributable filename.
-const artifact = path.join(output, `tython-${manifest.version}-${info.buildID}-linux-x64.vsix`);
+const artifact = path.join(output, `tython-${manifest.version}-${info.buildID}-${target.name}.vsix`);
 assert(!existsSync(artifact), `Artifact already exists: ${artifact}; do not overwrite a verified build.`);
 await rename(pending, artifact);
 await writeFile(`${artifact}.sha256`, `${await sha(artifact)}  ${path.basename(artifact)}\n`);
-await writeFile(`${artifact}.build-info.json`, JSON.stringify({ ...info, verified: true, checks: ["go-python-checker-lsp", "extension", "python-tools", "extracted-vsix-lsp"] }, null, 2) + "\n");
-console.log(`\nVerified local preview: ${artifact}\nBuild staging retained for inspection: ${work}`);
+await writeFile(`${artifact}.build-info.json`, JSON.stringify({ ...info, verified: runnable, checks: runnable ? ["go-python-checker-lsp", "extension", "python-tools", "extracted-vsix-lsp"] : ["cross-compiled-compiler"] }, null, 2) + "\n");
+console.log(`\n${runnable ? "Verified" : "Cross-compiled"} local preview: ${artifact}\nBuild staging retained for inspection: ${work}`);
 export const verifiedArtifact = artifact;

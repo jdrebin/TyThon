@@ -9,7 +9,7 @@ export function resolveFormatterPath(extensionPath: string, development: boolean
         : path.join(extensionPath, "bin", "formatter", name);
     if (!existsSync(result)) throw new Error(development
         ? "Bundled formatter is missing. Run npm run -w tython formatter:prepare."
-        : "Bundled formatter is missing. Reinstall the matching platform tython extension.");
+        : "This install has no bundled formatter. Checking still works. Format is included in the Linux x64, Linux arm64, macOS arm64, and Windows x64 packages built on that OS.");
     return result;
 }
 

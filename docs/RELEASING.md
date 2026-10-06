@@ -14,9 +14,14 @@ automatic asset bundling is added. Never distribute failed `.package-*` staging.
 
 ## Build
 
-Use the source toolchain documented in the root README on Linux x64. The current
-formatter bundle is built and tested on Ubuntu 24.04 (glibc 2.39). A working
-systemd/cgroup setup is required for the packaged server tests. Python 3.10+
+Use the source toolchain documented in the root README. `npm run preview:package -- --target linux-x64`
+(or `darwin-arm64`, `darwin-x64`, `win32-x64`, `linux-arm64`) builds that machine's VSIX.
+The Go compiler cross-compiles. The frozen formatter is bundled only when the
+build host is that target, because PyInstaller cannot cross-compile. GitHub
+Actions workflow `Platform packages` builds the native pair on Linux x64, macOS
+arm64, and Windows x64, and cross-compiles the compiler for Linux arm64 and
+macOS x64. A working systemd/cgroup setup is required for the packaged Linux
+server tests. Python 3.10+
 with pip, venv, setuptools >=68, and wheel >=0.42 is needed to build the wheel;
 these are maintainer tools, not user dependencies. The wheel uses setuptools'
 standard backend, with explicit native-platform metadata for the executable.

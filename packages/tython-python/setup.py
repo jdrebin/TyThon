@@ -20,14 +20,22 @@ class BinaryWheel(bdist_wheel):
         self.root_is_pure = False
 
     def get_tag(self):
-        # The launcher is pure Python, but the payload is Linux x64 native code.
+        # The launcher is pure Python. The payload is a native compiler.
         # Do not claim manylinux compatibility without an auditwheel validation.
-        return "py3", "none", "linux_x86_64"
+        tags = {
+            "linux-x64": "linux_x86_64",
+            "linux-arm64": "linux_aarch64",
+            "darwin-x64": "macosx_10_15_x86_64",
+            "darwin-arm64": "macosx_11_0_arm64",
+            "win32-x64": "win_amd64",
+        }
+        platform = tags.get(info["target"])
+        if platform is None:
+            raise RuntimeError(f"No wheel tag for target {info['target']}")
+        return "py3", "none", platform
 
 
 info = json.loads((Path(__file__).parent / "tython_cli/build-info.json").read_text())
-if info["target"] != "linux-x64":
-    raise RuntimeError("Only the verified Linux x64 target can be packaged.")
 setup(
     version=info["version"],
     distclass=BinaryDistribution,

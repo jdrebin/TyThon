@@ -38,6 +38,8 @@ web_modules/
 # Build and package outputs
 *.tsbuildinfo
 *.tgz
+__pycache__/
+*.pyc
 dist
 .eslintcache
 .cache

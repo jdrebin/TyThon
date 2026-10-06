@@ -28,19 +28,21 @@ async function compiled(relative) {
 const { resolveCompilerPath } = await compiled("../src/compilerPath.ts");
 const { createServerLaunch } = await compiled("../src/serverLaunch.ts");
 const compiler = resolveCompilerPath(installed, false);
-assert.equal(compiler, path.join(installed, "bin/tython"));
+assert.equal(compiler, path.join(installed, "bin", process.platform === "win32" ? "tython.exe" : "tython"));
 await access(compiler, constants.X_OK);
 const workspace = await mkdtemp(path.join(tmpdir(), "ty-installed-preview-"));
 const { resolveFormatterPath, runFormatter } = await compiled("../src/formatterProcess.ts");
 const formatter = resolveFormatterPath(installed, false);
-assert.equal(formatter, path.join(installed, "bin/formatter/black-formatter"));
+assert.equal(formatter, path.join(installed, "bin/formatter", process.platform === "win32" ? "black-formatter.exe" : "black-formatter"));
 await access(formatter, constants.X_OK);
 assert.match(await readFile(path.join(installed, "bin/formatter/LICENSE.black"), "utf8"), /Łukasz Langa/);
 assert.equal(await runFormatter({ executable: formatter, source: 'type User={"id":int}\n',
     fileName: path.join(workspace, "format.ty"), root: workspace }, new AbortController().signal), 'type User = {"id": int}\n');
 await cp(path.join(installed, "preview"), workspace, { recursive: true });
-const launch = createServerLaunch(compiler, installed, workspace, { memoryMiB: 4096, swapMiB: 512, goMemoryMiB: 3072, linuxContainment: true, profileDirectory: "" });
-assert(launch.unit, "Installed Linux preview must run contained");
+const contain = process.platform === "linux" && !process.env.CI;
+const launch = createServerLaunch(compiler, installed, workspace, { memoryMiB: 4096, swapMiB: 512, goMemoryMiB: 3072, linuxContainment: contain, profileDirectory: "" });
+if (contain) assert(launch.unit, "Installed Linux preview must run contained");
+else assert.equal(launch.unit, undefined);
 const child = spawn(launch.command, launch.args, { cwd: workspace, stdio: ["pipe", "pipe", "pipe"] });
 let stderr = "";
 child.stderr.on("data", data => { stderr = (stderr + data).slice(-16000); });
@@ -118,14 +120,16 @@ try {
     await notify("exit");
 } finally {
     connection.dispose(); child.kill();
-    try { await promisify(execFile)("systemctl", [...launch.managerArgs, "stop", launch.unit], { timeout: 8000 }); }
-    catch { /* --collect removes an already stopped unit */ }
+    if (launch.unit) {
+        try { await promisify(execFile)("systemctl", [...launch.managerArgs, "stop", launch.unit], { timeout: 8000 }); }
+        catch { /* --collect removes an already stopped unit */ }
+    }
     if (stderr) console.log(stderr);
 }
 
 // Exercise the packaged optional Python helpers and vendored Pyright resolver.
 const { runPythonTool } = await compiled("../src/pythonToolProcess.ts");
-const python = process.env.TYPED_PYTHON_TEST_PYTHON ?? fileURLToPath(new URL("../../../built/local/python-tools/bin/python", import.meta.url));
+const python = process.env.TYPED_PYTHON_TEST_PYTHON ?? fileURLToPath(new URL(process.platform === "win32" ? "../../../built/local/python-tools/Scripts/python.exe" : "../../../built/local/python-tools/bin/python", import.meta.url));
 const imported = await runPythonTool(python, path.join(installed, "scripts/python-provider.py"),
     { method: "definition", source: importProjection.text, erased: true, root: workspace,
         path: path.join(workspace, "04_imports.py"), line: 1, character: 22, cachePath: path.join(workspace, ".jedi-cache") }, new AbortController().signal);

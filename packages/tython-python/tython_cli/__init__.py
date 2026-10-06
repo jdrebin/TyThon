@@ -40,7 +40,7 @@ def main():
             "files", nargs="+", metavar="FILE", help=".ty or .d.ty input file"
         )
     args = parser.parse_args()
-    executable = package / "bin/tython"
+    executable = package / ("bin/tython.exe" if os.name == "nt" else "bin/tython")
     # Absolute paths also prevent a filename beginning with '-' from being
     # interpreted as a compiler flag. Keep cwd intact for import resolution.
     files = [str(Path(file).absolute()) for file in args.files]
