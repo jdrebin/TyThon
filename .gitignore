@@ -50,6 +50,7 @@ dist
 .rts2_cache_umd/
 .vscode-test
 /built
+/tsc/built/
 # https://github.com/golang/go/issues/63901
 /go.work.sum
 /tsc/cmd/tsc/tsc
