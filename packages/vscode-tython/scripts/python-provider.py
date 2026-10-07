@@ -193,10 +193,21 @@ if __name__ == "__main__":
         if os.name == "posix":
             import resource
 
-            resource.setrlimit(
-                resource.RLIMIT_AS, (768 * 1024 * 1024, 768 * 1024 * 1024)
-            )
-            resource.setrlimit(resource.RLIMIT_CPU, (10, 10))
+            def tighten(limit, value):
+                # macOS rejects RLIMIT_AS outright, and a hard ceiling below the
+                # requested value raises ValueError. Keep the helper running.
+                try:
+                    _soft, hard = resource.getrlimit(limit)
+                    ceiling = value if hard == resource.RLIM_INFINITY else min(value, hard)
+                    if ceiling <= 0:
+                        return
+                    kept = hard if hard != resource.RLIM_INFINITY else ceiling
+                    resource.setrlimit(limit, (ceiling, kept))
+                except (ValueError, OSError):
+                    return
+
+            tighten(resource.RLIMIT_AS, 768 * 1024 * 1024)
+            tighten(resource.RLIMIT_CPU, 10)
         print(json.dumps({"result": handle(json.load(sys.stdin))}))
     except Exception as error:
         print(json.dumps({"error": str(error)}))

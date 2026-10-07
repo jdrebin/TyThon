@@ -83,7 +83,7 @@ try {
     if (savedPath === undefined) delete process.env.PATH; else process.env.PATH = savedPath;
     if (savedPython === undefined) delete process.env.PYTHONPATH; else process.env.PYTHONPATH = savedPython;
 }
-assert.throws(() => resolveFormatterPath(root, false), /Reinstall/);
+assert.throws(() => resolveFormatterPath(root, false), /no bundled formatter/);
 const info = JSON.parse(await readFile(path.join(installed, "bin/formatter/build-info.json"), "utf8"));
 assert.equal(info.engine, "black");
 assert.equal(info.version, "26.5.1");

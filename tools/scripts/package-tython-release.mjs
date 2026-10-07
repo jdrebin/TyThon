@@ -85,6 +85,7 @@ await writeFile(path.join(payload, "THIRD_PARTY_NOTICES.md"),
     "and licenses/go-toolchain/. LICENSING.md describes source attribution policy; " +
     "its editor-component paths refer to the separately distributed VSIX.\n");
 const wheelhouse = path.join(work, "wheels");
+run(python, ["-m", "pip", "install", "setuptools>=68", "wheel>=0.42"]);
 run(python, ["-m", "pip", "wheel", "--no-build-isolation", "--no-deps", "--no-index", "--wheel-dir", wheelhouse, stage]);
 const wheels = (await readdir(wheelhouse)).filter(name => name.endsWith(".whl"));
 assert.equal(wheels.length, 1);
