@@ -106,7 +106,18 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          mapfile -t upload < <(find dist -type f \( -name '*.vsix' -o -name '*.whl' -o -name 'INSTALL.md' -o -name 'SHA256SUMS' -o -name '*.sha256' -o -name 'release.json' \) | sort)
+          # The VSIX is stored twice: next to the build, and copied beside its wheel.
+          # GitHub asset names are basenames, so the second upload returns 422.
+          stage=dist/flat
+          mkdir -p "$stage"
+          while IFS= read -r path; do
+            base=$(basename "$path")
+            if [[ -e "$stage/$base" ]]; then
+              continue
+            fi
+            cp "$path" "$stage/$base"
+          done < <(find dist -type f \( -name '*.vsix' -o -name '*.whl' -o -name '*.sha256' \) | sort)
+          mapfile -t upload < <(find "$stage" -type f | sort)
           test "${#upload[@]}" -gt 0
           notes=$'Install the .vsix that matches your machine: Extensions → Install from VSIX.\n\nLinux x64, macOS arm64, and Windows x64 include the formatter. Linux arm64 and macOS Intel are the compiler only.\n\nThe matching tython-lang wheel is the CLI. Do not pip install tython.'
           if gh release view preview >/dev/null 2>&1; then
