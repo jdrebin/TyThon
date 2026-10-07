@@ -47,9 +47,11 @@ def main():
             "win32-x64": "py3-none-win_amd64",
         }
         assert f"Tag: {tags[editor['target']]}" in archive.read(metadata).decode()
-        package_metadata = archive.read(
-            metadata.removesuffix("WHEEL") + "METADATA"
-        ).decode()
+        package_metadata = (
+            archive.read(metadata.removesuffix("WHEEL") + "METADATA")
+            .decode()
+            .replace("\r\n", "\n")
+        )
         assert "Name: tython-lang\n" in package_metadata
         assert f"Version: {editor['version']}\n" in package_metadata
         assert (
@@ -106,25 +108,13 @@ def main():
     with tempfile.TemporaryDirectory(prefix="tython-wheel-") as folder:
         root = Path(folder)
         venv = root / "venv"
-        run(
-            [sys.executable, "-m", "venv", "--without-pip", str(venv)],
-            cwd=root,
-            env=env,
-        )
+        run([sys.executable, "-m", "venv", str(venv)], cwd=root, env=env)
         scripts = "Scripts" if os.name == "nt" else "bin"
         python = venv / scripts / ("python.exe" if os.name == "nt" else "python")
+        # Run this interpreter. pip --python resolves the macOS symlink and
+        # installs into the base prefix instead of the venv.
         run(
-            [
-                sys.executable,
-                "-m",
-                "pip",
-                "--python",
-                str(python),
-                "install",
-                "--no-index",
-                "--no-deps",
-                str(wheel),
-            ],
+            [str(python), "-m", "pip", "install", "--no-index", "--no-deps", str(wheel)],
             cwd=root,
             env=env,
         )
@@ -142,8 +132,9 @@ def main():
             cwd=root,
             env=env,
         ).strip()
-        assert Path(location).is_relative_to(venv)
-        installed = Path(location).parent
+        installed = Path(location).resolve()
+        assert installed.is_relative_to(venv.resolve()), location
+        installed = installed.parent
         assert (
             digest((installed / compiler).read_bytes())
             == editor["compilerSHA256"]
