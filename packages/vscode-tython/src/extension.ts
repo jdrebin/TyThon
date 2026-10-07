@@ -75,7 +75,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         options: { cwd: vscode.workspace.workspaceFolders?.[0]?.uri.fsPath, env: { ...process.env, GOMEMLIMIT: launch.softLimit } },
     };
     const documentSelector = [
-        { language: "tython", scheme: "file" },
+        { language: "tython", scheme: "file", pattern: "**/*.ty" },
         { language: "tython", scheme: "tython" },
     ];
     let pythonTools: PythonTools | undefined;
@@ -171,7 +171,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         },
     }));
     context.subscriptions.push(vscode.languages.registerDefinitionProvider(
-        [{ language: "tython", scheme: "file" }, { language: "tython", scheme: "tython" }],
+        [{ language: "tython", scheme: "file", pattern: "**/*.ty" }, { language: "tython", scheme: "tython" }],
         {
             async provideDefinition(document, position, token) {
                 if (!languageClient?.isRunning()) return undefined;

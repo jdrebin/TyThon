@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { existsSync } from "node:fs";
-import { cp, mkdir, readFile, readdir, writeFile } from "node:fs/promises";
+import { cp, mkdir, readFile, readdir, readlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -42,7 +42,8 @@ async function fingerprint(dir) {
     for (const entry of (await readdir(dir, { withFileTypes: true })).sort((a, b) => a.name.localeCompare(b.name))) {
         if (entry.name === "build-info.json") continue;
         const file = path.join(dir, entry.name);
-        if (entry.isDirectory()) result.push([entry.name, await fingerprint(file)]);
+        if (entry.isSymbolicLink()) result.push([entry.name, sha(`link:${await readlink(file)}`)]);
+        else if (entry.isDirectory()) result.push([entry.name, await fingerprint(file)]);
         else result.push([entry.name, sha(await readFile(file))]);
     }
     return sha(JSON.stringify(result));

@@ -199,6 +199,7 @@ if (info.formatterSHA256) assert.equal(await sha(path.join(installed, "bin/forma
 assert.equal(await sha(path.join(installed, "dist/extension.bundle.js")), info.extensionSHA256);
 assert.equal(await sha(path.join(installed, "library/builtins.d.ty")), info.librarySHA256);
 if (runnable) {
+    npm(["run", "tools:prepare"]);
     run(process.execPath, [path.join(extension, "test/packagedPreview.test.mjs"), installed], root);
     run(process.execPath, [path.join(extension, "test/icons.test.mjs"), installed], root);
 }
