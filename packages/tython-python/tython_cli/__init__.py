@@ -3,6 +3,8 @@
 import argparse
 import json
 import os
+import subprocess
+import sys
 from pathlib import Path
 
 
@@ -47,7 +49,15 @@ def main():
     options = [f"--root-dir={Path(args.root_dir).absolute()}"] if args.root_dir else []
     if args.command == "build":
         options.extend(["--emit", f"--out-dir={Path(args.out_dir).absolute()}"])
+    command = [str(executable), "--python", *options, *files]
+    if os.name == "nt":
+        # os.execv on Windows does not overlay the process. The compiler runs,
+        # then this interpreter exits 0 and drops the compiler's status.
+        try:
+            sys.exit(subprocess.run(command).returncode)
+        except OSError as error:
+            parser.exit(2, f"tython: could not start the bundled compiler: {error}\n")
     try:
-        os.execv(str(executable), [str(executable), "--python", *options, *files])
+        os.execv(command[0], command)
     except OSError as error:
         parser.exit(2, f"tython: could not start the bundled compiler: {error}\n")
