@@ -12,19 +12,26 @@ import { canRun, targetByName } from "./targets.mjs";
 
 const root = fileURLToPath(new URL("../..", import.meta.url));
 const { values } = parseArgs({ options: { vsix: { type: "string" } } });
-const npm = process.platform === "win32" ? "npm.cmd" : "npm";
 const python = process.platform === "win32" ? "python" : "python3";
 function run(command, args) {
     console.log(`\n> ${command} ${args.join(" ")}`);
-    const result = spawnSync(command, args, { cwd: root, stdio: "inherit", timeout: 600000 });
+    const result = spawnSync(command, args, {
+        cwd: root, stdio: "inherit", timeout: 600000,
+        shell: process.platform === "win32" && command.endsWith(".cmd"),
+    });
     if (result.error || result.status !== 0) throw result.error || new Error(`${command} exited ${result.status}`);
+}
+function npm(args) {
+    const cli = process.env.npm_execpath;
+    if (cli) return run(process.execPath, [cli, ...args]);
+    return run(process.platform === "win32" ? "npm.cmd" : "npm", args);
 }
 // --vsix reuses an explicitly selected local artifact. A cross-compiled VSIX
 // was not executed on this machine; its wheel is still packed and tagged.
 // Omit it to rebuild and verify the editor/server first.
 const vsix = values.vsix ? path.resolve(values.vsix)
     : (await import("../../packages/vscode-tython/scripts/package-preview.mjs")).verifiedArtifact;
-run(npm, ["run", "licenses:check"]);
+npm(["run", "licenses:check"]);
 const sha = bytes => createHash("sha256").update(bytes).digest("hex");
 const bytes = await readFile(vsix);
 const digest = sha(bytes);

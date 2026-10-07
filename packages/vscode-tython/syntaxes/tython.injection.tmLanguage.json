@@ -7,12 +7,8 @@
             "include": "source.python.typed#comments"
         },
         {
-            "match": "(-)(optional)\\b|(!(?!=))",
-            "captures": {
-                "1": { "name": "keyword.operator.arithmetic.python" },
-                "2": { "name": "storage.modifier.declaration.python" },
-                "3": { "name": "keyword.operator.arithmetic.python" }
-            }
+            "name": "keyword.operator.presence.tython",
+            "match": "(-optional)\\b|(!(?!=))"
         },
         {
             "match": "(?<!\\bdef\\s+)(?<![\\w])(__)([A-Za-z][A-Za-z0-9_]*?)(__)(?![\\w])",
@@ -29,6 +25,9 @@
         },
         {
             "include": "#type-alias-declaration"
+        },
+        {
+            "include": "#interface-declaration"
         },
         {
             "include": "#declaration-modifiers"

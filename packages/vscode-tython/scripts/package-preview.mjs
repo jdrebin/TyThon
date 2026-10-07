@@ -19,20 +19,33 @@ const runnable = canRun(target);
 const extension = fileURLToPath(new URL("..", import.meta.url));
 const root = path.resolve(extension, "../..");
 const require = createRequire(import.meta.url);
-const npm = process.platform === "win32" ? "npm.cmd" : "npm";
 const goHost = { ...process.env, GOCACHE: process.env.GOCACHE || path.join(tmpdir(), "tython-go-cache"), GOMAXPROCS: "2" };
 const goBuild = { ...goHost, GOOS: target.goos, GOARCH: target.goarch, CGO_ENABLED: "0" };
+function npmArgs(args) {
+    const cli = process.env.npm_execpath;
+    if (cli) return [process.execPath, [cli, ...args]];
+    return [process.platform === "win32" ? "npm.cmd" : "npm", args];
+}
 function run(command, args, cwd = extension, capture = false, env = process.env) {
     console.log(`\n> ${command} ${args.join(" ")}`);
-    const result = spawnSync(command, args, { cwd, env, stdio: capture ? "pipe" : "inherit", encoding: "utf8", timeout: 600000 });
+    const result = spawnSync(command, args, {
+        cwd, env, encoding: "utf8", timeout: 600000,
+        stdio: capture ? "pipe" : "inherit",
+        shell: process.platform === "win32" && command.endsWith(".cmd"),
+    });
     if (result.error || result.status !== 0) throw result.error || new Error(`${command} exited ${result.status}: ${result.stderr || ""}`);
     return result.stdout?.trim();
 }
+function npm(args, cwd = extension) {
+    const [command, commandArgs] = npmArgs(args);
+    return run(command, commandArgs, cwd);
+}
+npm(["run", "build"]);
 if (!values["skip-checks"]) {
-    run(npm, ["run", "licenses:check"], root);
-    if (runnable) run(npm, ["run", "formatter:prepare"]);
+    npm(["run", "licenses:check"], root);
+    if (runnable) npm(["run", "formatter:prepare"]);
     run("go", ["test", "-p", "1", "./cmd/tsc", "./internal/python", "./internal/checker", "./internal/lsp", "-count=1", "-timeout=120s"], path.join(root, "tsc"), false, goHost);
-    for (const script of ["build", "test", "tools:test"]) run(npm, ["run", script]);
+    for (const script of ["test", "tools:test"]) npm(["run", script]);
 }
 
 const output = path.join(root, "built/preview");
