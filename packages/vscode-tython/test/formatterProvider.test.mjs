@@ -22,7 +22,7 @@ const vscode = {
         provider = value;
         return { dispose() { unregistered = true; } };
     } },
-    workspace: { isTrusted: true, getConfiguration: () => ({ get: () => enabled }),
+    workspace: { isTrusted: true, getConfiguration: () => ({ get: (key, fallback) => key === "formatting.enabled" ? enabled : fallback }),
         getWorkspaceFolder: () => ({ uri: { fsPath: root } }) },
     window: { showWarningMessage: message => { warnings.push(message); } },
 };

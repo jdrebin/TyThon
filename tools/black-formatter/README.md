@@ -15,13 +15,12 @@ grammar additions, token/CST adapters, spacing/lambda guards, and test harness.
 ## Run it
 
 For editor use, run `npm run -w tython demo:prepare` and restart the development
-launch. **Format Document** uses the frozen bundle in `built/local/black-formatter`.
-`bundle.mjs` freezes pinned dependencies, Python, and the native parser helper;
-the same folder is packaged at `bin/formatter` in the extension. No runtime
-downloads or workspace Python imports are used. PyInstaller runs in an isolated
-build environment; wheel licenses and native runtime provenance are retained.
-The initial verified build environment is Linux x64 / WSL Ubuntu 24.04.
-The existing release-license audit remains mandatory before distribution.
+launch. **Format Document** runs `formatter_cli.py` with the user's Python.
+Pinned Black is installed as pure Python under `built/local/black-spike/vendor`
+and patched in memory. The Go parser helper is `built/local/black-spike/oracle`.
+A packaged extension copies that Black tree to `formatter/vendor` and a
+cross-compiled helper to `bin/oracle`. The user's installed Black is not
+imported. The release-license audit remains mandatory before distribution.
 
 From the repository root (Python 3.12+, pip, Go, and Node available):
 
@@ -34,7 +33,7 @@ Preparation installs checksum-pinned **pure-Python** wheels only into
 `built/local/black-spike/vendor`, retaining their upstream licenses, and builds a
 development-only native parser oracle. It does not install global packages.
 After dependencies are installed, `prepare.mjs --offline` rebuilds the oracle
-without downloading packages. Windows packaging is not assessed by this spike.
+without downloading packages. Spike tests run on the host. The helper binary cross-compiles into each VSIX.
 
 Read the generated `built/local/black-spike/report.json` and the formatted `.ty`
 files in `built/local/black-spike/results/` to inspect the actual output.
@@ -157,5 +156,5 @@ has not been performed. Editor integration does not imply exhaustive syntax cove
 
 Before broad release: expand syntax and upstream regression suites, complete the
 release license/provenance audit, validate platform runtime compatibility, and
-exercise the resulting VSIX end-to-end. The relocated formatter bundle and
-registered provider are covered independently of the release packaging gate.
+exercise the resulting VSIX end-to-end. The formatter adapter and registered
+provider are covered independently of the release packaging gate.

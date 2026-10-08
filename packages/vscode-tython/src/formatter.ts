@@ -1,9 +1,9 @@
 import * as path from "node:path";
 import * as vscode from "vscode";
-import { formattingEdit, resolveFormatterPath, runFormatter } from "./formatterProcess";
+import { formattingEdit, resolveFormatterLaunch, runFormatter } from "./formatterProcess";
 
-// Separate from optional Jedi/lint tooling: formatting uses the shipped bundle,
-// never the selected interpreter or a workspace-specified executable.
+// Pinned Black is shipped as files. The user's Python runs it. Their installed
+// Black is not imported. Checking does not need Python.
 export class BundledFormatter implements vscode.Disposable {
     private readonly subscriptions: vscode.Disposable[];
     private active?: AbortController;
@@ -30,8 +30,9 @@ export class BundledFormatter implements vscode.Disposable {
         const current = () => !this.disposed && !controller.signal.aborted && !token.isCancellationRequested
             && !document.isClosed && document.version === version;
         try {
+            const python = vscode.workspace.getConfiguration("pythonTypeScript", document.uri).get<string>("tools.pythonPath", "");
             const formatted = await runFormatter({
-                executable: resolveFormatterPath(this.context.extensionPath, this.context.extensionMode === vscode.ExtensionMode.Development),
+                ...resolveFormatterLaunch(this.context.extensionPath, this.context.extensionMode === vscode.ExtensionMode.Development, python || undefined),
                 source: original, fileName: document.fileName,
                 root: vscode.workspace.getWorkspaceFolder(document.uri)?.uri.fsPath ?? path.dirname(document.fileName),
             }, controller.signal);

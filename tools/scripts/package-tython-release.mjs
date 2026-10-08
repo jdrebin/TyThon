@@ -37,7 +37,7 @@ const bytes = await readFile(vsix);
 const digest = sha(bytes);
 assert.equal((await readFile(`${vsix}.sha256`, "utf8")).split(/\s/)[0], digest, "VSIX checksum mismatch");
 const verification = JSON.parse(await readFile(`${vsix}.build-info.json`, "utf8"));
-assert(verification.verified === true || (verification.checks || []).includes("cross-compiled-compiler"), "Use a built local VSIX");
+assert(verification.verified === true || (verification.checks || []).some(check => String(check).startsWith("cross-compiled-compiler")), "Use a built local VSIX");
 const archive = new AdmZip(bytes);
 const info = JSON.parse(archive.readAsText("extension/build-info.json"));
 assert.equal(info.buildID, verification.buildID);
@@ -108,11 +108,11 @@ await writeFile(path.join(pending, "SHA256SUMS"), artifacts.map(a => `${a.sha256
 await writeFile(path.join(pending, "release.json"), JSON.stringify({
     ...info, verified: canRun(target), artifacts,
     checks: [...verification.checks, "wheel-records-and-platform", "wheel-vsix-identical-compiler-library", ...(canRun(target) ? ["fresh-venv-install", "cli-check-build-errors-imports"] : [])],
-    limitations: [`Target ${info.target}`, info.formatterSHA256 ? "Formatter bundled for this target" : "No bundled formatter for this target", info.target.startsWith("linux") ? "VSIX requires systemd/cgroups by default" : "systemd containment is Linux-only", "No interactive VS Code host test", "Not published"],
+    limitations: [`Target ${info.target}`, "Formatting uses the user's Python 3.10+ and the pinned Black shipped in the VSIX", info.target.startsWith("linux") ? "VSIX requires systemd/cgroups by default" : "systemd containment is Linux-only", "No interactive VS Code host test", "Not published"],
 }, null, 2) + "\n");
 await writeFile(path.join(pending, "INSTALL.md"), `# Install this tython alpha\n\n` +
     `Target \`${info.target}\`. Python 3.10+, VS Code 1.100+. ` +
-    (info.formatterSHA256 ? `A Black formatter binary is bundled.\n\n` : `No formatter binary is in this package. Checking and emit still work.\n\n`) +
+    `Formatting runs the pinned Black shipped in the VSIX with your Python 3.10+. Checking does not need Python.\n\n` +
     (info.target.startsWith("linux") ? `The Linux VSIX requires working systemd/cgroup memory containment by default.\n\n` : "") +
     `1. In your Linux/WSL VS Code window, run **Extensions: Install from VSIX…** and select \`${path.basename(vsix)}\`. Reload the window.\n` +
     `2. Activate your project's Python virtual environment and run:\n\n` +

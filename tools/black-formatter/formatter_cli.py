@@ -18,6 +18,9 @@ def main():
     # No writes to the extension install, project, or global Black cache.
     with tempfile.TemporaryDirectory(prefix="tython-format-") as cache:
         os.environ["BLACK_CACHE_DIR"] = cache
+        # -I implies -P on 3.11+, so the script directory is not on sys.path.
+        # Add only that directory. The workspace and user site stay off the path.
+        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
         from adapter import black, format_source
         from black.files import find_pyproject_toml, parse_pyproject_toml
 

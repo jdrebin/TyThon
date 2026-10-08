@@ -90,7 +90,7 @@
             "properties": {
                 "pythonTypeScript.formatting.enabled": {
                     "type": "boolean", "default": true,
-                    "description": "Enable the bundled Black-based formatter for .ty and .d.ty documents. Independent of optional Python tooling. Unsupported syntax is left unchanged with an error."
+                    "description": "Format .ty and .d.ty documents with the pinned Black shipped in this extension, using pythonTypeScript.tools.pythonPath or python3. Checking does not need Python. Unsupported syntax is left unchanged with an error."
                 },
                 "pythonTypeScript.tools.enabled": {
                     "type": "boolean", "default": true,

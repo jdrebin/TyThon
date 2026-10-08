@@ -17,12 +17,11 @@ machinery.
 [Try it](#try-it) · [Language guide](#language-guide) · [Library possibilities](#what-this-could-unlock-for-libraries) · [Current limitations](#current-limitations) · [Help shape tython](#help-shape-tython)
 
 > **Development preview.** The checker and editor integration are working, but
-> Python/library coverage and tooling are still being completed. Packages are
-> built per machine: Linux x64, Linux arm64, macOS arm64, macOS x64, and
-> Windows x64. The formatter binary is included when that package is built on
-> the matching OS (Linux x64, macOS arm64, Windows x64). Linux still expects
-> systemd/cgroup containment. This is not yet a claim of production readiness
-> or complete Python compatibility.
+> Python/library coverage and tooling are still being completed. One VSIX is
+> published per machine: Linux x64, Linux arm64, macOS arm64, macOS x64, and
+> Windows x64. Formatting uses your Python 3.10+ and the pinned Black shipped
+> in the VSIX. Linux still expects systemd/cgroup containment. This is not yet
+> a claim of production readiness or complete Python compatibility.
 
 ## A little input. A precise result.
 
@@ -71,7 +70,8 @@ python dist/app.py
 
 No Go, Node, source checkout, or compiler build is needed. The wheel requires
 Python 3.10+ and provides the `tython` command; the VSIX bundles its own matching
-compiler, library, and Black-based formatter. Either package works independently.
+compiler and library. Formatting uses that same Python and the pinned Black
+shipped in the VSIX. Either package works independently for checking.
 The VSIX is tested on Ubuntu 24.04/WSL with working systemd/cgroup containment.
 Optional Jedi/Ruff integrations still require separate Python packages.
 

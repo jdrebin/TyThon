@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtemp, readFile, writeFile, cp } from "node:fs/promises";
+import { mkdtemp, readFile, writeFile, cp, mkdir } from "node:fs/promises";
 import path from "node:path";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
@@ -8,13 +8,13 @@ import { build } from "esbuild";
 const extension = fileURLToPath(new URL("..", import.meta.url));
 const compiled = await build({ entryPoints: [path.join(extension, "src/formatterProcess.ts")],
     bundle: true, platform: "node", format: "esm", write: false });
-const { runFormatter, resolveFormatterPath, formattingEdit } = await import(
+const { runFormatter, resolveFormatterLaunch, formattingEdit } = await import(
     `data:text/javascript;base64,${Buffer.from(compiled.outputFiles[0].text).toString("base64")}`);
-const executable = resolveFormatterPath(extension, true);
+const launch = resolveFormatterLaunch(extension, true);
 const root = await mkdtemp(path.join(tmpdir(), "ty-formatter-test-"));
 const fileName = path.join(root, "example.ty");
 const request = (source, extra = {}, signal = new AbortController().signal) =>
-    runFormatter({ executable, source, root, fileName, ...extra }, signal);
+    runFormatter({ ...launch, source, root, fileName, ...extra }, signal);
 
 assert.equal(await request('user={"id":1}\n'), 'user = {"id": 1}\n');
 const source = '# explanation\nasync def f( a , b=1):\n  return {"😀":a,"b":b}\n';
@@ -52,7 +52,7 @@ assert.equal(await request("x='quote'\n"), "x = 'quote'\n", "preserve literal sp
 
 await assert.rejects(request('def f(:\n'), /refused|parse|expected/i);
 await assert.rejects(request("x".repeat(1_000_001)), /input exceeds/);
-await assert.rejects(request("x=1\n", { executable: path.join(root, "missing") }), /ENOENT/);
+await assert.rejects(request("x=1\n", { command: path.join(root, "missing") }), /ENOENT|not found/);
 const cancelled = new AbortController();
 cancelled.abort();
 await assert.rejects(request("x=1\n", {}, cancelled.signal), /cancelled/);
@@ -68,24 +68,26 @@ assert.equal(original.slice(0, edit.start) + edit.text + original.slice(edit.end
 assert.equal(formattingEdit(original, original), undefined);
 assert.deepEqual(formattingEdit('"😀"', '"😄"'), { start: 1, end: 3, text: "😄" });
 
-// Relocated bundle: no repository-relative imports or user Python needed.
+// Relocated install: the user's site-packages and a workspace black.py are not imported.
 const installed = path.join(root, "installed");
-await cp(path.dirname(executable), path.join(installed, "bin/formatter"), { recursive: true });
-const installedExecutable = resolveFormatterPath(installed, false);
-assert.equal(installedExecutable, path.join(installed, "bin/formatter/black-formatter"));
-const savedPath = process.env.PATH, savedPython = process.env.PYTHONPATH;
+await mkdir(path.join(installed, "formatter"), { recursive: true });
+await mkdir(path.join(installed, "bin"), { recursive: true });
+const repo = path.resolve(extension, "../..");
+const spike = path.join(repo, "built/local/black-spike");
+await cp(path.join(repo, "tools/black-formatter/formatter_cli.py"), path.join(installed, "formatter/formatter_cli.py"));
+await cp(path.join(repo, "tools/black-formatter/adapter.py"), path.join(installed, "formatter/adapter.py"));
+await cp(path.join(repo, "tools/black-formatter/LICENSE.black"), path.join(installed, "formatter/LICENSE.black"));
+await cp(path.join(spike, "vendor"), path.join(installed, "formatter/vendor"), { recursive: true });
+await cp(path.join(spike, process.platform === "win32" ? "oracle.exe" : "oracle"), path.join(installed, "bin", process.platform === "win32" ? "oracle.exe" : "oracle"));
+const installedLaunch = resolveFormatterLaunch(installed, false);
+const savedPython = process.env.PYTHONPATH;
 await writeFile(path.join(root, "black.py"), 'raise RuntimeError("workspace code must not be imported")\n');
 try {
-    process.env.PATH = "";
     process.env.PYTHONPATH = path.join(root, "nonexistent-python");
-    assert.equal(await request("type A=[]str\n", { executable: installedExecutable }), "type A = []str\n");
+    assert.equal(await request("type A=[]str\n", installedLaunch), "type A = []str\n");
 } finally {
-    if (savedPath === undefined) delete process.env.PATH; else process.env.PATH = savedPath;
     if (savedPython === undefined) delete process.env.PYTHONPATH; else process.env.PYTHONPATH = savedPython;
 }
-assert.throws(() => resolveFormatterPath(root, false), /no bundled formatter/);
-const info = JSON.parse(await readFile(path.join(installed, "bin/formatter/build-info.json"), "utf8"));
-assert.equal(info.engine, "black");
-assert.equal(info.version, "26.5.1");
-assert.match(await readFile(path.join(installed, "bin/formatter/LICENSE.black"), "utf8"), /Łukasz Langa/);
-console.log("Bundled Black: typed syntax, config, comments, CRLF, idempotence, cancellation, and relocated execution without Python/PATH passed.");
+assert.throws(() => resolveFormatterLaunch(root, false), /missing/);
+assert.match(await readFile(path.join(installed, "formatter/LICENSE.black"), "utf8"), /Łukasz Langa/);
+console.log("Pinned Black: typed syntax, config, comments, CRLF, idempotence, cancellation, and relocated execution passed.");

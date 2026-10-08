@@ -16,11 +16,10 @@ automatic asset bundling is added. Never distribute failed `.package-*` staging.
 
 Use the source toolchain documented in the root README. `npm run preview:package -- --target linux-x64`
 (or `darwin-arm64`, `darwin-x64`, `win32-x64`, `linux-arm64`) builds that machine's VSIX.
-The Go compiler cross-compiles. The frozen formatter is bundled only when the
-build host is that target, because PyInstaller cannot cross-compile. GitHub
-Actions workflow `Platform packages` builds the native pair on Linux x64, macOS
-arm64, and Windows x64, and cross-compiles the compiler for Linux arm64 and
-macOS x64. A working systemd/cgroup setup is required for the packaged Linux
+`npm run release:platforms` cross-compiles every target on this machine: the
+`tython` binary, the formatter's Go parser helper, and a platform wheel for
+each. Pinned Black is pure Python and is copied into every VSIX. The user's
+Python runs it. A working systemd/cgroup setup is required for the packaged Linux
 server tests. Python 3.10+
 with pip, venv, setuptools >=68, and wheel >=0.42 is needed to build the wheel;
 these are maintainer tools, not user dependencies. The wheel uses setuptools'
@@ -29,9 +28,11 @@ standard backend, with explicit native-platform metadata for the executable.
 ```sh
 npm ci
 npm run licenses:prepare
-npm run -w tython tools:prepare
-npm run release:package
+npm run release:platforms
 ```
+
+`npm run release:package` still builds only this machine's VSIX and wheel. Pass
+`--target` to `npm run preview:package` when you want one VSIX and no wheel.
 
 `licenses:prepare` downloads one pinned upstream commit into an ignored audit
 cache. It does not change project history or remotes. It is only needed if the
@@ -74,12 +75,13 @@ changed. Normal releases should omit this option to rebuild everything.
   with spaces/leading dashes, and no output writes after failed checks.
 - Compiler/library hashes match across the installed wheel and VSIX.
 
-An interactive VS Code host test remains a separate manual check. Only Linux
-x64 is packaged; the wheel is **not** tagged as a portable manylinux build.
-Other operating systems/architectures and wider Linux compatibility require
-their own builds and verification. The CLI doesn't expose formatting yet;
-the Black adaptation ships in the VSIX. Optional Jedi/Ruff helpers aren't
-installed automatically.
+An interactive VS Code host test remains a separate manual check. Wheels are
+**not** tagged as portable manylinux builds. Cross-compiled targets are packed
+here and executed when a build runs on that OS. The CLI doesn't expose
+formatting; the VSIX ships pinned Black and runs it with the user's Python.
+Optional Jedi/Ruff helpers aren't installed automatically. Publish every
+targeted VSIX with `vsce publish --packagePath` so the Marketplace serves one
+listing and installs the matching target.
 
 ## Sharing
 

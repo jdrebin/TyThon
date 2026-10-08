@@ -14,11 +14,17 @@ import subprocess
 import sys
 
 HERE = Path(__file__).resolve().parent
-FROZEN = getattr(sys, "frozen", False)
-BUILD = Path(sys._MEIPASS) if FROZEN else HERE.parents[1] / "built/local/black-spike"
-if not FROZEN:
-    sys.path.insert(0, str(BUILD / "vendor"))
+# Shipped copies pass TYTHON_BLACK and TYTHON_ORACLE. A source checkout
+# uses the prepare.mjs output. Black on disk is never modified.
+if os.environ.get("TYTHON_BLACK") and os.environ.get("TYTHON_ORACLE"):
+    VENDOR = Path(os.environ["TYTHON_BLACK"])
+    ORACLE = Path(os.environ["TYTHON_ORACLE"])
+else:
+    BUILD = HERE.parents[1] / "built/local/black-spike"
+    VENDOR = BUILD / "vendor"
+    ORACLE = BUILD / ("oracle.exe" if os.name == "nt" else "oracle")
     os.environ.setdefault("BLACK_CACHE_DIR", str(BUILD / "cache"))
+sys.path.insert(0, str(VENDOR))
 
 from blib2to3 import pygram
 from blib2to3.pgen2 import parse, pgen, token, tokenize
@@ -148,7 +154,7 @@ def analyze(source):
     if len(source.encode("utf8")) > 1_000_000:
         raise ValueError("Spike input exceeds 1 MB")
     result = subprocess.run(
-        [str(BUILD / "oracle")],
+        [str(ORACLE)],
         input=json.dumps({"source": source}),
         text=True,
         capture_output=True,

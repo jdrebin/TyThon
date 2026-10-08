@@ -31,12 +31,11 @@ const compiler = resolveCompilerPath(installed, false);
 assert.equal(compiler, path.join(installed, "bin", process.platform === "win32" ? "tython.exe" : "tython"));
 await access(compiler, constants.X_OK);
 const workspace = await mkdtemp(path.join(tmpdir(), "ty-installed-preview-"));
-const { resolveFormatterPath, runFormatter } = await compiled("../src/formatterProcess.ts");
-const formatter = resolveFormatterPath(installed, false);
-assert.equal(formatter, path.join(installed, "bin/formatter", process.platform === "win32" ? "black-formatter.exe" : "black-formatter"));
-await access(formatter, constants.X_OK);
-assert.match(await readFile(path.join(installed, "bin/formatter/LICENSE.black"), "utf8"), /Łukasz Langa/);
-assert.equal(await runFormatter({ executable: formatter, source: 'type User={"id":int}\n',
+const { resolveFormatterLaunch, runFormatter } = await compiled("../src/formatterProcess.ts");
+const formatter = resolveFormatterLaunch(installed, false);
+await access(formatter.env.TYTHON_ORACLE, constants.X_OK);
+assert.match(await readFile(path.join(installed, "formatter/LICENSE.black"), "utf8"), /Łukasz Langa/);
+assert.equal(await runFormatter({ ...formatter, source: 'type User={"id":int}\n',
     fileName: path.join(workspace, "format.ty"), root: workspace }, new AbortController().signal), 'type User = {"id": int}\n');
 await cp(path.join(installed, "preview"), workspace, { recursive: true });
 const contain = process.platform === "linux" && !process.env.CI;

@@ -42,9 +42,9 @@ not yet navigate every value directly to its `.d.ty` declaration.
 
 Supplementary Python docs/import completion come from Jedi; linting comes from
 Ruff. These optional features require your own Python environment with those
-tools. No environment is installed or modified automatically. Formatting uses
-a separate, pinned Black adaptation bundled with the extension; it does not require
-Python, Jedi, or Ruff in your environment.
+tools. No environment is installed or modified automatically. Formatting uses the
+pinned Black shipped in the extension and runs it with your Python. It does
+not use Jedi, Ruff, or the Black package in that environment.
 
 For a dedicated environment, run:
 
@@ -80,15 +80,13 @@ other Black options are not exposed yet. **Format Selection is not registered**
 until typed range formatting has been validated.
 
 `pythonTypeScript.formatting.enabled` controls formatting independently of
-`pythonTypeScript.tools.enabled`. The installed extension never downloads or
-installs a formatter. For development, `npm run -w tython demo:prepare` prepares
-the formatter bundle; subsequent runs reuse it when its inputs and payload match.
-Restart the development launch after rebuilding. The bundle includes Black,
-Python, and the native parser helper: no selected Python environment or separate
-formatter installation is needed at runtime. Build dependencies are hash-pinned;
-licenses and native runtime provenance are retained. Current builds are tested
-on Linux x64 / WSL Ubuntu 24.04, not yet other platforms.
-`npm run -w tython formatter:test` exercises the real bundle and provider.
+`pythonTypeScript.tools.enabled`. Formatting runs the pinned Black shipped in
+the extension with `pythonTypeScript.tools.pythonPath`, or `python3` when that
+is empty (`python` on Windows). It does not import Black from the selected
+environment. Checking does not need Python. For development,
+`npm run -w tython demo:prepare` installs that Black and builds the parser
+helper. Build dependencies are hash-pinned.
+`npm run -w tython formatter:test` exercises the real adapter and provider.
 
 Typed formatting is available, but grammar coverage is not yet exhaustive.
 Unsupported syntax or a failed native/Black equivalence check produces a warning

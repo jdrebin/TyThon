@@ -42,16 +42,11 @@ Implemented:
   the default formatter for the tython language. Ordinary Python editor
   formatting is not intercepted. Selection formatting is deliberately not
   advertised until typed ranges have independent validation.
-- A pinned Black/Python bundle plus the existing native parser/erasure helper.
-  Build dependencies are checksum-pinned and PyInstaller runs in an isolated
-  build environment, not the user's selected interpreter. Installed extensions
-  do not download dependencies or depend on Python/Go/Black on PATH.
-- The development launch prepares the bundle automatically. Matching build
-  inputs and payload hashes allow reuse; package-preview copies the same bundle
-  to `bin/formatter`. Linux x64 / WSL Ubuntu 24.04 is the tested build target;
-  other OS/ABI targets are not yet verified.
-- Wheel licenses, PyInstaller notices, and bundled native runtime provenance
-  are retained. Release licensing checks remain mandatory.
+- Pinned Black 26.5.1 is shipped as pure Python and patched in memory. The
+  user's Python runs it. Their installed Black is not imported. The Go parser
+  helper is cross-compiled into each platform VSIX. Checking does not need Python.
+- `npm run release:platforms` builds every Marketplace target on one machine.
+  Release licensing checks remain mandatory.
 - Black owns Python layout and configuration discovery. Currently we honor
   `[tool.black]` line-length and skip-magic-trailing-comma, preserve literal
   spelling for type-aware equivalence, and leave other options unexposed.
@@ -63,8 +58,8 @@ Implemented:
   group cancellation, and stale-document checks protect edits.
 
 Coverage: 43 typed examples and 10 Python controls matching stock Black, plus
-real frozen-bundle and registered-provider tests (including relocated execution
-without Python/PATH, CRLF, Unicode, configuration, cancellation, and stale edits).
+real adapter and registered-provider tests (including relocated execution,
+CRLF, Unicode, configuration, cancellation, and stale edits).
 The five original formatter gap fixtures are positive regressions.
 
 Added-syntax rules follow Black patterns: keep typed/generic lambda headers and

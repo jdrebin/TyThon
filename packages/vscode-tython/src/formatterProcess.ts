@@ -2,26 +2,46 @@ import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
 import * as path from "node:path";
 
-export function resolveFormatterPath(extensionPath: string, development: boolean): string {
-    const name = process.platform === "win32" ? "black-formatter.exe" : "black-formatter";
-    const result = development
-        ? path.resolve(extensionPath, "../../built/local/black-formatter", name)
-        : path.join(extensionPath, "bin", "formatter", name);
-    if (!existsSync(result)) throw new Error(development
-        ? "Bundled formatter is missing. Run npm run -w tython formatter:prepare."
-        : "This install has no bundled formatter. Checking still works. Format is included in the Linux x64, Linux arm64, macOS arm64, and Windows x64 packages built on that OS.");
-    return result;
+export interface FormatterLaunch {
+    command: string;
+    args: string[];
+    env: NodeJS.ProcessEnv;
 }
 
-export interface FormatRequest {
-    executable: string;
+// Python runs the pinned Black tree shipped with the extension. -I keeps the
+// user's site-packages, including their own Black, off the import path.
+export function resolveFormatterLaunch(extensionPath: string, development: boolean, python?: string): FormatterLaunch {
+    const command = python || (process.platform === "win32" ? "python" : "python3");
+    const oracleName = process.platform === "win32" ? "oracle.exe" : "oracle";
+    const root = path.resolve(extensionPath, "../..");
+    const script = development
+        ? path.join(root, "tools/black-formatter/formatter_cli.py")
+        : path.join(extensionPath, "formatter", "formatter_cli.py");
+    const black = development
+        ? path.join(root, "built/local/black-spike/vendor")
+        : path.join(extensionPath, "formatter", "vendor");
+    const oracle = development
+        ? path.join(root, "built/local/black-spike", oracleName)
+        : path.join(extensionPath, "bin", oracleName);
+    if (!existsSync(script) || !existsSync(path.join(black, "black")) || !existsSync(oracle)) {
+        throw new Error(development
+            ? "Formatter is missing. Run npm run -w tython formatter:prepare."
+            : "Formatter files are missing from this install. Reinstall the extension. Formatting needs Python 3.10+.");
+    }
+    return {
+        command,
+        args: ["-I", script],
+        env: { TYTHON_BLACK: black, TYTHON_ORACLE: oracle, PYTHONDONTWRITEBYTECODE: "1", PYTHONNOUSERSITE: "1" },
+    };
+}
+
+export interface FormatRequest extends FormatterLaunch {
     source: string;
     fileName: string;
     root: string;
 }
 
-// The bundled process owns native semantic validation and Black formatting.
-// Never send an erased projection here; actual .ty source is the only input.
+// Actual .ty source is the only input. The process also starts the Go parser helper.
 export function runFormatter(request: FormatRequest, signal: AbortSignal): Promise<string> {
     if (signal.aborted) return Promise.reject(new Error("Formatting cancelled"));
     if (Buffer.byteLength(request.source, "utf8") > 1_000_000) {
@@ -30,12 +50,14 @@ export function runFormatter(request: FormatRequest, signal: AbortSignal): Promi
     return new Promise((resolve, reject) => {
         let failure: Error | undefined;
         let stdout = "", stderr = "";
-        const child = spawn(request.executable, ["--stdin-filename", request.fileName, "-"], {
+        const child = spawn(request.command, [...request.args, "--stdin-filename", request.fileName, "-"], {
             cwd: request.root, stdio: ["pipe", "pipe", "pipe"],
             detached: process.platform !== "win32", windowsHide: true,
-            env: { ...process.env, GOMAXPROCS: "2", GOMEMLIMIT: "256MiB" },
+            env: {
+                ...process.env, ...request.env,
+                GOMAXPROCS: "2", GOMEMLIMIT: "256MiB",
+            },
         });
-        // Include the short-lived native parser helper in cancellation.
         const stop = (message: string) => {
             failure ??= new Error(message);
             if (!child.pid) return;
@@ -52,7 +74,12 @@ export function runFormatter(request: FormatRequest, signal: AbortSignal): Promi
         child.stderr.setEncoding("utf8");
         child.stdout.on("data", chunk => { stdout += chunk; if (stdout.length > 2_000_000) stop("Formatter output exceeds 2 MB"); });
         child.stderr.on("data", chunk => { stderr += chunk; if (stderr.length > 64_000) stop("Formatter error output exceeds 64 KB"); });
-        child.on("error", error => { failure ??= error; });
+        child.on("error", error => {
+            const missing = "code" in error && error.code === "ENOENT";
+            failure ??= missing
+                ? new Error(`Python was not found (${request.command}). Formatting needs Python 3.10+ on PATH, or set pythonTypeScript.tools.pythonPath.`)
+                : error;
+        });
         child.on("close", code => {
             clearTimeout(timer);
             signal.removeEventListener("abort", cancel);

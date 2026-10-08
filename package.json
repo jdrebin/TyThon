@@ -29,6 +29,7 @@
         "extension:watch": "npm run -w tython watch",
         "preview:package": "node packages/vscode-tython/scripts/package-preview.mjs",
         "release:package": "node tools/scripts/package-tython-release.mjs",
+        "release:platforms": "node tools/scripts/package-platforms.mjs",
         "setup-hooks": "node tools/scripts/link-hooks.mjs"
     },
     "devDependencies": {

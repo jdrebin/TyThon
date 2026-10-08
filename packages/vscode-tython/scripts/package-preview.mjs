@@ -74,29 +74,31 @@ delete manifest.scripts;
 delete manifest.devDependencies;
 delete manifest.dependencies; // JS dependencies are bundled or explicitly vendored below.
 manifest.files = ["README.md", "LICENSE.txt", "NOTICE.txt", "LICENSING.md", "THIRD_PARTY_NOTICES.md", "build-info.json", "language-configuration.json",
-    "bin/**", "dist/**", "icons/**", "library/**", "licenses/**", "preview/**", "scripts/**", "syntaxes/**", "vendor/**"];
+    "bin/**", "dist/**", "formatter/**", "icons/**", "library/**", "licenses/**", "preview/**", "scripts/**", "syntaxes/**", "vendor/**"];
 await writeFile(path.join(stage, "package.json"), JSON.stringify(manifest, null, 2) + "\n");
 await mkdir(path.join(stage, "bin"));
 run("go", ["build", "-trimpath", "-buildvcs=false", "-o", path.join(stage, "bin", target.binary), "./cmd/tsc"], path.join(root, "tsc"), false, goBuild);
-const formatter = path.join(root, "built/local/black-formatter");
-let formatterInfo;
-if (existsSync(path.join(formatter, "build-info.json"))) {
-    formatterInfo = JSON.parse(await readFile(path.join(formatter, "build-info.json"), "utf8"));
-    if (formatterInfo.target === target.name) await copy(formatter, "bin/formatter");
-    else formatterInfo = undefined;
+const blackVendor = path.join(root, "built/local/black-spike/vendor");
+if (!existsSync(path.join(blackVendor, "black"))) {
+    run(process.execPath, [path.join(root, "tools/black-formatter/prepare.mjs")], root);
 }
+const formatterDir = path.join(root, "tools/black-formatter");
+for (const name of ["adapter.py", "formatter_cli.py", "LICENSE.black"]) {
+    await copy(path.join(formatterDir, name), path.join("formatter", name));
+}
+await cp(blackVendor, path.join(stage, "formatter/vendor"), {
+    recursive: true, dereference: true,
+    filter: source => !source.includes("__pycache__") && !source.endsWith(".pyc"),
+});
+run("go", ["build", "-trimpath", "-buildvcs=false", "-o", path.join(stage, "bin", target.oracle), "./cmd/blackspike"], path.join(root, "tsc"), false, goBuild);
 
 // Pyright's npm distribution is self-contained on Linux (fsevents is optional).
 const pyright = path.dirname(require.resolve("pyright-typeserver/package.json"));
 await copy(pyright, "vendor/pyright-typeserver");
 const notices = ["# Third-party notices", "", "This independent project adapts TypeScript. Its upstream Apache-2.0 license and notices are retained in LICENSE.txt and NOTICE.txt. This distribution contains modified checker, Python frontend and editor integration code. The filesystem watcher license is in licenses/fswatch/LICENSE.", "", "Grammar attribution is in syntaxes/LICENSE.magicpython. Pyright includes its MIT license and typeshed notices in vendor/pyright-typeserver. The bundled Type Server Protocol is sourced from Pyright under that MIT license.", ""];
 const dependencies = [];
-if (formatterInfo) {
-    dependencies.push({ ecosystem: "binary", name: "black-tython-adaptation", version: formatterInfo.version, payloadSHA256: formatterInfo.payloadSHA256 });
-    notices.push(`Bundled Black ${formatterInfo.version}, modified by tython's grammar/layout adapter: bin/formatter/LICENSE.black. Python dependency metadata, PyInstaller notices, and native runtime license/provenance records are retained in bin/formatter/licenses/.`, "");
-} else {
-    notices.push("This platform package has no bundled formatter. Checking and emission still work. A formatter is included when the package is built on the matching OS.", "");
-}
+dependencies.push({ ecosystem: "python", name: "black", version: "26.5.1" });
+notices.push("Pinned Black 26.5.1 is shipped as pure Python in formatter/vendor and patched in memory by formatter/adapter.py. LICENSE.black is beside those files. The user's Python runs it. No private interpreter is bundled.", "");
 const goToolchain = JSON.parse(run("go", ["env", "-json", "GOROOT", "GOVERSION"], path.join(root, "tsc"), true, goHost));
 // The linked Go runtime is not a go.mod dependency. Retain its license and
 // patent files, including the toolchain's vendored component notices.
@@ -175,7 +177,7 @@ const info = {
     sourceDirty: !!run("git", ["status", "--porcelain"], root, true),
     compilerFile: target.compilerFile,
     compilerSHA256: compilerHash,
-    formatterSHA256: formatterInfo ? await sha(path.join(stage, "bin/formatter", target.formatter)) : "",
+    formatterSHA256: await sha(path.join(stage, "bin", target.oracle)),
     extensionSHA256: extensionHash,
     librarySHA256: await sha(path.join(stage, "library/builtins.d.ty")),
     lockfileSHA256: await sha(path.join(root, "package-lock.json")), dependencies,
@@ -195,7 +197,7 @@ for (const entry of zip.getEntries()) {
 zip.extractAllTo(extracted, false, true);
 const installed = path.join(extracted, "extension");
 assert.equal(await sha(path.join(installed, info.compilerFile)), info.compilerSHA256);
-if (info.formatterSHA256) assert.equal(await sha(path.join(installed, "bin/formatter", target.formatter)), info.formatterSHA256);
+assert.equal(await sha(path.join(installed, "bin", target.oracle)), info.formatterSHA256);
 assert.equal(await sha(path.join(installed, "dist/extension.bundle.js")), info.extensionSHA256);
 assert.equal(await sha(path.join(installed, "library/builtins.d.ty")), info.librarySHA256);
 if (runnable) {
@@ -208,6 +210,6 @@ const artifact = path.join(output, `tython-${manifest.version}-${info.buildID}-$
 assert(!existsSync(artifact), `Artifact already exists: ${artifact}; do not overwrite a verified build.`);
 await rename(pending, artifact);
 await writeFile(`${artifact}.sha256`, `${await sha(artifact)}  ${path.basename(artifact)}\n`);
-await writeFile(`${artifact}.build-info.json`, JSON.stringify({ ...info, verified: runnable, checks: runnable ? ["go-python-checker-lsp", "extension", "python-tools", "extracted-vsix-lsp"] : ["cross-compiled-compiler"] }, null, 2) + "\n");
+await writeFile(`${artifact}.build-info.json`, JSON.stringify({ ...info, verified: runnable, checks: runnable ? ["go-python-checker-lsp", "extension", "python-tools", "formatter", "extracted-vsix-lsp"] : ["cross-compiled-compiler-and-oracle"] }, null, 2) + "\n");
 console.log(`\n${runnable ? "Verified" : "Cross-compiled"} local preview: ${artifact}\nBuild staging retained for inspection: ${work}`);
 export const verifiedArtifact = artifact;

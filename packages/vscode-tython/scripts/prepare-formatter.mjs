@@ -1,2 +1,2 @@
-// Build-only: freeze the pinned Black adaptation and its native parser helper.
-import "../../../tools/black-formatter/bundle.mjs";
+// Install pinned pure-Python Black and build the host parser helper.
+import "../../../tools/black-formatter/prepare.mjs";
