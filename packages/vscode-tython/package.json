@@ -2,7 +2,7 @@
     "name": "tython",
     "displayName": "TyThon",
     "description": "Python with an erasable structural type system powered by the adapted TypeScript checker. Independent project.",
-    "publisher": "tython-local",
+    "publisher": "tython",
     "license": "Apache-2.0",
     "repository": {
         "type": "git",
@@ -11,7 +11,6 @@
     },
     "homepage": "https://github.com/jdrebin/TyThon#readme",
     "bugs": { "url": "https://github.com/jdrebin/TyThon/issues" },
-    "private": true,
     "version": "0.1.0",
     "capabilities": {
         "untrustedWorkspaces": { "supported": false }
@@ -30,7 +29,7 @@
         "configurationDefaults": {
             "[tython]": {
                 "editor.semanticHighlighting.enabled": true,
-                "editor.defaultFormatter": "tython-local.tython",
+                "editor.defaultFormatter": "tython.tython",
                 "editor.wordBasedSuggestions": "off",
                 "editor.quickSuggestions": { "other": "on", "comments": "off", "strings": "on" },
                 "editor.tabSize": 4,
