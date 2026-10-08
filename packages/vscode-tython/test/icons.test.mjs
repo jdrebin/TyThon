@@ -11,7 +11,7 @@ assert(language.extensions.includes(".ty") && language.extensions.includes(".d.t
 for (const variant of ["light", "dark"]) {
     assert.equal(language.icon[variant], `./icons/tython-${variant}.svg`);
     const svg = await readFile(path.join(extension, language.icon[variant]), "utf8");
-    assert.match(svg, /viewBox="0 0 32 32"/);
+    assert.match(svg, /viewBox="0 0 349.00 325.05"/);
     assert.match(svg, /xmlns="http:\/\/www.w3.org\/2000\/svg"/);
     assert.doesNotMatch(svg, /<script|<image|<foreignObject|href=|url\(/i, "Icons must be self-contained");
     assert.equal((svg.match(/<path /g) ?? []).length, 2);
