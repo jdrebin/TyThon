@@ -35,18 +35,18 @@ Non-code assets and dynamically loaded modules are not automatically copied;
 relative data-file paths retain Python's usual working-directory behavior.
 The CLI does not execute your Python code or install project dependencies.
 
-Install the matching `.vsix` through **Extensions: Install from VSIX…** for
-highlighting, completion, diagnostics, hover, and the bundled Black-based
-formatter. The VSIX and CLI are independently usable; both contain the same
-compiler and library. Optional Jedi/Ruff editor integrations remain separate.
+Install **TyThon** (`tython.tython`) from the VS Code Marketplace for
+highlighting, completion, diagnostics, hover, and formatting. Formatting runs
+the pinned Black shipped in that extension with your Python 3.10+. The VSIX
+and CLI are independently usable; both contain the same compiler and library.
+Optional Jedi/Ruff editor integrations remain separate.
 
-Only `check`, `build`, and `--version` are exposed by this initial CLI; formatting
-is available through the VS Code extension. The language and library coverage
-are still incomplete. See the [project guide](https://github.com/jdrebin/TyThon)
-for syntax and current limitations. The unrelated PyPI project named `tython`
-is not this package. These local artifacts are not automatically published.
+Only `check`, `build`, and `--version` are exposed by this CLI. The language
+and library coverage are still incomplete. See the
+[project guide](https://github.com/jdrebin/TyThon) for syntax and current
+limitations. The unrelated PyPI project named `tython` is not this package.
 
-For maintainers: `npm run release:package` at the repository root builds and
-tests a matching VSIX/wheel pair. This directory alone is not a source
+For maintainers: `npm run release:platforms` at the repository root builds
+every platform VSIX and wheel. This directory alone is not a source
 distribution; packaging stages the verified native payload before invoking
 the standard setuptools build backend.

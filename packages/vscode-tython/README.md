@@ -5,16 +5,17 @@ This is an independent project, not an official Microsoft extension.
 
 ## Install and try it
 
-The initial package targets **Linux x64**, including a **VS Code WSL** extension
-host. It requires a trusted workspace and working systemd/cgroup containment.
-Windows and macOS packages are not included in this preview.
+Install **TyThon** (`tython.tython`) from the Marketplace. VS Code selects the
+VSIX for Linux x64, Linux arm64, macOS arm64, macOS x64, or Windows x64.
+**Extensions: Install from VSIX…** is the sideload path; use the file whose
+target matches the machine. The workspace must be trusted. On Linux the
+language server expects working systemd/cgroup containment.
 
-1. Open your Linux/WSL VS Code window.
-2. Run **Extensions: Install from VSIX…** and select the supplied `.vsix`.
-3. Disable the development version of this extension in that window if present.
-4. Run **tython: Open Preview Examples**, select a parent folder, and open
+1. Install the extension and reload the window.
+2. Disable a development copy of this extension in that window if one is present.
+3. Run **tython: Open Preview Examples**, select a parent folder, and open
    the newly created workspace. The command will not overwrite an existing folder.
-5. Open `01_shapes.ty`. Try hover, quoted-key completion, diagnostics, and
+4. Open `01_shapes.ty`. Try hover, quoted-key completion, diagnostics, and
    navigation in the numbered examples.
 
 The matching compiler and library are bundled. You do **not** need Go, Node,
@@ -56,8 +57,9 @@ python3 -m venv /path/to/ty-editor-tools
 Set `pythonTypeScript.tools.pythonPath` to that environment's Python executable.
 Set `pythonTypeScript.tools.interpreterPath` to your project's interpreter, or use
 the Python extension's selected environment. Disable `pythonTypeScript.tools.enabled`
-if you only want the native typed-language features. Declaration import uses the
-bundled Pyright Type Server for stub resolution, not as a second `.ty` checker.
+if you only want the native typed-language features. **Import Python Declarations**
+starts the bundled Pyright server and resolves the module in your environment.
+Typeshed is not shipped. Pyright is not a second checker for `.ty` files.
 
 ## File icons
 
@@ -127,8 +129,7 @@ Include the version and `build-info.json` build identifier, platform/WSL details
 a minimal example, expected result, actual result, and relevant output. Remove
 secrets, private data and personal paths. A screenshot alone is usually not enough
 to reproduce a checker issue. Report ordinary issues at
-[jdrebin/TyThon](https://github.com/jdrebin/TyThon/issues). Marketplace publication
-and private security reporting are not configured yet.
+[jdrebin/TyThon](https://github.com/jdrebin/TyThon/issues).
 
 ## Licensing and provenance
 
@@ -141,17 +142,19 @@ builds predating these additions must be rebuilt before sharing.
 
 ## Build the preview from source
 
-From the repository root, after installing the repository's Node/Go dependencies
-and preparing the optional Python tools:
+From the repository root, after `npm ci`:
 
 ```sh
-npm run -w tython preview:package
+npm run release:platforms
 ```
 
-Packaging runs the Go suites, extension tests, Python tool tests, and an actual
-LSP smoke test against the extracted VSIX. It fails instead of producing a
-verified release if a required check fails. Artifacts are written under
-`built/preview`. No publish or installation action is performed.
+That cross-compiles every platform VSIX and wheel on this machine. Pinned Black
+is copied into each VSIX. The user's Python runs it. `npm run -w tython preview:package`
+builds only this machine's VSIX and, unless `--skip-checks` is passed, runs the
+Go suites, extension tests, Python tool tests, and an extracted-VSIX language
+server smoke test. `release:platforms` writes VSIXes under `built/preview` and
+wheels under `built/release`. `preview:package` writes only a VSIX. Neither
+command publishes or installs. See `docs/RELEASING.md`.
 
 The canonical source library is `tsc/internal/python/lib/builtins.d.ty`.
 `Launch tython standard library` opens it directly in extension development.

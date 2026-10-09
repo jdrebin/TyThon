@@ -54,10 +54,14 @@ fallback; it won't color all of tython's type syntax correctly. See
 
 ### Install without cloning
 
-Use a matching **Linux x64/WSL** wheel and VSIX from the same tython build:
+The editor is the Marketplace extension `tython.tython`. VS Code installs the
+VSIX that matches the machine: Linux x64, Linux arm64, macOS arm64, macOS x64,
+or Windows x64. The CLI is the PyPI package `tython-lang`, with a wheel for
+each of those platforms. Linux wheels are tagged `manylinux_2_17` because the
+compiler is a statically linked Go binary. `pip` installs them on glibc Linux,
+including WSL. Alpine is not covered.
 
-1. In your Linux/WSL VS Code window, run **Extensions: Install from VSIX…**
-   and choose the `.vsix`. Reload the window.
+1. In VS Code, install **TyThon** (`tython.tython`) from the Marketplace and reload the window.
 2. With your project's Python virtual environment active:
 
 ```sh
@@ -68,11 +72,15 @@ python dist/app.py
 ```
 
 No Go, Node, source checkout, or compiler build is needed. The wheel requires
-Python 3.10+ and provides the `tython` command; the VSIX bundles its own matching
+Python 3.10+ and provides the `tython` command. The VSIX bundles its own matching
 compiler and library. Formatting uses that same Python and the pinned Black
-shipped in the VSIX. Either package works independently for checking.
-The VSIX is tested on Ubuntu 24.04/WSL with working systemd/cgroup containment.
+shipped in the VSIX. It does not use Black from the environment. Checking does
+not need Python. Either package works independently for checking.
+The Linux language server expects working systemd/cgroup containment.
 Optional Jedi/Ruff integrations still require separate Python packages.
+**Import Python Declarations** asks Pyright to resolve a module in your
+environment. Typeshed is not shipped. If that module has no annotations, the
+command says so.
 
 `build` preserves the source layout under `dist/` and overwrites generated
 outputs there, never sibling source files. Use `--out-dir PATH` to change the
@@ -86,11 +94,10 @@ Relative data-file paths still depend on the working directory. Use `check`
 when you only want diagnostics. To explore without writing your own
 sample, run **tython: Open Preview Examples** in VS Code.
 
-These artifacts are built locally for now, not automatically published to PyPI,
-GitHub Releases, or the Marketplace. **Do not `pip install tython`**: that PyPI
-name belongs to an unrelated project. Our distribution is named `tython-lang`.
-Maintainers can build the pair with `npm run release:package`; see
-[release packaging](docs/RELEASING.md).
+**Do not `pip install tython`**: that PyPI name belongs to an unrelated project.
+Our distribution is named `tython-lang`. There is no GitHub Release. Maintainers
+build every platform VSIX and wheel on one machine with `npm run release:platforms`.
+See [release packaging](docs/RELEASING.md).
 
 ### From source
 
@@ -122,12 +129,13 @@ its final line is deliberately invalid.
 
 ### From a VSIX
 
-If you have a packaged tython `.vsix`, use **Extensions: Install from VSIX…**,
-then **tython: Open Preview Examples**. The compiler and declarations are bundled;
-native typing features do not require Go, Node, or this checkout.
+**Extensions: Install from VSIX…** is the sideload path. Use the VSIX whose
+target matches the machine. Then run **tython: Open Preview Examples**. The
+compiler and declarations are bundled. Native typing features do not require
+Go, Node, or this checkout.
 
 See the [extension guide](packages/vscode-tython/README.md) for optional
-Jedi documentation/navigation, Ruff linting, bundled Black-based formatting, interpreter selection,
+Jedi documentation/navigation, Ruff linting, formatting, interpreter selection,
 memory limits, and installation details. Those integrations complement the
 tython checker; they do not replace it.
 
@@ -895,14 +903,14 @@ demonstrate type transformations already checked by tython itself.
 | Area | Current boundary |
 | --- | --- |
 | Python and libraries | Built-in signatures and stdlib coverage are incomplete. `.d.ty` contracts remain necessary for precise external-library typing. |
-| Stub import | Existing `.pyi`/Python annotation import is a supported subset, not automatic conversion of all typeshed or arbitrary implementations. Unsupported conversions report errors. |
+| Stub import | **Import Python Declarations** converts annotations it finds in your environment. Tython does not ship typeshed. Unsupported conversions report errors. |
 | Dictionaries | Some exact-shape to open-map assignments are rejected because their method/index contracts differ. This relationship needs further work. |
 | Generic indexing | Some constrained generic indexed-access function bodies and type-utility calls in function constraints still need frontend fixes. See the audit for reproductions. |
 | Inheritance | Base-constructor signatures and instance attributes inferred inside a base `__init__` do not yet propagate reliably to subclasses. The inheritance example above exercises declared methods. |
 | Editor | Hover still has custom rendering paths. Navigation is partial; complete reference/rename/refactor parity is not promised. |
-| Formatting | The bundled Black adaptation formats typed documents without a user Python-tool installation. Unsupported syntax is rejected without edits; range formatting is not yet exposed. |
+| Formatting | Format Document runs the pinned Black shipped in the VSIX with your Python 3.10+. It does not use the Black package in that environment. Unsupported syntax is rejected without edits. Range formatting is not exposed. |
 | Runtime | Erasure is not validation. No inferred arbitrary decorator transformations, general monkey-patch tracking, or runtime enforcement of readonly/presence assertions. |
-| Distribution | Verified preview packaging is Linux x64/WSL. Memory containment is required by default; it is not silently disabled on startup failure. |
+| Distribution | Marketplace VSIXes and `tython-lang` wheels cover Linux x64, Linux arm64, macOS arm64, macOS x64, and Windows x64. Linux memory containment is required by default and is not silently disabled on startup failure. |
 
 Shared TypeScript semantics are the design rule, **not a claim that every editor
 feature or Python adaptation is finished**. The [design plan](TYTHON_PLAN.md)
