@@ -20,11 +20,12 @@ class BinaryWheel(bdist_wheel):
         self.root_is_pure = False
 
     def get_tag(self):
-        # The launcher is pure Python. The payload is a native compiler.
-        # Do not claim manylinux compatibility without an auditwheel validation.
+        # The launcher is pure Python. The compiler is a statically linked Go
+        # binary, so the Linux tag is manylinux_2_17: PyPI rejects linux_x86_64,
+        # and pip installs this tag on glibc distros including WSL.
         tags = {
-            "linux-x64": "linux_x86_64",
-            "linux-arm64": "linux_aarch64",
+            "linux-x64": "manylinux_2_17_x86_64",
+            "linux-arm64": "manylinux_2_17_aarch64",
             "darwin-x64": "macosx_10_15_x86_64",
             "darwin-arm64": "macosx_11_0_arm64",
             "win32-x64": "win_amd64",

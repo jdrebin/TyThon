@@ -5,20 +5,20 @@ adaptation of the TypeScript checker for typed Python, not a Microsoft product.
 The wheel contains a prebuilt compiler and its matching library. No Go, Node,
 source checkout, or compilation is required when installing it.
 
-This alpha targets Linux x64/WSL and Python 3.10+. The accompanying VSIX is tested
-on Ubuntu 24.04/WSL; other platforms are not yet packaged. This wheel does not
-claim manylinux compatibility.
+This alpha targets Python 3.10+. Linux wheels use the manylinux_2_17 tag because
+the compiler is a statically linked Go binary. pip installs them on glibc Linux,
+including WSL. Alpine is not covered.
 
-Install the downloaded wheel in your project's virtual environment:
+Install it in your project's virtual environment:
 
 ```sh
-python -m pip install /path/to/tython_lang-VERSION-py3-none-linux_x86_64.whl
+python -m pip install tython-lang
 tython check app.ty
 tython build app.ty
 python dist/app.py
 ```
 
-Replace `VERSION` with the downloaded filename. `python -m tython_cli` is also
+`python -m tython_cli` is also
 available if your environment's scripts directory is not on PATH.
 
 `check` writes no output files. `build` checks first, then preserves the source

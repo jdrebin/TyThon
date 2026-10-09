@@ -40,8 +40,8 @@ def main():
         metadata = next(n for n in names if n.endswith(".dist-info/WHEEL"))
         assert "Root-Is-Purelib: false" in archive.read(metadata).decode()
         tags = {
-            "linux-x64": "py3-none-linux_x86_64",
-            "linux-arm64": "py3-none-linux_aarch64",
+            "linux-x64": "py3-none-manylinux_2_17_x86_64",
+            "linux-arm64": "py3-none-manylinux_2_17_aarch64",
             "darwin-x64": "py3-none-macosx_10_15_x86_64",
             "darwin-arm64": "py3-none-macosx_11_0_arm64",
             "win32-x64": "py3-none-win_amd64",

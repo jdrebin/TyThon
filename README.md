@@ -58,11 +58,10 @@ Use a matching **Linux x64/WSL** wheel and VSIX from the same tython build:
 
 1. In your Linux/WSL VS Code window, run **Extensions: Install from VSIX…**
    and choose the `.vsix`. Reload the window.
-2. With your project's Python virtual environment active, install the downloaded
-   wheel (replace `VERSION` with its actual filename):
+2. With your project's Python virtual environment active:
 
 ```sh
-python -m pip install /path/to/tython_lang-VERSION-py3-none-linux_x86_64.whl
+python -m pip install tython-lang
 tython check app.ty
 tython build app.ty
 python dist/app.py

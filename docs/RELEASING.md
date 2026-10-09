@@ -43,7 +43,7 @@ Build-time formatter dependencies may also need downloading on the first build.
 Successful output is under `built/release/tython-<version>-<build>-<wheel-hash>-linux-x64/`:
 
 - `tython-<version>-<build>-linux-x64.vsix`
-- `tython_lang-<version>-py3-none-linux_x86_64.whl`
+- `tython_lang-<version>-py3-none-manylinux_2_17_x86_64.whl`
 - `INSTALL.md` with the exact install commands
 - `SHA256SUMS` and `release.json` with hashes and test results
 
@@ -75,8 +75,8 @@ changed. Normal releases should omit this option to rebuild everything.
   with spaces/leading dashes, and no output writes after failed checks.
 - Compiler/library hashes match across the installed wheel and VSIX.
 
-An interactive VS Code host test remains a separate manual check. Wheels are
-**not** tagged as portable manylinux builds. Cross-compiled targets are packed
+An interactive VS Code host test remains a separate manual check. Linux wheels
+are tagged manylinux_2_17 because the compiler is statically linked. Cross-compiled targets are packed
 here and executed when a build runs on that OS. The CLI doesn't expose
 formatting; the VSIX ships pinned Black and runs it with the user's Python.
 Optional Jedi/Ruff helpers aren't installed automatically. Publish every
