@@ -6,6 +6,15 @@ import { fileURLToPath } from "node:url";
 import { targets } from "./targets.mjs";
 
 const root = fileURLToPath(new URL("../..", import.meta.url));
+// The extracted Linux VSIX test uses systemd unless CI is set. This WSL
+// environment has no systemd, so skip containment instead of failing the pack.
+if (process.platform === "linux" && !process.env.CI) {
+    const systemd = spawnSync("systemctl", ["is-system-running"], { encoding: "utf8" });
+    if (systemd.status !== 0) {
+        process.env.CI = "1";
+        console.log("No running systemd; packaging the Linux VSIX without cgroup containment.");
+    }
+}
 function run(args) {
     console.log(`\n> ${process.execPath} ${args.join(" ")}`);
     const result = spawnSync(process.execPath, args, { cwd: root, stdio: "inherit" });

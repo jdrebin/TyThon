@@ -27,9 +27,14 @@ standard backend, with explicit native-platform metadata for the executable.
 
 ```sh
 npm ci
-npm run licenses:prepare
-npm run release:platforms
+npm run release
 ```
+
+`npm run release` prepares license notices, runs the checker and extension tests
+once, then cross-compiles every VSIX and wheel. It does not bump
+`packages/vscode-tython/package.json` and it does not publish. Bump the version
+before this command when the previous number is already on the Marketplace or
+PyPI. `npm run release:platforms` skips the tests and only packs.
 
 `npm run release:package` still builds only this machine's VSIX and wheel. Pass
 `--target` to `npm run preview:package` when you want one VSIX and no wheel.

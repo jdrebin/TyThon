@@ -96,7 +96,7 @@ sample, run **tython: Open Preview Examples** in VS Code.
 
 **Do not `pip install tython`**: that PyPI name belongs to an unrelated project.
 Our distribution is named `tython-lang`. There is no GitHub Release. Maintainers
-build every platform VSIX and wheel on one machine with `npm run release:platforms`.
+build every platform VSIX and wheel on one machine with `npm run release`.
 See [release packaging](docs/RELEASING.md).
 
 ### From source

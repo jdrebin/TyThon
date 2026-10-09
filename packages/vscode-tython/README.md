@@ -145,11 +145,12 @@ builds predating these additions must be rebuilt before sharing.
 From the repository root, after `npm ci`:
 
 ```sh
-npm run release:platforms
+npm run release
 ```
 
-That cross-compiles every platform VSIX and wheel on this machine. Pinned Black
-is copied into each VSIX. The user's Python runs it. `npm run -w tython preview:package`
+That runs the checker and extension tests, then cross-compiles every platform
+VSIX and wheel. Pinned Black is copied into each VSIX. The user's Python runs
+it. `npm run release:platforms` packs without the test suite. `npm run -w tython preview:package`
 builds only this machine's VSIX and, unless `--skip-checks` is passed, runs the
 Go suites, extension tests, Python tool tests, and an extracted-VSIX language
 server smoke test. `release:platforms` writes VSIXes under `built/preview` and

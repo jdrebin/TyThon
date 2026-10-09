@@ -46,7 +46,7 @@ and library coverage are still incomplete. See the
 [project guide](https://github.com/jdrebin/TyThon) for syntax and current
 limitations. The unrelated PyPI project named `tython` is not this package.
 
-For maintainers: `npm run release:platforms` at the repository root builds
+For maintainers: `npm run release` at the repository root tests, then builds
 every platform VSIX and wheel. This directory alone is not a source
 distribution; packaging stages the verified native payload before invoking
 the standard setuptools build backend.
