@@ -109,7 +109,9 @@ func connectModuleImports(c *checker.Checker, states []*moduleState, state *modu
 			for _, binding := range importDeclaration.Bindings {
 				target, err := resolveImportedModule(states, state, binding.Name, importDeclaration.Level)
 				if err != nil {
-					diagnostics = append(diagnostics, TypeDiagnostic{Range: importDeclaration.Range(), Message: err.Error()})
+					if !valuesOnly {
+						diagnostics = append(diagnostics, TypeDiagnostic{Range: importDeclaration.Range(), Message: err.Error()})
+					}
 					continue
 				}
 				local := binding.Alias
@@ -143,7 +145,9 @@ func connectModuleImports(c *checker.Checker, states []*moduleState, state *modu
 
 		target, err := resolveImportedModule(states, state, importDeclaration.Module, importDeclaration.Level)
 		if err != nil {
-			diagnostics = append(diagnostics, TypeDiagnostic{Range: importDeclaration.Range(), Message: err.Error()})
+			if !valuesOnly {
+				diagnostics = append(diagnostics, TypeDiagnostic{Range: importDeclaration.Range(), Message: err.Error()})
+			}
 			continue
 		}
 		for _, binding := range importDeclaration.Bindings {

@@ -151,20 +151,15 @@ language completeness requires a separate versioned syntax/behavior matrix.
 
 ## 7. Immediate migration issues discovered
 
-1. `tools/scripts/check-tython-notices.mjs` requires upstream commit
-   `f6b1667aa5c0468900eb2819ffcb41c0efd2cf09`, which is no longer available in
-   this repository. The packager runs this check first. Replace the history
-   dependency with an auditable checked-in provenance/legal-file manifest
-   before packaging or deleting audited upstream paths. Preserve change notices;
-   don't simply disable the check. Update `docs/LICENSING.md` accordingly.
-2. There is no `.github/workflows/` directory in this checkout. Earlier plan
-   text referring to active tython CI and archived workflows does not describe
-   the current tree. Restore intentional tython CI, not upstream publishing.
+1. **Resolved (2026-10-09):** `npm run licenses:check` now validates against a
+   checked-in manifest instead of a missing upstream Git object.
+2. **Resolved (2026-10-09):** `.github/workflows/tython.yml` runs Go and extension
+   verification; upstream Azure publish pipelines remain under `tools/pipelines/`.
 3. `.vscode/launch.json` and `.vscode/settings.json` are ignored by the broad
    editor rule. The tracked launch workflow is therefore incomplete for a fresh
    checkout; retain intentional shared launch configuration, not personal settings.
-4. Root `npm test` still selects the old extension suite. Establish correct
-   default verification before retiring that workspace.
+4. **Resolved (2026-10-09):** `hereby test` and root `npm test` run the tython
+   Go suites and `npm test -w tython`.
 5. README verification exposed two generic-function frontend gaps. A declaration
    beginning `def read<T, K extends ItemKeys(T)>(record: T, key: K) -> T[K]:`
    reports `unexpected token after type expression`. Replacing the constraint
@@ -172,13 +167,8 @@ language completeness requires a separate versioned syntax/behavior matrix.
    key K` and an incompatible `unknown` return. These are follow-up defects,
    not intentional language restrictions. The README uses a verified generic
    wrapper instead; no checker/parser fix was attempted during documentation work.
-6. The inheritance documentation check exposed incomplete subclass propagation.
-   Given `User.__init__(self, name: str)` assigning `self.name = name`, an
-   `Admin(User)` method reading `self.name.upper()` reports a missing attribute,
-   and `Admin("Ada")` reports too many positional arguments. This is ordinary
-   Python inheritance that the frontend still needs to model, not a language
-   design exclusion. The README's checked example demonstrates inherited
-   declared methods instead. No production code was changed for this audit.
+6. **Partially resolved:** ordinary subclass attribute propagation now checks in
+   the demo suite; constructor/`__init__` arity bridging remains follow-up work.
 
 ## 8. Recommended execution order and gates
 

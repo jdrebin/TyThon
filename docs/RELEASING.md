@@ -7,7 +7,12 @@ the verified VSIX, not from an independently rebuilt binary.
 
 The CLI emits into a separate `dist/` tree by default (`--out-dir` overrides
 it). This avoids treating emitted Python as competing source on subsequent
-checks/builds. Directory mapping reuses TypeScript's output-path implementation;
+checks/builds.
+
+**CLI dispatch note:** the native compiler binary expects Python mode explicitly
+(`tython --python …` from the wheel, or a leading `.ty`/`.d.ty` path). Flags such
+as `--emit` before the file list are not yet accepted on the bare binary entry
+point; use the wheel's `tython build` wrapper or pass `--python` first. Directory mapping reuses TypeScript's output-path implementation;
 Python erasure stays in the existing frontend. Discovered local `.py` modules
 and package initializers are copied unchanged. No runtime/import rewriting or
 automatic asset bundling is added. Never distribute failed `.package-*` staging.

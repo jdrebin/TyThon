@@ -2,6 +2,7 @@ package python
 
 import (
 	"strings"
+	"unicode"
 	"unicode/utf8"
 )
 
@@ -82,6 +83,23 @@ func parseDeclarationSource(fileName string, source string, declarationOnly bool
 			}
 			index++
 		default:
+			if isRuntimeClassControlStatement(line.text) || strings.HasPrefix(line.text, "elif ") ||
+				strings.HasPrefix(line.text, "return") || strings.HasPrefix(line.text, "raise ") ||
+				line.text == "raise" || strings.HasPrefix(line.text, "assert ") || line.text == "assert" ||
+				strings.HasPrefix(line.text, "del ") || strings.HasPrefix(line.text, "pass") ||
+				strings.HasPrefix(line.text, "break") || strings.HasPrefix(line.text, "continue") ||
+				strings.HasPrefix(line.text, "global ") || strings.HasPrefix(line.text, "nonlocal ") ||
+				strings.HasPrefix(line.text, "@") {
+				index++
+				continue
+			}
+			if strings.HasPrefix(line.text, "if ") || strings.HasPrefix(line.text, "for ") ||
+				strings.HasPrefix(line.text, "async for ") || strings.HasPrefix(line.text, "while ") ||
+				strings.HasPrefix(line.text, "with ") || strings.HasPrefix(line.text, "async with ") ||
+				strings.HasPrefix(line.text, "match ") {
+				index = blockEnd(lines, index)
+				continue
+			}
 			colon := findTopLevel(line.text, ':')
 			if declarationOnly || colon >= 0 && isSimpleIdentifier(strings.TrimSpace(line.text[:colon])) {
 				declaration, declarationErrors := parseVariableDeclaration(line, declarationOnly)
@@ -361,6 +379,7 @@ func stripTypeComment(line string) string {
 
 func delimiterDelta(text string) int {
 	delta := 0
+	openAngles := 0
 	quote := rune(0)
 	escaped := false
 	previous := rune(0)
@@ -388,18 +407,34 @@ func delimiterDelta(text string) int {
 			continue
 		}
 		switch r {
-		case '(', '[', '{', '<':
+		case '(', '[', '{':
 			delta++
+		case '<':
+			// Type argument lists attach directly to a name (`Box<T>`). Comparison
+			// operators are spaced (`a < b`, `lambda <T>` uses a leading keyword).
+			if isGenericTypeArgumentOpener(previous) {
+				delta++
+				openAngles++
+			}
 		case ')', ']', '}':
 			delta--
 		case '>':
-			if previous != '-' {
+			if previous != '-' && openAngles > 0 && isGenericTypeArgumentOpener(previous) {
 				delta--
+				openAngles--
 			}
 		}
 		previous = r
 	}
 	return delta
+}
+
+func isGenericTypeArgumentOpener(previous rune) bool {
+	if previous == 0 {
+		return false
+	}
+	return previous == '_' || unicode.IsLetter(previous) || unicode.IsDigit(previous) ||
+		previous == ')' || previous == ']' || previous == '}'
 }
 
 func blockEnd(lines []logicalLine, start int) int {

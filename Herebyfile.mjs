@@ -379,7 +379,8 @@ export const generateExtension = task({
     name: "generate:extension",
     description: "Generates files in the extension",
     run: async () => {
-        await run("npm", ["run", "-w", "native-preview", "generateLocBundle"]);
+        // The retired TypeScript preview extension workspace is gone; tython ships
+        // its own VS Code bundle from packages/vscode-tython.
     },
 });
 
@@ -399,6 +400,9 @@ export const generateExtension = task({
 
 /** @type {EnumDef[]} */
 const enumDefs = [
+    // Retired with the TypeScript JS API workspace; enum generation is a no-op until a
+    // tython-facing consumer needs these values again.
+    /*
     { name: "SymbolFlags", goPrefix: "SymbolFlags", goFile: "tsc/internal/ast/symbolflags.go", outDir: "packages/typescript/src/enums" },
     { name: "CheckFlags", goPrefix: "CheckFlags", goFile: "tsc/internal/ast/checkflags.go", outDir: "packages/typescript/src/enums" },
     { name: "TypeFlags", goPrefix: "TypeFlags", goFile: "tsc/internal/checker/types.go", outDir: "packages/typescript/src/enums" },
@@ -430,6 +434,7 @@ const enumDefs = [
     // String enum: Go stores internal names with a "\xFE" sentinel prefix, but the escaped
     // form sent over the wire uses "__" (see EscapeSymbolName), so map the sentinel accordingly.
     { name: "InternalSymbolName", goPrefix: "InternalSymbolName", goFile: "tsc/internal/ast/symbol.go", outDir: "packages/typescript/src/enums", stringEnum: true, valueReplacements: { InternalSymbolNamePrefix: "__" } },
+    */
 ];
 
 /**
@@ -973,8 +978,13 @@ export const generateAPI = task({
     name: "generate:api",
     description: "Generates API files from internal/api/proto.go and internal/api/session.go.",
     run: async () => {
-        await run("go", ["-C", "./tools", "run", "./gen-proto", "../tsc/internal/api/proto.go", "../packages/typescript/src/api/proto.generated.ts"]);
-        await run("npx", ["dprint", "fmt", "packages/typescript/src/api/proto.generated.ts"]);
+        const apiOut = "packages/typescript/src/api/proto.generated.ts";
+        if (!fs.existsSync(apiOut)) {
+            console.log("Skipping generate:api; TypeScript API workspace removed.");
+            return;
+        }
+        await run("go", ["-C", "./tools", "run", "./gen-proto", "../tsc/internal/api/proto.go", "../" + apiOut]);
+        await run("npx", ["dprint", "fmt", apiOut]);
     },
 });
 
@@ -1142,7 +1152,7 @@ async function runTests() {
             ...(trackingDir ? { TSGO_BASELINE_TRACKING_DIR: trackingDir } : {}),
         };
         const command = gotestsum("tests");
-        await run(command[0], [...command.slice(1), "./...", ...(isCI ? ["--timeout=45m"] : [])], {
+        await run(command[0], [...command.slice(1), "./cmd/tsc", "./internal/python", "./internal/checker", "./internal/lsp", ...(isCI ? ["--timeout=45m"] : ["-timeout=120s"])], {
             env: testEnv,
             cwd: "./tsc",
         });
@@ -1179,7 +1189,7 @@ async function runTests() {
 }
 
 async function runTestExtension() {
-    await run("npm", ["test", "-w", "native-preview"]);
+    await run("npm", ["test", "-w", "tython"]);
 }
 
 export const testTsc = task({

@@ -111,7 +111,24 @@ func runPython(args []string) int {
 	for _, input := range inputs {
 		texts[input.FileName] = input.Text
 	}
-	for _, diagnostic := range program.Diagnostics {
+	sortedDiagnostics := append([]pythonfrontend.ProgramDiagnostic(nil), program.Diagnostics...)
+	sort.Slice(sortedDiagnostics, func(i, j int) bool {
+		left, right := sortedDiagnostics[i], sortedDiagnostics[j]
+		if left.FileName != right.FileName {
+			return left.FileName < right.FileName
+		}
+		if left.Range.Start != right.Range.Start {
+			return left.Range.Start < right.Range.Start
+		}
+		return left.Message < right.Message
+	})
+	seen := make(map[string]struct{}, len(sortedDiagnostics))
+	for _, diagnostic := range sortedDiagnostics {
+		key := diagnostic.FileName + "\x00" + fmt.Sprint(diagnostic.Range.Start) + "\x00" + diagnostic.Message
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
 		line, column := sourceLineAndColumn(texts[diagnostic.FileName], diagnostic.Range.Start)
 		fmt.Fprintf(os.Stderr, "%s:%d:%d: error: %s\n", diagnostic.FileName, line, column, pythonfrontend.FormatDiagnosticMessage(diagnostic.Message))
 	}

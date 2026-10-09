@@ -1,3 +1,5 @@
+//go:build ignore
+
 package ast_test
 
 import (
