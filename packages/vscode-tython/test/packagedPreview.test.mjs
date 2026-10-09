@@ -140,5 +140,6 @@ assert.match(conversion.text, /declare def greet\(name: str\) -> str/);
 const { resolvePythonStub } = await compiled("../src/pythonTypeServer.ts");
 const stub = await resolvePythonStub({ extensionPath: installed, root: workspace, interpreter: python, linuxContainment: true, log: message => console.log(message) },
     path.join(workspace, "catalog.py"), "pathlib", new AbortController().signal);
-assert.match(stub, /vendor\/pyright-typeserver\/.*pathlib/);
+assert.match(stub, /pathlib\.py$/);
+assert.doesNotMatch(stub, /typeshed|pyright-typeserver/);
 console.log("Extracted VSIX passed: contained native LSP, matching library, examples, diagnostics, hover, completion, definitions, semantic tokens, edits, Python helper and bundled Pyright.");

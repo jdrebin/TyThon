@@ -12,10 +12,16 @@ function run(args) {
     if (result.error || result.status !== 0) throw result.error || new Error(`exited ${result.status}`);
 }
 run(["tools/black-formatter/prepare.mjs"]);
+const preview = path.join(root, "built/preview");
+const vsixNames = async () => (await readdir(preview).catch(() => [])).filter(name => name.endsWith(".vsix"));
+const seen = new Set(await vsixNames());
+const built = [];
 for (const name of Object.keys(targets)) {
     run(["packages/vscode-tython/scripts/package-preview.mjs", "--target", name, "--skip-checks"]);
+    for (const file of await vsixNames()) {
+        if (!seen.has(file)) { seen.add(file); built.push(file); }
+    }
 }
-const preview = path.join(root, "built/preview");
-for (const name of (await readdir(preview)).filter(file => file.endsWith(".vsix")).sort()) {
+for (const name of built) {
     run(["tools/scripts/package-tython-release.mjs", "--vsix", path.join(preview, name)]);
 }

@@ -92,10 +92,13 @@ await cp(blackVendor, path.join(stage, "formatter/vendor"), {
 });
 run("go", ["build", "-trimpath", "-buildvcs=false", "-o", path.join(stage, "bin", target.oracle), "./cmd/blackspike"], path.join(root, "tsc"), false, goBuild);
 
-// Pyright's npm distribution is self-contained on Linux (fsevents is optional).
+// The type server resolves modules in the user's environment. Typeshed is not
+// shipped: declaration import reads the files that environment already has.
 const pyright = path.dirname(require.resolve("pyright-typeserver/package.json"));
-await copy(pyright, "vendor/pyright-typeserver");
-const notices = ["# Third-party notices", "", "This independent project adapts TypeScript. Its upstream Apache-2.0 license and notices are retained in LICENSE.txt and NOTICE.txt. This distribution contains modified checker, Python frontend and editor integration code. The filesystem watcher license is in licenses/fswatch/LICENSE.", "", "Grammar attribution is in syntaxes/LICENSE.magicpython. Pyright includes its MIT license and typeshed notices in vendor/pyright-typeserver. The bundled Type Server Protocol is sourced from Pyright under that MIT license.", ""];
+for (const name of ["pyright-typeserver.js", "LICENSE.txt", "dist/pyright-internal.js", "dist/pyright-typeserver.js", "dist/vendor.js"]) {
+    await copy(path.join(pyright, name), path.join("vendor/pyright-typeserver", name));
+}
+const notices = ["# Third-party notices", "", "This independent project adapts TypeScript. Its upstream Apache-2.0 license and notices are retained in LICENSE.txt and NOTICE.txt. This distribution contains modified checker, Python frontend and editor integration code. The filesystem watcher license is in licenses/fswatch/LICENSE.", "", "Grammar attribution is in syntaxes/LICENSE.magicpython. Pyright's MIT license is in vendor/pyright-typeserver/LICENSE.txt. Typeshed is not bundled. The bundled Type Server Protocol is sourced from Pyright under that MIT license.", ""];
 const dependencies = [];
 dependencies.push({ ecosystem: "python", name: "black", version: "26.5.1" });
 notices.push("Pinned Black 26.5.1 is shipped as pure Python in formatter/vendor and patched in memory by formatter/adapter.py. LICENSE.black is beside those files. The user's Python runs it. No private interpreter is bundled.", "");

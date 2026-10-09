@@ -28,7 +28,7 @@ files are not automatically claimed to be copied from upstream.
   The text is published in [VS Code's license](https://github.com/microsoft/vscode/blob/main/LICENSE.txt).
 - The Pyright Type Server Protocol copy in `src/vendor/` retains its header;
   its MIT license is in `licenses/LICENSE.pyright.txt`. The packaged resolver
-  also retains its package and typeshed licenses.
+  retains the Pyright package license and does not bundle typeshed.
 - The grammar retains `syntaxes/LICENSE.magicpython`; its generator records
   the pinned MagicPython/VS Code sources.
 - `tsc/internal/fswatch/LICENSE` remains applicable to the inherited watcher.

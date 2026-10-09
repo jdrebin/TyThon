@@ -10,10 +10,14 @@
         "directory": "packages/vscode-tython"
     },
     "homepage": "https://github.com/jdrebin/TyThon#readme",
-    "bugs": { "url": "https://github.com/jdrebin/TyThon/issues" },
-    "version": "0.1.0",
+    "bugs": {
+        "url": "https://github.com/jdrebin/TyThon/issues"
+    },
+    "version": "0.1.1",
     "capabilities": {
-        "untrustedWorkspaces": { "supported": false }
+        "untrustedWorkspaces": {
+            "supported": false
+        }
     },
     "engines": {
         "vscode": "^1.100.0"
@@ -31,7 +35,11 @@
                 "editor.semanticHighlighting.enabled": true,
                 "editor.defaultFormatter": "tython.tython",
                 "editor.wordBasedSuggestions": "off",
-                "editor.quickSuggestions": { "other": "on", "comments": "off", "strings": "on" },
+                "editor.quickSuggestions": {
+                    "other": "on",
+                    "comments": "off",
+                    "strings": "on"
+                },
                 "editor.tabSize": 4,
                 "editor.insertSpaces": true,
                 "editor.detectIndentation": true,
@@ -43,9 +51,18 @@
             }
         },
         "commands": [
-            { "command": "pythonTypeScript.openPreview", "title": "tython: Open Preview Examples" },
-            { "command": "pythonTypeScript.importDeclarations", "title": "tython: Import Python Declarations" },
-            { "command": "pythonTypeScript.saveHeapProfile", "title": "tython: Save Heap Profile" }
+            {
+                "command": "pythonTypeScript.openPreview",
+                "title": "tython: Open Preview Examples"
+            },
+            {
+                "command": "pythonTypeScript.importDeclarations",
+                "title": "tython: Import Python Declarations"
+            },
+            {
+                "command": "pythonTypeScript.saveHeapProfile",
+                "title": "tython: Save Heap Profile"
+            }
         ],
         "languages": [
             {
@@ -89,39 +106,54 @@
             "title": "tython",
             "properties": {
                 "pythonTypeScript.formatting.enabled": {
-                    "type": "boolean", "default": true,
+                    "type": "boolean",
+                    "default": true,
                     "description": "Format .ty and .d.ty documents with the pinned Black shipped in this extension, using pythonTypeScript.tools.pythonPath or python3. Checking does not need Python. Unsupported syntax is left unchanged with an error."
                 },
                 "pythonTypeScript.tools.enabled": {
-                    "type": "boolean", "default": true,
+                    "type": "boolean",
+                    "default": true,
                     "description": "Use Jedi and Ruff for supplementary Python editor features in trusted workspaces. Native .ty type checking remains authoritative."
                 },
                 "pythonTypeScript.tools.pythonPath": {
-                    "type": "string", "default": "",
+                    "type": "string",
+                    "default": "",
                     "description": "Python executable containing Jedi and Ruff. Empty uses the development tools environment in extension development, otherwise python3 (python on Windows)."
                 },
                 "pythonTypeScript.tools.interpreterPath": {
-                    "type": "string", "default": "",
+                    "type": "string",
+                    "default": "",
                     "description": "Interpreter whose libraries Jedi should inspect. Empty uses the Python extension's selected environment, or the tools environment if unavailable."
                 },
                 "pythonTypeScript.server.memoryLimitMiB": {
-                    "type": "integer", "default": 4096, "minimum": 256, "maximum": 65536,
+                    "type": "integer",
+                    "default": 4096,
+                    "minimum": 256,
+                    "maximum": 65536,
                     "description": "Linux server hard RAM limit in MiB. Reload the window after changing."
                 },
                 "pythonTypeScript.server.swapLimitMiB": {
-                    "type": "integer", "default": 512, "minimum": 0, "maximum": 65536,
+                    "type": "integer",
+                    "default": 512,
+                    "minimum": 0,
+                    "maximum": 65536,
                     "description": "Linux swap allowance in MiB. On cgroup v1 this adds to the combined RAM+swap ceiling, not a separate swap ceiling."
                 },
                 "pythonTypeScript.server.goMemoryLimitMiB": {
-                    "type": "integer", "default": 3072, "minimum": 128, "maximum": 65535,
+                    "type": "integer",
+                    "default": 3072,
+                    "minimum": 128,
+                    "maximum": 65535,
                     "description": "Go soft memory target. Must be below the hard RAM limit; this alone cannot prevent an OOM."
                 },
                 "pythonTypeScript.server.linuxContainment": {
-                    "type": "boolean", "default": true,
+                    "type": "boolean",
+                    "default": true,
                     "description": "Require verified Linux cgroup containment via systemd. Disabling this removes hard memory protection. Reload required."
                 },
                 "pythonTypeScript.server.profileDirectory": {
-                    "type": "string", "default": "",
+                    "type": "string",
+                    "default": "",
                     "description": "Optional directory for native Go CPU/allocation profiles (workspace-relative or absolute). Profiles are finalized on graceful exit, not SIGKILL. Reload required."
                 },
                 "pythonTypeScript.compilerPath": {

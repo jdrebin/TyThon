@@ -85,8 +85,13 @@ await writeFile(path.join(payload, "THIRD_PARTY_NOTICES.md"),
     "and licenses/go-toolchain/. LICENSING.md describes source attribution policy; " +
     "its editor-component paths refer to the separately distributed VSIX.\n");
 const wheelhouse = path.join(work, "wheels");
-run(python, ["-m", "pip", "install", "setuptools>=68", "wheel>=0.42"]);
-run(python, ["-m", "pip", "wheel", "--no-build-isolation", "--no-deps", "--no-index", "--wheel-dir", wheelhouse, stage]);
+// Debian/Ubuntu mark the system interpreter as externally managed. Build tools
+// go in a venv; the system Python is only the bootstrap.
+const buildEnv = path.join(work, "build-python");
+run(python, ["-m", "venv", "--without-pip", buildEnv]);
+const buildPython = path.join(buildEnv, process.platform === "win32" ? "Scripts/python.exe" : "bin/python");
+run(python, ["-m", "pip", "--python", buildPython, "install", "pip", "setuptools>=68", "wheel>=0.42"]);
+run(buildPython, ["-m", "pip", "wheel", "--no-build-isolation", "--no-deps", "--no-index", "--wheel-dir", wheelhouse, stage]);
 const wheels = (await readdir(wheelhouse)).filter(name => name.endsWith(".whl"));
 assert.equal(wheels.length, 1);
 const wheel = path.join(wheelhouse, wheels[0]);
