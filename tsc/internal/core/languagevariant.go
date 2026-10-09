@@ -8,4 +8,7 @@ type LanguageVariant int32
 const (
 	LanguageVariantStandard LanguageVariant = iota
 	LanguageVariantJSX
+	// LanguageVariantPython selects the Python lexical grammar (layout tokens,
+	// string prefixes, f-strings, Python operators). Used for tython .ty/.d.ty files.
+	LanguageVariantPython
 )

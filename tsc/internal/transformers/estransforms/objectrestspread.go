@@ -402,8 +402,10 @@ func (ch *objectRestSpreadTransformer) visitCatchClause(node *ast.CatchClause) *
 		}
 		return ch.Factory().UpdateCatchClause(
 			node,
+			node.Exception,
 			ch.Factory().UpdateVariableDeclaration(node.VariableDeclaration.AsVariableDeclaration(), name, nil, nil, nil),
 			block,
+			node.NextClause,
 		)
 	}
 	return ch.Visitor().VisitEachChild(node.AsNode())

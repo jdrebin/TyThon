@@ -10,11 +10,12 @@ func _() {
 	var x [1]struct{}
 	_ = x[LanguageVariantStandard-0]
 	_ = x[LanguageVariantJSX-1]
+	_ = x[LanguageVariantPython-2]
 }
 
-const _LanguageVariant_name = "LanguageVariantStandardLanguageVariantJSX"
+const _LanguageVariant_name = "LanguageVariantStandardLanguageVariantJSXLanguageVariantPython"
 
-var _LanguageVariant_index = [...]uint8{0, 23, 41}
+var _LanguageVariant_index = [...]uint8{0, 23, 41, 62}
 
 func (i LanguageVariant) String() string {
 	idx := int(i) - 0

@@ -506,8 +506,11 @@ func (c *Checker) narrowTypeByBinaryExpression(f *FlowState, t *Type, expr *ast.
 	switch expr.OperatorToken.Kind {
 	case ast.KindEqualsToken, ast.KindBarBarEqualsToken, ast.KindAmpersandAmpersandEqualsToken, ast.KindQuestionQuestionEqualsToken:
 		return c.narrowTypeByTruthiness(f, c.narrowType(f, t, expr.Right, assumeTrue), expr.Left, assumeTrue)
-	case ast.KindEqualsEqualsToken, ast.KindExclamationEqualsToken, ast.KindEqualsEqualsEqualsToken, ast.KindExclamationEqualsEqualsToken:
+	case ast.KindEqualsEqualsToken, ast.KindExclamationEqualsToken, ast.KindEqualsEqualsEqualsToken, ast.KindExclamationEqualsEqualsToken, ast.KindIsKeyword:
 		operator := expr.OperatorToken.Kind
+		if operator == ast.KindIsKeyword {
+			operator = ast.KindEqualsEqualsEqualsToken
+		}
 		left := c.getReferenceCandidate(expr.Left)
 		right := c.getReferenceCandidate(expr.Right)
 		if left.Kind == ast.KindTypeOfExpression && ast.IsStringLiteralLike(right) {

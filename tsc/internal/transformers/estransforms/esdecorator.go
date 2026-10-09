@@ -1165,7 +1165,7 @@ func (tx *esDecoratorTransformer) transformConstructorBodyWorker(statementsOut [
 		if superStatement.AsTryStatement().FinallyBlock != nil {
 			finallyBlock = tx.Visitor().VisitNode(superStatement.AsTryStatement().FinallyBlock)
 		}
-		updated := tx.Factory().UpdateTryStatement(superStatement.AsTryStatement(), newTryBlock, catchClause, finallyBlock)
+		updated := tx.Factory().UpdateTryStatement(superStatement.AsTryStatement(), newTryBlock, catchClause, superStatement.AsTryStatement().ElseBlock, finallyBlock)
 		statementsOut = append(statementsOut, updated)
 	} else {
 		statementsOut = append(statementsOut, tx.Visitor().VisitNode(superStatement))

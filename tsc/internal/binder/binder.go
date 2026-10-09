@@ -630,6 +630,7 @@ func (b *Binder) bind(node *ast.Node) bool {
 		case ast.JSDeclarationKindThisProperty:
 			b.bindThisPropertyAssignment(node)
 		}
+		b.bindPythonAssignment(node)
 		b.checkStrictModeBinaryExpression(node)
 	case ast.KindCatchClause:
 		b.checkStrictModeCatchClause(node)
@@ -1121,9 +1122,6 @@ func getInitializerSymbol(symbol *ast.Symbol) *ast.Symbol {
 }
 
 func (b *Binder) bindThisPropertyAssignment(node *ast.Node) {
-	if !ast.IsInJSFile(node) {
-		return
-	}
 	bin := node.AsBinaryExpression()
 	if ast.IsPropertyAccessExpression(bin.Left) && ast.IsPrivateIdentifier(bin.Left.AsPropertyAccessExpression().Name()) ||
 		b.thisContainer == nil {
@@ -1196,6 +1194,10 @@ func (b *Binder) bindVariableDeclarationOrBindingElement(node *ast.Node) {
 
 func (b *Binder) bindParameter(node *ast.Node) {
 	decl := node.AsParameterDeclaration()
+	if star := decl.DotDotDotToken; star != nil && (star.Kind == ast.KindSlashToken || star.Kind == ast.KindAsteriskToken && ast.NodeIsMissing(decl.Name())) {
+		// The `/` and bare `*` markers of a parameter list declare nothing.
+		return
+	}
 	if node.Flags&ast.NodeFlagsAmbient == 0 {
 		// It is a SyntaxError if the identifier eval or arguments appears within a FormalParameterList of a
 		// strict mode FunctionLikeDeclaration or FunctionExpression(13.1)
@@ -1688,6 +1690,8 @@ func (b *Binder) bindChildren(node *ast.Node) {
 		b.bindContinueStatement(node)
 	case ast.KindTryStatement:
 		b.bindTryStatement(node)
+	case ast.KindCatchClause:
+		b.bindCatchClause(node)
 	case ast.KindSwitchStatement:
 		b.bindSwitchStatement(node)
 	case ast.KindCaseBlock:
@@ -2031,18 +2035,27 @@ func (b *Binder) bindTryStatement(node *ast.Node) {
 	b.addAntecedent(exceptionLabel, b.currentFlow)
 	b.currentExceptionTarget = exceptionLabel
 	b.bind(stmt.TryBlock)
+	// tython: the `else` block runs after the try block completes without an
+	// exception. Its own exceptions are not handled by the except clauses; they are
+	// conservatively modelled as flowing to the same exception label.
+	b.bind(stmt.ElseBlock)
 	b.addAntecedent(normalExitLabel, b.currentFlow)
 	if stmt.CatchClause != nil {
 		// Start of catch clause is the target of exceptions from try block.
-		b.currentFlow = b.finishFlowLabel(exceptionLabel)
+		catchStart := b.finishFlowLabel(exceptionLabel)
 		// The currentExceptionTarget now represents control flows from exceptions in the catch clause.
 		// Effectively, in a try-catch-finally, if an exception occurs in the try block, the catch block
 		// acts like a second try block.
 		exceptionLabel = b.createBranchLabel()
-		b.addAntecedent(exceptionLabel, b.currentFlow)
 		b.currentExceptionTarget = exceptionLabel
-		b.bind(stmt.CatchClause)
-		b.addAntecedent(normalExitLabel, b.currentFlow)
+		// tython: every `except` clause starts from the exception label; the chain is
+		// linked through NextClause, and each is bound here.
+		for clause := stmt.CatchClause; clause != nil; clause = clause.AsCatchClause().NextClause {
+			b.currentFlow = catchStart
+			b.addAntecedent(exceptionLabel, b.currentFlow)
+			b.bind(clause)
+			b.addAntecedent(normalExitLabel, b.currentFlow)
+		}
 	}
 	b.currentReturnTarget = saveReturnTarget
 	b.currentExceptionTarget = saveExceptionTarget
@@ -2091,6 +2104,15 @@ func (b *Binder) bindTryStatement(node *ast.Node) {
 	} else {
 		b.currentFlow = b.finishFlowLabel(normalExitLabel)
 	}
+}
+
+// bindCatchClause binds an `except` clause without its NextClause, which
+// bindTryStatement binds as a sibling.
+func (b *Binder) bindCatchClause(node *ast.Node) {
+	clause := node.AsCatchClause()
+	b.bind(clause.Exception)
+	b.bind(clause.VariableDeclaration)
+	b.bind(clause.Block)
 }
 
 func (b *Binder) bindSwitchStatement(node *ast.Node) {
@@ -2609,14 +2631,9 @@ func GetContainerFlags(node *ast.Node) ContainerFlags {
 		} else {
 			return ContainerFlagsNone
 		}
-	case ast.KindCatchClause, ast.KindForStatement, ast.KindForInStatement, ast.KindForOfStatement, ast.KindCaseBlock:
-		return ContainerFlagsIsBlockScopedContainer | ContainerFlagsHasLocals
-	case ast.KindBlock:
-		if ast.IsFunctionLike(node.Parent) || ast.IsClassStaticBlockDeclaration(node.Parent) {
-			return ContainerFlagsNone
-		} else {
-			return ContainerFlagsIsBlockScopedContainer | ContainerFlagsHasLocals
-		}
+		// Python has no block scope: catch clauses, loops, case blocks and plain
+		// blocks open no scope, so a name bound inside them lands in the enclosing
+		// function or module (see python.go).
 	}
 	return ContainerFlagsNone
 }
@@ -2754,8 +2771,20 @@ func isSignedNumericLiteral(node *ast.Node) bool {
 }
 
 func getOptionalSymbolFlagForNode(node *ast.Node) ast.SymbolFlags {
+	// `optional name: T` and `optional def m()` mark a member that may be absent;
+	// it is the same presence marker as TypeScript's `?` postfix.
 	postfixToken := node.PostfixToken()
-	return core.IfElse(postfixToken != nil && postfixToken.Kind == ast.KindQuestionToken, ast.SymbolFlagsOptional, ast.SymbolFlagsNone)
+	if postfixToken != nil && postfixToken.Kind == ast.KindQuestionToken {
+		return ast.SymbolFlagsOptional
+	}
+	if modifiers := node.Modifiers(); modifiers != nil {
+		for _, modifier := range modifiers.Nodes {
+			if modifier.Kind == ast.KindOptionalKeyword {
+				return ast.SymbolFlagsOptional
+			}
+		}
+	}
+	return ast.SymbolFlagsNone
 }
 
 func isFunctionSymbol(symbol *ast.Symbol) bool {

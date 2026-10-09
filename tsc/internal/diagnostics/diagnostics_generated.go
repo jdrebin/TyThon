@@ -4424,6 +4424,30 @@ var The_invalid_diagnostic_directive_is_in_supplemental_output_0_returned_by_the
 
 var Diagnostic_directive_0_returned_by_the_content_mapper_has_an_invalid_unusedExpectDirectiveIndex = &Message{code: 100068, category: CategoryMessage, key: "Diagnostic_directive_0_returned_by_the_content_mapper_has_an_invalid_unusedExpectDirectiveIndex_100068", text: "Diagnostic directive {0} returned by the content mapper has an invalid 'unusedExpectDirectiveIndex'."}
 
+var Unindent_does_not_match_any_outer_indentation_level = &Message{code: 110000, category: CategoryError, key: "Unindent_does_not_match_any_outer_indentation_level_110000", text: "Unindent does not match any outer indentation level."}
+
+var Inconsistent_use_of_tabs_and_spaces_in_indentation = &Message{code: 110001, category: CategoryError, key: "Inconsistent_use_of_tabs_and_spaces_in_indentation_110001", text: "Inconsistent use of tabs and spaces in indentation."}
+
+var Unterminated_triple_quoted_string_literal = &Message{code: 110002, category: CategoryError, key: "Unterminated_triple_quoted_string_literal_110002", text: "Unterminated triple-quoted string literal."}
+
+var Unexpected_character_after_line_continuation_character = &Message{code: 110003, category: CategoryError, key: "Unexpected_character_after_line_continuation_character_110003", text: "Unexpected character after line continuation character."}
+
+var Unexpected_end_of_file_after_line_continuation_character = &Message{code: 110004, category: CategoryError, key: "Unexpected_end_of_file_after_line_continuation_character_110004", text: "Unexpected end of file after line continuation character."}
+
+var Leading_zeros_in_decimal_integer_literals_are_not_permitted_use_an_0o_prefix_for_octal_integers = &Message{code: 110005, category: CategoryError, key: "Leading_zeros_in_decimal_integer_literals_are_not_permitted_use_an_0o_prefix_for_octal_integers_110005", text: "Leading zeros in decimal integer literals are not permitted; use an 0o prefix for octal integers."}
+
+var Bytes_can_only_contain_ASCII_literal_characters = &Message{code: 110006, category: CategoryError, key: "Bytes_can_only_contain_ASCII_literal_characters_110006", text: "Bytes can only contain ASCII literal characters."}
+
+var Single_is_not_allowed_in_an_f_string = &Message{code: 110007, category: CategoryError, key: "Single_is_not_allowed_in_an_f_string_110007", text: "Single '}' is not allowed in an f-string."}
+
+var Unmatched_0 = &Message{code: 110008, category: CategoryError, key: "Unmatched_0_110008", text: "Unmatched '{0}'."}
+
+var Unterminated_f_string_replacement_field = &Message{code: 110009, category: CategoryError, key: "Unterminated_f_string_replacement_field_110009", text: "Unterminated f-string replacement field."}
+
+var Invalid_format_specifier_in_f_string = &Message{code: 110010, category: CategoryError, key: "Invalid_format_specifier_in_f_string_110010", text: "Invalid format specifier in f-string."}
+
+var Unicode_character_name_escapes_are_not_resolved_the_escape_is_kept_verbatim = &Message{code: 110011, category: CategoryMessage, key: "Unicode_character_name_escapes_are_not_resolved_the_escape_is_kept_verbatim_110011", text: "Unicode character name escapes are not resolved; the escape is kept verbatim."}
+
 func keyToMessage(key Key) *Message {
 	switch key {
 	case "Unterminated_string_literal_1002":
@@ -8848,6 +8872,30 @@ func keyToMessage(key Key) *Message {
 		return The_invalid_diagnostic_directive_is_in_supplemental_output_0_returned_by_the_content_mapper
 	case "Diagnostic_directive_0_returned_by_the_content_mapper_has_an_invalid_unusedExpectDirectiveIndex_100068":
 		return Diagnostic_directive_0_returned_by_the_content_mapper_has_an_invalid_unusedExpectDirectiveIndex
+	case "Unindent_does_not_match_any_outer_indentation_level_110000":
+		return Unindent_does_not_match_any_outer_indentation_level
+	case "Inconsistent_use_of_tabs_and_spaces_in_indentation_110001":
+		return Inconsistent_use_of_tabs_and_spaces_in_indentation
+	case "Unterminated_triple_quoted_string_literal_110002":
+		return Unterminated_triple_quoted_string_literal
+	case "Unexpected_character_after_line_continuation_character_110003":
+		return Unexpected_character_after_line_continuation_character
+	case "Unexpected_end_of_file_after_line_continuation_character_110004":
+		return Unexpected_end_of_file_after_line_continuation_character
+	case "Leading_zeros_in_decimal_integer_literals_are_not_permitted_use_an_0o_prefix_for_octal_integers_110005":
+		return Leading_zeros_in_decimal_integer_literals_are_not_permitted_use_an_0o_prefix_for_octal_integers
+	case "Bytes_can_only_contain_ASCII_literal_characters_110006":
+		return Bytes_can_only_contain_ASCII_literal_characters
+	case "Single_is_not_allowed_in_an_f_string_110007":
+		return Single_is_not_allowed_in_an_f_string
+	case "Unmatched_0_110008":
+		return Unmatched_0
+	case "Unterminated_f_string_replacement_field_110009":
+		return Unterminated_f_string_replacement_field
+	case "Invalid_format_specifier_in_f_string_110010":
+		return Invalid_format_specifier_in_f_string
+	case "Unicode_character_name_escapes_are_not_resolved_the_escape_is_kept_verbatim_110011":
+		return Unicode_character_name_escapes_are_not_resolved_the_escape_is_kept_verbatim
 	default:
 		return nil
 	}

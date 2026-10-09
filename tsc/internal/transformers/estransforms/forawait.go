@@ -479,8 +479,10 @@ func (tx *forawaitTransformer) transformForAwaitOfStatement(node *ast.ForInOrOfS
 	}), false)
 	tx.EmitContext().AddEmitFlags(catchBody, printer.EFSingleLine)
 	catchClause := f.NewCatchClause(
+		nil,
 		f.NewVariableDeclaration(catchVariable, nil, nil, nil),
 		catchBody,
+		nil,
 	)
 
 	// finally block
@@ -515,6 +517,7 @@ func (tx *forawaitTransformer) transformForAwaitOfStatement(node *ast.ForInOrOfS
 		errorRecord,
 		f.NewThrowStatement(
 			f.NewPropertyAccessExpression(errorRecord, nil, f.NewIdentifier("error"), ast.NodeFlagsNone),
+			nil,
 		),
 		nil,
 	)
@@ -522,10 +525,10 @@ func (tx *forawaitTransformer) transformForAwaitOfStatement(node *ast.ForInOrOfS
 	innerFinallyBlock := f.NewBlock(f.NewNodeList([]*ast.Node{innerFinallyIf}), false)
 	tx.EmitContext().AddEmitFlags(innerFinallyBlock, printer.EFSingleLine)
 
-	innerTryStatement := f.NewTryStatement(innerTryBlock, nil, innerFinallyBlock)
+	innerTryStatement := f.NewTryStatement(innerTryBlock, nil, nil, innerFinallyBlock)
 	finallyBlock := f.NewBlock(f.NewNodeList([]*ast.Node{innerTryStatement}), true)
 
-	return f.NewTryStatement(tryBlock, catchClause, finallyBlock)
+	return f.NewTryStatement(tryBlock, catchClause, nil, finallyBlock)
 }
 
 func (tx *forawaitTransformer) visitConstructorDeclaration(node *ast.Node) *ast.Node {

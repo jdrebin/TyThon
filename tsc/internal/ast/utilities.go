@@ -715,7 +715,9 @@ func IsFunctionBlock(node *Node) bool {
 }
 
 func IsBlockOrCatchScoped(declaration *Node) bool {
-	return GetCombinedNodeFlags(declaration)&NodeFlagsBlockScoped != 0 || IsCatchClauseVariableDeclarationOrBindingElement(declaration)
+	// tython: an `except ... as e` name is an ordinary function-scoped variable, so only
+	// let and const (and loop) declarations are block scoped.
+	return GetCombinedNodeFlags(declaration)&NodeFlagsBlockScoped != 0
 }
 
 func IsCatchClauseVariableDeclarationOrBindingElement(declaration *Node) bool {
@@ -1072,7 +1074,7 @@ func CanHaveSymbol(node *Node) bool {
 func CanHaveIllegalDecorators(node *Node) bool {
 	switch node.Kind {
 	case KindPropertyAssignment, KindShorthandPropertyAssignment,
-		KindFunctionDeclaration, KindConstructor,
+		KindConstructor,
 		KindIndexSignature, KindClassStaticBlockDeclaration,
 		KindMissingDeclaration, KindVariableStatement,
 		KindInterfaceDeclaration, KindTypeAliasDeclaration,
@@ -1549,6 +1551,9 @@ func GetAssignmentDeclarationKind(node *Node) JSDeclarationKind {
 	case KindBinaryExpression:
 		bin := node.AsBinaryExpression()
 		if bin.OperatorToken.Kind == KindEqualsToken && IsAccessExpression(bin.Left) {
+			if bin.Left.Expression().Kind == KindThisKeyword || IsPythonReceiverAccess(bin.Left) {
+				return JSDeclarationKindThisProperty
+			}
 			if IsInJSFile(bin.Left) {
 				if IsModuleExportsAccessExpression(bin.Left) && !IsExportsIdentifier(bin.Right) {
 					return JSDeclarationKindModuleExports
@@ -1556,9 +1561,6 @@ func GetAssignmentDeclarationKind(node *Node) JSDeclarationKind {
 				if (IsModuleExportsAccessExpression(bin.Left.Expression()) || IsExportsIdentifier(bin.Left.Expression())) &&
 					GetElementOrPropertyAccessName(bin.Left) != nil {
 					return JSDeclarationKindExportsProperty
-				}
-				if bin.Left.Expression().Kind == KindThisKeyword {
-					return JSDeclarationKindThisProperty
 				}
 			}
 			if bin.Left.Kind == KindPropertyAccessExpression && IsEntityNameExpressionEx(bin.Left.Expression(), IsInJSFile(bin.Left)) && IsIdentifier(bin.Left.Name()) ||
@@ -1576,6 +1578,35 @@ func GetAssignmentDeclarationKind(node *Node) JSDeclarationKind {
 		}
 	}
 	return JSDeclarationKindNone
+}
+
+// IsPythonReceiverAccess reports `self.x` (or whatever the method's first
+// parameter is named) on the left of an assignment: the analogue of `this.x`
+// in a TypeScript constructor. Static methods have no instance receiver.
+func IsPythonReceiverAccess(access *Node) bool {
+	if access == nil || !IsAccessExpression(access) {
+		return false
+	}
+	expr := access.Expression()
+	if expr.Kind != KindIdentifier {
+		return false
+	}
+	name := expr.Text()
+	for n := access.Parent; n != nil; n = n.Parent {
+		switch n.Kind {
+		case KindMethodDeclaration, KindMethodSignature, KindConstructor:
+			if HasStaticModifier(n) {
+				return false
+			}
+			params := n.Parameters()
+			return len(params) > 0 && params[0].Name() != nil && params[0].Name().Text() == name
+		default:
+			if IsFunctionLike(n) {
+				return false
+			}
+		}
+	}
+	return false
 }
 
 func IsBindableObjectDefinePropertyCall(node *Node) bool {
@@ -4302,6 +4333,9 @@ func NodeCanBeDecorated(useLegacyDecorators bool, node *Node, parent *Node, gran
 	case KindClassDeclaration:
 		// class declarations are valid targets
 		return true
+	case KindFunctionDeclaration:
+		// tython: def can be decorated.
+		return true
 	case KindClassExpression:
 		// class expressions are valid targets for native decorators
 		return !useLegacyDecorators
@@ -4310,8 +4344,8 @@ func NodeCanBeDecorated(useLegacyDecorators bool, node *Node, parent *Node, gran
 		return parent != nil && (useLegacyDecorators && IsClassDeclaration(parent) ||
 			!useLegacyDecorators && IsClassLike(parent) && !HasAbstractModifier(node) && !HasAmbientModifier(node))
 	case KindGetAccessor, KindSetAccessor, KindMethodDeclaration:
-		// if this method has a body and its parent is a class declaration, this is a valid target.
-		return parent != nil && node.Body() != nil && (useLegacyDecorators && IsClassDeclaration(parent) ||
+		// tython: a method is decorated with or without a body (a stub `...` is bodiless).
+		return parent != nil && (useLegacyDecorators && IsClassDeclaration(parent) ||
 			!useLegacyDecorators && IsClassLike(parent))
 	case KindParameter:
 		// TODO(rbuckton): ParameterDeclaration decorator support for ES decorators must wait until it is standardized

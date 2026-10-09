@@ -1262,7 +1262,9 @@ func (tx *CommonJSModuleTransformer) visitTopLevelNestedLabeledStatement(node *a
 func (tx *CommonJSModuleTransformer) visitTopLevelNestedWithStatement(node *ast.WithStatement) *ast.Node {
 	return tx.Factory().UpdateWithStatement(
 		node,
+		node.AwaitModifier,
 		tx.Visitor().VisitNode(node.Expression),
+		node.Target,
 		tx.topLevelNestedVisitor.VisitEmbeddedStatement(node.Statement),
 	)
 }
@@ -1316,8 +1318,10 @@ func (tx *CommonJSModuleTransformer) visitTopLevelNestedTryStatement(node *ast.T
 func (tx *CommonJSModuleTransformer) visitTopLevelNestedCatchClause(node *ast.CatchClause) *ast.Node {
 	return tx.Factory().UpdateCatchClause(
 		node,
+		node.Exception,
 		node.VariableDeclaration,
 		tx.topLevelNestedVisitor.VisitNode(node.Block),
+		node.NextClause,
 	)
 }
 

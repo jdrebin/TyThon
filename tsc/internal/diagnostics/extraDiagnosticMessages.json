@@ -338,5 +338,53 @@
     "Diagnostic directive {0} returned by the content mapper has an invalid 'unusedExpectDirectiveIndex'.": {
         "category": "Message",
         "code": 100068
+    },
+    "Unindent does not match any outer indentation level.": {
+        "category": "Error",
+        "code": 110000
+    },
+    "Inconsistent use of tabs and spaces in indentation.": {
+        "category": "Error",
+        "code": 110001
+    },
+    "Unterminated triple-quoted string literal.": {
+        "category": "Error",
+        "code": 110002
+    },
+    "Unexpected character after line continuation character.": {
+        "category": "Error",
+        "code": 110003
+    },
+    "Unexpected end of file after line continuation character.": {
+        "category": "Error",
+        "code": 110004
+    },
+    "Leading zeros in decimal integer literals are not permitted; use an 0o prefix for octal integers.": {
+        "category": "Error",
+        "code": 110005
+    },
+    "Bytes can only contain ASCII literal characters.": {
+        "category": "Error",
+        "code": 110006
+    },
+    "Single '}' is not allowed in an f-string.": {
+        "category": "Error",
+        "code": 110007
+    },
+    "Unmatched '{0}'.": {
+        "category": "Error",
+        "code": 110008
+    },
+    "Unterminated f-string replacement field.": {
+        "category": "Error",
+        "code": 110009
+    },
+    "Invalid format specifier in f-string.": {
+        "category": "Error",
+        "code": 110010
+    },
+    "Unicode character name escapes are not resolved; the escape is kept verbatim.": {
+        "category": "Message",
+        "code": 110011
     }
 }

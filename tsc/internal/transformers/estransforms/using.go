@@ -706,6 +706,7 @@ func (tx *usingDeclarationTransformer) createDownlevelUsingStatements(bodyStatem
 	tryBlock := tx.Factory().NewBlock(tx.Factory().NewNodeList(bodyStatements), true /*multiLine*/)
 	bodyCatchBinding := tx.Factory().NewUniqueName("e")
 	catchClause := tx.Factory().NewCatchClause(
+		nil,
 		tx.Factory().NewVariableDeclaration(
 			bodyCatchBinding,
 			nil, /*exclamationToken*/
@@ -726,6 +727,7 @@ func (tx *usingDeclarationTransformer) createDownlevelUsingStatements(bodyStatem
 				),
 			),
 		}), true /*multiLine*/),
+		nil,
 	)
 
 	var finallyBlock *ast.BlockNode
@@ -753,7 +755,7 @@ func (tx *usingDeclarationTransformer) createDownlevelUsingStatements(bodyStatem
 		}), true /*multiLine*/)
 	}
 
-	tryStatement := tx.Factory().NewTryStatement(tryBlock, catchClause, finallyBlock)
+	tryStatement := tx.Factory().NewTryStatement(tryBlock, catchClause, nil, finallyBlock)
 	statements = append(statements, tryStatement)
 	return statements
 }

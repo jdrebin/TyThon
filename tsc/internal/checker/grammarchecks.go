@@ -284,7 +284,7 @@ func (c *Checker) checkGrammarModifiers(node *ast.Node /*Union[HasModifiers, Has
 				firstDecorator = modifier
 			}
 		} else {
-			if modifier.Kind != ast.KindReadonlyKeyword {
+			if modifier.Kind != ast.KindReadonlyKeyword && modifier.Kind != ast.KindOptionalKeyword {
 				if node.Kind == ast.KindPropertySignature || node.Kind == ast.KindMethodSignature {
 					return c.grammarErrorOnNode(modifier, diagnostics.X_0_modifier_cannot_appear_on_a_type_member, scanner.TokenToString(modifier.Kind))
 				}
@@ -691,8 +691,10 @@ func (c *Checker) checkGrammarParameterList(parameters *ast.NodeList) bool {
 	for i := range parameterCount {
 		parameter := parameters.Nodes[i].AsParameterDeclaration()
 		if parameter.DotDotDotToken != nil {
-			if i != parameterCount-1 {
-				return c.grammarErrorOnNode(parameter.DotDotDotToken, diagnostics.A_rest_parameter_must_be_last_in_a_parameter_list)
+			// tython: `*args` may be followed by keyword-only parameters and `**kwargs`,
+			// so a rest parameter need not be last.
+			if !isRestParameter(parameter.AsNode()) {
+				continue
 			}
 			if parameter.Flags&ast.NodeFlagsAmbient == 0 {
 				c.checkGrammarForDisallowedTrailingComma(parameters, diagnostics.A_rest_parameter_or_binding_pattern_may_not_have_a_trailing_comma)
@@ -822,15 +824,10 @@ func (c *Checker) checkGrammarIndexSignatureParameters(node *ast.IndexSignatureD
 	if typeNode == nil {
 		return c.grammarErrorOnNode(parameter.Name(), diagnostics.An_index_signature_parameter_must_have_a_type_annotation)
 	}
-	t := c.getTypeFromTypeNode(typeNode)
-	if someType(t, func(t *Type) bool {
-		return t.flags&TypeFlagsStringOrNumberLiteralOrUnique != 0
-	}) || c.isGenericType(t) {
-		return c.grammarErrorOnNode(parameter.Name(), diagnostics.An_index_signature_parameter_type_cannot_be_a_literal_type_or_generic_type_Consider_using_a_mapped_object_type_instead)
-	}
-	if !everyType(t, c.isValidIndexKeyType) {
-		return c.grammarErrorOnNode(parameter.Name(), diagnostics.An_index_signature_parameter_type_must_be_string_number_symbol_or_a_template_literal_type)
-	}
+	// tython: an item key `(K): V` can be any type, literals and type parameters
+	// included, so TypeScript's restriction to string, number, symbol and template
+	// keys does not apply. The key type is still resolved and checked.
+	c.getTypeFromTypeNode(typeNode)
 	if node.Type == nil {
 		return c.grammarErrorOnNode(node.AsNode(), diagnostics.An_index_signature_must_have_a_type_annotation)
 	}
@@ -907,11 +904,7 @@ func (c *Checker) checkGrammarClassDeclarationHeritageClauses(node *ast.ClassLik
 					return c.grammarErrorOnFirstToken(heritageClauseNode, diagnostics.X_extends_clause_must_precede_implements_clause)
 				}
 
-				typeNodes := heritageClause.Types.Nodes
-				if len(typeNodes) > 1 {
-					return c.grammarErrorOnFirstToken(typeNodes[1], diagnostics.Classes_can_only_extend_a_single_class)
-				}
-
+				// tython: a class may list several bases (checked per base elsewhere).
 				seenExtendsClause = true
 			} else {
 				if heritageClause.Token != ast.KindImplementsKeyword {
@@ -1854,10 +1847,8 @@ func (c *Checker) checkGrammarConstructorTypeParameters(node *ast.ConstructorDec
 }
 
 func (c *Checker) checkGrammarConstructorTypeAnnotation(node *ast.ConstructorDeclaration) bool {
-	t := node.Type
-	if t != nil {
-		return c.grammarErrorOnNode(t, diagnostics.Type_annotation_cannot_appear_on_a_constructor_declaration)
-	}
+	// tython: `def __init__(...) -> None` is allowed; the construct signature still
+	// returns the instance type.
 	return false
 }
 
@@ -2004,6 +1995,12 @@ func (c *Checker) checkGrammarTopLevelElementForRequiredDeclareModifier(node *as
 	//     export_opt   AmbientDeclaration
 	//
 	// TODO: The spec needs to be amended to reflect this grammar.
+	//
+	// tython: a .d.ty file is ambient as a whole, so no declaration in it needs
+	// `declare`; the modifier is accepted but never required.
+	if true {
+		return false
+	}
 	if node.Kind == ast.KindInterfaceDeclaration || node.Kind == ast.KindTypeAliasDeclaration || node.Kind == ast.KindImportDeclaration || node.Kind == ast.KindJSImportDeclaration || node.Kind == ast.KindImportEqualsDeclaration || node.Kind == ast.KindExportDeclaration || node.Kind == ast.KindExportAssignment || node.Kind == ast.KindNamespaceExportDeclaration || ast.HasSyntacticModifier(node, ast.ModifierFlagsAmbient|ast.ModifierFlagsExport|ast.ModifierFlagsDefault) {
 		return false
 	}

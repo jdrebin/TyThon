@@ -2459,6 +2459,7 @@ func (tx *classFieldsTransformer) transformConstructorBodyWorker(
 			superStatement.AsTryStatement(),
 			tx.Factory().UpdateBlock(tryBlock, tryStatementList, tryBlock.MultiLine),
 			catchClause,
+			superStatement.AsTryStatement().ElseBlock,
 			finallyBlock,
 		)
 		statementsOut = append(statementsOut, updated)

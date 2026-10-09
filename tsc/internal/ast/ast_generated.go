@@ -20,6 +20,7 @@ var (
 type NodeFactory struct {
 	hooks                              NodeFactoryHooks
 	arrayTypeNodeArena                 core.Arena[ArrayTypeNode]
+	attributeAccessTypeNodeArena       core.Arena[AttributeAccessTypeNode]
 	binaryExpressionArena              core.Arena[BinaryExpression]
 	blockArena                         core.Arena[Block]
 	callExpressionArena                core.Arena[CallExpression]
@@ -59,6 +60,7 @@ type NodeFactory struct {
 	stringLiteralArena                 core.Arena[StringLiteral]
 	tokenArena                         core.Arena[Token]
 	typeAliasDeclarationArena          core.Arena[TypeAliasDeclaration]
+	typeCallTypeNodeArena              core.Arena[TypeCallTypeNode]
 	typeLiteralNodeArena               core.Arena[TypeLiteralNode]
 	typeOperatorNodeArena              core.Arena[TypeOperatorNode]
 	typeParameterDeclarationArena      core.Arena[TypeParameterDeclaration]
@@ -269,6 +271,9 @@ type (
 	CaseBlockNode                     = Node
 	CaseOrDefaultClauseNode           = Node
 	ThrowStatementNode                = Node
+	AssertStatementNode               = Node
+	GlobalStatementNode               = Node
+	NonlocalStatementNode             = Node
 	TryStatementNode                  = Node
 	CatchClauseNode                   = Node
 	DebuggerStatementNode             = Node
@@ -315,6 +320,13 @@ type (
 	SemicolonClassElementNode         = Node
 	ClassStaticBlockDeclarationNode   = Node
 	OmittedExpressionNode             = Node
+	EllipsisExpressionNode            = Node
+	TupleExpressionNode               = Node
+	SetExpressionNode                 = Node
+	DictExpressionNode                = Node
+	ComprehensionExpressionNode       = Node
+	DictEntryNode                     = Node
+	KeywordArgumentNode               = Node
 	KeywordExpressionNode             = Node
 	StringLiteralNode                 = Node
 	NumericLiteralNode                = Node
@@ -441,6 +453,9 @@ type (
 	SyntheticReferenceExpressionNode  = Node
 	JSDocTypeLiteralNode              = Node
 	JSDocParameterOrPropertyTagNode   = Node
+	EllipsisTypeNodeNode              = Node
+	TypeCallTypeNodeNode              = Node
+	AttributeAccessTypeNodeNode       = Node
 	EndOfFile                         = Node
 	DotToken                          = Node
 	DotDotDotToken                    = Node
@@ -608,7 +623,7 @@ func (node *Token) Clone(f NodeFactoryCoercible) *Node {
 
 func IsToken(node *Node) bool {
 	switch node.Kind {
-	case KindUnknown, KindEndOfFile, KindSingleLineCommentTrivia, KindMultiLineCommentTrivia, KindNewLineTrivia, KindWhitespaceTrivia, KindConflictMarkerTrivia, KindNonTextFileMarkerTrivia, KindNumericLiteral, KindBigIntLiteral, KindStringLiteral, KindJsxText, KindJsxTextAllWhiteSpaces, KindRegularExpressionLiteral, KindNoSubstitutionTemplateLiteral, KindTemplateHead, KindTemplateMiddle, KindTemplateTail, KindOpenBraceToken, KindCloseBraceToken, KindOpenParenToken, KindCloseParenToken, KindOpenBracketToken, KindCloseBracketToken, KindDotToken, KindDotDotDotToken, KindSemicolonToken, KindCommaToken, KindQuestionDotToken, KindLessThanToken, KindLessThanSlashToken, KindGreaterThanToken, KindLessThanEqualsToken, KindGreaterThanEqualsToken, KindEqualsEqualsToken, KindExclamationEqualsToken, KindEqualsEqualsEqualsToken, KindExclamationEqualsEqualsToken, KindEqualsGreaterThanToken, KindPlusToken, KindMinusToken, KindAsteriskToken, KindAsteriskAsteriskToken, KindSlashToken, KindPercentToken, KindPlusPlusToken, KindMinusMinusToken, KindLessThanLessThanToken, KindGreaterThanGreaterThanToken, KindGreaterThanGreaterThanGreaterThanToken, KindAmpersandToken, KindBarToken, KindCaretToken, KindExclamationToken, KindTildeToken, KindAmpersandAmpersandToken, KindBarBarToken, KindQuestionToken, KindColonToken, KindAtToken, KindQuestionQuestionToken, KindBacktickToken, KindHashToken, KindEqualsToken, KindPlusEqualsToken, KindMinusEqualsToken, KindAsteriskEqualsToken, KindAsteriskAsteriskEqualsToken, KindSlashEqualsToken, KindPercentEqualsToken, KindLessThanLessThanEqualsToken, KindGreaterThanGreaterThanEqualsToken, KindGreaterThanGreaterThanGreaterThanEqualsToken, KindAmpersandEqualsToken, KindBarEqualsToken, KindBarBarEqualsToken, KindAmpersandAmpersandEqualsToken, KindQuestionQuestionEqualsToken, KindCaretEqualsToken, KindIdentifier, KindPrivateIdentifier, KindJSDocCommentTextToken, KindBreakKeyword, KindCaseKeyword, KindCatchKeyword, KindClassKeyword, KindConstKeyword, KindContinueKeyword, KindDebuggerKeyword, KindDefaultKeyword, KindDeleteKeyword, KindDoKeyword, KindElseKeyword, KindEnumKeyword, KindExportKeyword, KindExtendsKeyword, KindFalseKeyword, KindFinallyKeyword, KindForKeyword, KindFunctionKeyword, KindIfKeyword, KindImportKeyword, KindInKeyword, KindInstanceOfKeyword, KindNewKeyword, KindNullKeyword, KindReturnKeyword, KindSuperKeyword, KindSwitchKeyword, KindThisKeyword, KindThrowKeyword, KindTrueKeyword, KindTryKeyword, KindTypeOfKeyword, KindVarKeyword, KindVoidKeyword, KindWhileKeyword, KindWithKeyword, KindImplementsKeyword, KindInterfaceKeyword, KindLetKeyword, KindPackageKeyword, KindPrivateKeyword, KindProtectedKeyword, KindPublicKeyword, KindStaticKeyword, KindYieldKeyword, KindAbstractKeyword, KindAccessorKeyword, KindAsKeyword, KindAssertsKeyword, KindAssertKeyword, KindAnyKeyword, KindAsyncKeyword, KindAwaitKeyword, KindBooleanKeyword, KindConstructorKeyword, KindDeclareKeyword, KindGetKeyword, KindImmediateKeyword, KindInferKeyword, KindIntrinsicKeyword, KindIsKeyword, KindKeyOfKeyword, KindModuleKeyword, KindNamespaceKeyword, KindNeverKeyword, KindOutKeyword, KindReadonlyKeyword, KindRequireKeyword, KindNumberKeyword, KindObjectKeyword, KindSatisfiesKeyword, KindSetKeyword, KindStringKeyword, KindSymbolKeyword, KindTypeKeyword, KindUndefinedKeyword, KindUniqueKeyword, KindUnknownKeyword, KindUsingKeyword, KindFromKeyword, KindGlobalKeyword, KindBigIntKeyword, KindOverrideKeyword, KindOfKeyword, KindDeferKeyword:
+	case KindUnknown, KindEndOfFile, KindSingleLineCommentTrivia, KindMultiLineCommentTrivia, KindNewLineTrivia, KindWhitespaceTrivia, KindConflictMarkerTrivia, KindNonTextFileMarkerTrivia, KindNewlineToken, KindIndentToken, KindDedentToken, KindNumericLiteral, KindBigIntLiteral, KindStringLiteral, KindJsxText, KindJsxTextAllWhiteSpaces, KindRegularExpressionLiteral, KindNoSubstitutionTemplateLiteral, KindTemplateHead, KindTemplateMiddle, KindTemplateTail, KindOpenBraceToken, KindCloseBraceToken, KindOpenParenToken, KindCloseParenToken, KindOpenBracketToken, KindCloseBracketToken, KindDotToken, KindDotDotDotToken, KindSemicolonToken, KindCommaToken, KindQuestionDotToken, KindLessThanToken, KindLessThanSlashToken, KindGreaterThanToken, KindLessThanEqualsToken, KindGreaterThanEqualsToken, KindEqualsEqualsToken, KindExclamationEqualsToken, KindEqualsEqualsEqualsToken, KindExclamationEqualsEqualsToken, KindEqualsGreaterThanToken, KindMinusGreaterThanToken, KindPlusToken, KindMinusToken, KindAsteriskToken, KindAsteriskAsteriskToken, KindSlashToken, KindSlashSlashToken, KindPercentToken, KindPlusPlusToken, KindMinusMinusToken, KindLessThanLessThanToken, KindGreaterThanGreaterThanToken, KindGreaterThanGreaterThanGreaterThanToken, KindAmpersandToken, KindBarToken, KindCaretToken, KindExclamationToken, KindTildeToken, KindAmpersandAmpersandToken, KindBarBarToken, KindQuestionToken, KindColonToken, KindAtToken, KindQuestionQuestionToken, KindBacktickToken, KindHashToken, KindEqualsToken, KindColonEqualsToken, KindPlusEqualsToken, KindMinusEqualsToken, KindAsteriskEqualsToken, KindAsteriskAsteriskEqualsToken, KindSlashEqualsToken, KindSlashSlashEqualsToken, KindAtEqualsToken, KindPercentEqualsToken, KindLessThanLessThanEqualsToken, KindGreaterThanGreaterThanEqualsToken, KindGreaterThanGreaterThanGreaterThanEqualsToken, KindAmpersandEqualsToken, KindBarEqualsToken, KindBarBarEqualsToken, KindAmpersandAmpersandEqualsToken, KindQuestionQuestionEqualsToken, KindCaretEqualsToken, KindIdentifier, KindPrivateIdentifier, KindJSDocCommentTextToken, KindBreakKeyword, KindCaseKeyword, KindCatchKeyword, KindClassKeyword, KindConstKeyword, KindContinueKeyword, KindDebuggerKeyword, KindDefaultKeyword, KindDeleteKeyword, KindDoKeyword, KindElseKeyword, KindElifKeyword, KindLambdaKeyword, KindNonlocalKeyword, KindPassKeyword, KindEnumKeyword, KindExportKeyword, KindExtendsKeyword, KindFalseKeyword, KindFinallyKeyword, KindForKeyword, KindFunctionKeyword, KindIfKeyword, KindImportKeyword, KindInKeyword, KindInstanceOfKeyword, KindNewKeyword, KindNullKeyword, KindReturnKeyword, KindSuperKeyword, KindSwitchKeyword, KindThisKeyword, KindThrowKeyword, KindTrueKeyword, KindTryKeyword, KindTypeOfKeyword, KindVarKeyword, KindVoidKeyword, KindWhileKeyword, KindWithKeyword, KindImplementsKeyword, KindInterfaceKeyword, KindLetKeyword, KindPackageKeyword, KindPrivateKeyword, KindProtectedKeyword, KindPublicKeyword, KindStaticKeyword, KindYieldKeyword, KindAbstractKeyword, KindAccessorKeyword, KindAsKeyword, KindAssertsKeyword, KindAssertKeyword, KindAnyKeyword, KindAsyncKeyword, KindAwaitKeyword, KindBooleanKeyword, KindConstructorKeyword, KindDeclareKeyword, KindGetKeyword, KindImmediateKeyword, KindInferKeyword, KindIntrinsicKeyword, KindIsKeyword, KindKeyOfKeyword, KindModuleKeyword, KindNamespaceKeyword, KindNeverKeyword, KindOutKeyword, KindReadonlyKeyword, KindRequireKeyword, KindNumberKeyword, KindObjectKeyword, KindSatisfiesKeyword, KindSetKeyword, KindStringKeyword, KindSymbolKeyword, KindTypeKeyword, KindUndefinedKeyword, KindUniqueKeyword, KindUnknownKeyword, KindUsingKeyword, KindFromKeyword, KindGlobalKeyword, KindBigIntKeyword, KindOverrideKeyword, KindOfKeyword, KindMatchKeyword, KindOptionalKeyword, KindDeferKeyword:
 		return true
 	}
 	return false
@@ -1182,38 +1197,47 @@ func IsReturnStatement(node *Node) bool {
 type WithStatement struct {
 	StatementBase
 	CompositeBase
-	Expression *Expression
-	Statement  *Statement
+	AwaitModifier *AwaitKeyword // Optional
+	Expression    *Expression
+	Target        *ForInitializer // Optional
+	Statement     *Statement
 }
 
-func (f *NodeFactory) NewWithStatement(expression *Expression, statement *Statement) *Node {
+func (f *NodeFactory) NewWithStatement(awaitModifier *AwaitKeyword, expression *Expression, target *ForInitializer, statement *Statement) *Node {
 	data := &WithStatement{}
+	data.AwaitModifier = awaitModifier
 	data.Expression = expression
+	data.Target = target
 	data.Statement = statement
 	return f.newNode(KindWithStatement, data)
 }
 
-func (f *NodeFactory) UpdateWithStatement(node *WithStatement, expression *Expression, statement *Statement) *Node {
-	if expression != node.Expression || statement != node.Statement {
-		return updateNode(f.NewWithStatement(expression, statement), node.AsNode(), f.hooks)
+func (f *NodeFactory) UpdateWithStatement(node *WithStatement, awaitModifier *AwaitKeyword, expression *Expression, target *ForInitializer, statement *Statement) *Node {
+	if awaitModifier != node.AwaitModifier || expression != node.Expression || target != node.Target || statement != node.Statement {
+		return updateNode(f.NewWithStatement(awaitModifier, expression, target, statement), node.AsNode(), f.hooks)
 	}
 	return node.AsNode()
 }
 
 func (node *WithStatement) ForEachChild(v Visitor) bool {
-	return visit(v, node.Expression) || visit(v, node.Statement)
+	return visit(v, node.AwaitModifier) ||
+		visit(v, node.Expression) ||
+		visit(v, node.Target) ||
+		visit(v, node.Statement)
 }
 
 func (node *WithStatement) VisitEachChild(v *NodeVisitor) *Node {
-	return v.Factory.UpdateWithStatement(node, v.visitNode(node.Expression), v.visitEmbeddedStatement(node.Statement))
+	return v.Factory.UpdateWithStatement(node, v.visitNode(node.AwaitModifier), v.visitNode(node.Expression), v.visitNode(node.Target), v.visitEmbeddedStatement(node.Statement))
 }
 
 func (node *WithStatement) Clone(f NodeFactoryCoercible) *Node {
-	return cloneNode(f.AsNodeFactory().NewWithStatement(node.Expression, node.Statement), node.AsNode(), f.AsNodeFactory().hooks)
+	return cloneNode(f.AsNodeFactory().NewWithStatement(node.AwaitModifier, node.Expression, node.Target, node.Statement), node.AsNode(), f.AsNodeFactory().hooks)
 }
 
 func (node *WithStatement) computeSubtreeFacts() SubtreeFacts {
-	return propagateSubtreeFacts(node.Expression) |
+	return propagateSubtreeFacts(node.AwaitModifier) |
+		propagateSubtreeFacts(node.Expression) |
+		propagateSubtreeFacts(node.Target) |
 		propagateSubtreeFacts(node.Statement)
 }
 
@@ -1369,40 +1393,165 @@ func IsDefaultClause(node *Node) bool {
 type ThrowStatement struct {
 	StatementBase
 	CompositeBase
-	Expression *Expression
+	Expression *Expression // Optional
+	Cause      *Expression // Optional
 }
 
-func (f *NodeFactory) NewThrowStatement(expression *Expression) *Node {
+func (f *NodeFactory) NewThrowStatement(expression *Expression, cause *Expression) *Node {
 	data := &ThrowStatement{}
 	data.Expression = expression
+	data.Cause = cause
 	return f.newNode(KindThrowStatement, data)
 }
 
-func (f *NodeFactory) UpdateThrowStatement(node *ThrowStatement, expression *Expression) *Node {
-	if expression != node.Expression {
-		return updateNode(f.NewThrowStatement(expression), node.AsNode(), f.hooks)
+func (f *NodeFactory) UpdateThrowStatement(node *ThrowStatement, expression *Expression, cause *Expression) *Node {
+	if expression != node.Expression || cause != node.Cause {
+		return updateNode(f.NewThrowStatement(expression, cause), node.AsNode(), f.hooks)
 	}
 	return node.AsNode()
 }
 
 func (node *ThrowStatement) ForEachChild(v Visitor) bool {
-	return visit(v, node.Expression)
+	return visit(v, node.Expression) || visit(v, node.Cause)
 }
 
 func (node *ThrowStatement) VisitEachChild(v *NodeVisitor) *Node {
-	return v.Factory.UpdateThrowStatement(node, v.visitNode(node.Expression))
+	return v.Factory.UpdateThrowStatement(node, v.visitNode(node.Expression), v.visitNode(node.Cause))
 }
 
 func (node *ThrowStatement) Clone(f NodeFactoryCoercible) *Node {
-	return cloneNode(f.AsNodeFactory().NewThrowStatement(node.Expression), node.AsNode(), f.AsNodeFactory().hooks)
+	return cloneNode(f.AsNodeFactory().NewThrowStatement(node.Expression, node.Cause), node.AsNode(), f.AsNodeFactory().hooks)
 }
 
 func (node *ThrowStatement) computeSubtreeFacts() SubtreeFacts {
-	return propagateSubtreeFacts(node.Expression)
+	return propagateSubtreeFacts(node.Expression) |
+		propagateSubtreeFacts(node.Cause)
 }
 
 func IsThrowStatement(node *Node) bool {
 	return node.Kind == KindThrowStatement
+}
+
+// ──────────────────────────────────────────────────────────────────────
+// AssertStatement
+// ──────────────────────────────────────────────────────────────────────
+
+type AssertStatement struct {
+	StatementBase
+	CompositeBase
+	Test    *Expression
+	Message *Expression // Optional
+}
+
+func (f *NodeFactory) NewAssertStatement(test *Expression, message *Expression) *Node {
+	data := &AssertStatement{}
+	data.Test = test
+	data.Message = message
+	return f.newNode(KindAssertStatement, data)
+}
+
+func (f *NodeFactory) UpdateAssertStatement(node *AssertStatement, test *Expression, message *Expression) *Node {
+	if test != node.Test || message != node.Message {
+		return updateNode(f.NewAssertStatement(test, message), node.AsNode(), f.hooks)
+	}
+	return node.AsNode()
+}
+
+func (node *AssertStatement) ForEachChild(v Visitor) bool {
+	return visit(v, node.Test) || visit(v, node.Message)
+}
+
+func (node *AssertStatement) VisitEachChild(v *NodeVisitor) *Node {
+	return v.Factory.UpdateAssertStatement(node, v.visitNode(node.Test), v.visitNode(node.Message))
+}
+
+func (node *AssertStatement) Clone(f NodeFactoryCoercible) *Node {
+	return cloneNode(f.AsNodeFactory().NewAssertStatement(node.Test, node.Message), node.AsNode(), f.AsNodeFactory().hooks)
+}
+
+func (node *AssertStatement) computeSubtreeFacts() SubtreeFacts {
+	return propagateSubtreeFacts(node.Test) |
+		propagateSubtreeFacts(node.Message)
+}
+
+func IsAssertStatement(node *Node) bool {
+	return node.Kind == KindAssertStatement
+}
+
+// ──────────────────────────────────────────────────────────────────────
+// GlobalStatement
+// ──────────────────────────────────────────────────────────────────────
+
+type GlobalStatement struct {
+	StatementBase
+	Names *NodeList
+}
+
+func (f *NodeFactory) NewGlobalStatement(names *NodeList) *Node {
+	data := &GlobalStatement{}
+	data.Names = names
+	return f.newNode(KindGlobalStatement, data)
+}
+
+func (f *NodeFactory) UpdateGlobalStatement(node *GlobalStatement, names *NodeList) *Node {
+	if names != node.Names {
+		return updateNode(f.NewGlobalStatement(names), node.AsNode(), f.hooks)
+	}
+	return node.AsNode()
+}
+
+func (node *GlobalStatement) ForEachChild(v Visitor) bool {
+	return visitNodeList(v, node.Names)
+}
+
+func (node *GlobalStatement) VisitEachChild(v *NodeVisitor) *Node {
+	return v.Factory.UpdateGlobalStatement(node, v.visitNodes(node.Names))
+}
+
+func (node *GlobalStatement) Clone(f NodeFactoryCoercible) *Node {
+	return cloneNode(f.AsNodeFactory().NewGlobalStatement(node.Names), node.AsNode(), f.AsNodeFactory().hooks)
+}
+
+func IsGlobalStatement(node *Node) bool {
+	return node.Kind == KindGlobalStatement
+}
+
+// ──────────────────────────────────────────────────────────────────────
+// NonlocalStatement
+// ──────────────────────────────────────────────────────────────────────
+
+type NonlocalStatement struct {
+	StatementBase
+	Names *NodeList
+}
+
+func (f *NodeFactory) NewNonlocalStatement(names *NodeList) *Node {
+	data := &NonlocalStatement{}
+	data.Names = names
+	return f.newNode(KindNonlocalStatement, data)
+}
+
+func (f *NodeFactory) UpdateNonlocalStatement(node *NonlocalStatement, names *NodeList) *Node {
+	if names != node.Names {
+		return updateNode(f.NewNonlocalStatement(names), node.AsNode(), f.hooks)
+	}
+	return node.AsNode()
+}
+
+func (node *NonlocalStatement) ForEachChild(v Visitor) bool {
+	return visitNodeList(v, node.Names)
+}
+
+func (node *NonlocalStatement) VisitEachChild(v *NodeVisitor) *Node {
+	return v.Factory.UpdateNonlocalStatement(node, v.visitNodes(node.Names))
+}
+
+func (node *NonlocalStatement) Clone(f NodeFactoryCoercible) *Node {
+	return cloneNode(f.AsNodeFactory().NewNonlocalStatement(node.Names), node.AsNode(), f.AsNodeFactory().hooks)
+}
+
+func IsNonlocalStatement(node *Node) bool {
+	return node.Kind == KindNonlocalStatement
 }
 
 // ──────────────────────────────────────────────────────────────────────
@@ -1414,39 +1563,45 @@ type TryStatement struct {
 	CompositeBase
 	TryBlock     *BlockNode
 	CatchClause  *CatchClauseNode // Optional
+	ElseBlock    *BlockNode       // Optional
 	FinallyBlock *BlockNode       // Optional
 }
 
-func (f *NodeFactory) NewTryStatement(tryBlock *BlockNode, catchClause *CatchClauseNode, finallyBlock *BlockNode) *Node {
+func (f *NodeFactory) NewTryStatement(tryBlock *BlockNode, catchClause *CatchClauseNode, elseBlock *BlockNode, finallyBlock *BlockNode) *Node {
 	data := &TryStatement{}
 	data.TryBlock = tryBlock
 	data.CatchClause = catchClause
+	data.ElseBlock = elseBlock
 	data.FinallyBlock = finallyBlock
 	return f.newNode(KindTryStatement, data)
 }
 
-func (f *NodeFactory) UpdateTryStatement(node *TryStatement, tryBlock *BlockNode, catchClause *CatchClauseNode, finallyBlock *BlockNode) *Node {
-	if tryBlock != node.TryBlock || catchClause != node.CatchClause || finallyBlock != node.FinallyBlock {
-		return updateNode(f.NewTryStatement(tryBlock, catchClause, finallyBlock), node.AsNode(), f.hooks)
+func (f *NodeFactory) UpdateTryStatement(node *TryStatement, tryBlock *BlockNode, catchClause *CatchClauseNode, elseBlock *BlockNode, finallyBlock *BlockNode) *Node {
+	if tryBlock != node.TryBlock || catchClause != node.CatchClause || elseBlock != node.ElseBlock || finallyBlock != node.FinallyBlock {
+		return updateNode(f.NewTryStatement(tryBlock, catchClause, elseBlock, finallyBlock), node.AsNode(), f.hooks)
 	}
 	return node.AsNode()
 }
 
 func (node *TryStatement) ForEachChild(v Visitor) bool {
-	return visit(v, node.TryBlock) || visit(v, node.CatchClause) || visit(v, node.FinallyBlock)
+	return visit(v, node.TryBlock) ||
+		visit(v, node.CatchClause) ||
+		visit(v, node.ElseBlock) ||
+		visit(v, node.FinallyBlock)
 }
 
 func (node *TryStatement) VisitEachChild(v *NodeVisitor) *Node {
-	return v.Factory.UpdateTryStatement(node, v.visitNode(node.TryBlock), v.visitNode(node.CatchClause), v.visitNode(node.FinallyBlock))
+	return v.Factory.UpdateTryStatement(node, v.visitNode(node.TryBlock), v.visitNode(node.CatchClause), v.visitNode(node.ElseBlock), v.visitNode(node.FinallyBlock))
 }
 
 func (node *TryStatement) Clone(f NodeFactoryCoercible) *Node {
-	return cloneNode(f.AsNodeFactory().NewTryStatement(node.TryBlock, node.CatchClause, node.FinallyBlock), node.AsNode(), f.AsNodeFactory().hooks)
+	return cloneNode(f.AsNodeFactory().NewTryStatement(node.TryBlock, node.CatchClause, node.ElseBlock, node.FinallyBlock), node.AsNode(), f.AsNodeFactory().hooks)
 }
 
 func (node *TryStatement) computeSubtreeFacts() SubtreeFacts {
 	return propagateSubtreeFacts(node.TryBlock) |
 		propagateSubtreeFacts(node.CatchClause) |
+		propagateSubtreeFacts(node.ElseBlock) |
 		propagateSubtreeFacts(node.FinallyBlock)
 }
 
@@ -1462,34 +1617,41 @@ type CatchClause struct {
 	NodeBase
 	LocalsContainerBase
 	CompositeBase
+	Exception           *Expression              // Optional
 	VariableDeclaration *VariableDeclarationNode // Optional
 	Block               *BlockNode
+	NextClause          *CatchClauseNode // Optional
 }
 
-func (f *NodeFactory) NewCatchClause(variableDeclaration *VariableDeclarationNode, block *BlockNode) *Node {
+func (f *NodeFactory) NewCatchClause(exception *Expression, variableDeclaration *VariableDeclarationNode, block *BlockNode, nextClause *CatchClauseNode) *Node {
 	data := &CatchClause{}
+	data.Exception = exception
 	data.VariableDeclaration = variableDeclaration
 	data.Block = block
+	data.NextClause = nextClause
 	return f.newNode(KindCatchClause, data)
 }
 
-func (f *NodeFactory) UpdateCatchClause(node *CatchClause, variableDeclaration *VariableDeclarationNode, block *BlockNode) *Node {
-	if variableDeclaration != node.VariableDeclaration || block != node.Block {
-		return updateNode(f.NewCatchClause(variableDeclaration, block), node.AsNode(), f.hooks)
+func (f *NodeFactory) UpdateCatchClause(node *CatchClause, exception *Expression, variableDeclaration *VariableDeclarationNode, block *BlockNode, nextClause *CatchClauseNode) *Node {
+	if exception != node.Exception || variableDeclaration != node.VariableDeclaration || block != node.Block || nextClause != node.NextClause {
+		return updateNode(f.NewCatchClause(exception, variableDeclaration, block, nextClause), node.AsNode(), f.hooks)
 	}
 	return node.AsNode()
 }
 
 func (node *CatchClause) ForEachChild(v Visitor) bool {
-	return visit(v, node.VariableDeclaration) || visit(v, node.Block)
+	return visit(v, node.Exception) ||
+		visit(v, node.VariableDeclaration) ||
+		visit(v, node.Block) ||
+		visit(v, node.NextClause)
 }
 
 func (node *CatchClause) VisitEachChild(v *NodeVisitor) *Node {
-	return v.Factory.UpdateCatchClause(node, v.visitNode(node.VariableDeclaration), v.visitNode(node.Block))
+	return v.Factory.UpdateCatchClause(node, v.visitNode(node.Exception), v.visitNode(node.VariableDeclaration), v.visitNode(node.Block), v.visitNode(node.NextClause))
 }
 
 func (node *CatchClause) Clone(f NodeFactoryCoercible) *Node {
-	return cloneNode(f.AsNodeFactory().NewCatchClause(node.VariableDeclaration, node.Block), node.AsNode(), f.AsNodeFactory().hooks)
+	return cloneNode(f.AsNodeFactory().NewCatchClause(node.Exception, node.VariableDeclaration, node.Block, node.NextClause), node.AsNode(), f.AsNodeFactory().hooks)
 }
 
 func IsCatchClause(node *Node) bool {
@@ -3561,6 +3723,261 @@ func (node *OmittedExpression) Clone(f NodeFactoryCoercible) *Node {
 
 func IsOmittedExpression(node *Node) bool {
 	return node.Kind == KindOmittedExpression
+}
+
+// ──────────────────────────────────────────────────────────────────────
+// EllipsisExpression
+// ──────────────────────────────────────────────────────────────────────
+
+type EllipsisExpression struct {
+	ExpressionBase
+}
+
+func (f *NodeFactory) NewEllipsisExpression() *Node {
+	data := &EllipsisExpression{}
+	return f.newNode(KindEllipsisExpression, data)
+}
+
+func (node *EllipsisExpression) Clone(f NodeFactoryCoercible) *Node {
+	return cloneNode(f.AsNodeFactory().NewEllipsisExpression(), node.AsNode(), f.AsNodeFactory().hooks)
+}
+
+func IsEllipsisExpression(node *Node) bool {
+	return node.Kind == KindEllipsisExpression
+}
+
+// ──────────────────────────────────────────────────────────────────────
+// TupleExpression
+// ──────────────────────────────────────────────────────────────────────
+
+type TupleExpression struct {
+	ExpressionBase
+	Elements *ElementList
+}
+
+func (f *NodeFactory) NewTupleExpression(elements *ElementList) *Node {
+	data := &TupleExpression{}
+	data.Elements = elements
+	return f.newNode(KindTupleExpression, data)
+}
+
+func (f *NodeFactory) UpdateTupleExpression(node *TupleExpression, elements *ElementList) *Node {
+	if elements != node.Elements {
+		return updateNode(f.NewTupleExpression(elements), node.AsNode(), f.hooks)
+	}
+	return node.AsNode()
+}
+
+func (node *TupleExpression) ForEachChild(v Visitor) bool {
+	return visitNodeList(v, node.Elements)
+}
+
+func (node *TupleExpression) VisitEachChild(v *NodeVisitor) *Node {
+	return v.Factory.UpdateTupleExpression(node, v.visitNodes(node.Elements))
+}
+
+func (node *TupleExpression) Clone(f NodeFactoryCoercible) *Node {
+	return cloneNode(f.AsNodeFactory().NewTupleExpression(node.Elements), node.AsNode(), f.AsNodeFactory().hooks)
+}
+
+func IsTupleExpression(node *Node) bool {
+	return node.Kind == KindTupleExpression
+}
+
+// ──────────────────────────────────────────────────────────────────────
+// SetExpression
+// ──────────────────────────────────────────────────────────────────────
+
+type SetExpression struct {
+	ExpressionBase
+	Elements *ElementList
+}
+
+func (f *NodeFactory) NewSetExpression(elements *ElementList) *Node {
+	data := &SetExpression{}
+	data.Elements = elements
+	return f.newNode(KindSetExpression, data)
+}
+
+func (f *NodeFactory) UpdateSetExpression(node *SetExpression, elements *ElementList) *Node {
+	if elements != node.Elements {
+		return updateNode(f.NewSetExpression(elements), node.AsNode(), f.hooks)
+	}
+	return node.AsNode()
+}
+
+func (node *SetExpression) ForEachChild(v Visitor) bool {
+	return visitNodeList(v, node.Elements)
+}
+
+func (node *SetExpression) VisitEachChild(v *NodeVisitor) *Node {
+	return v.Factory.UpdateSetExpression(node, v.visitNodes(node.Elements))
+}
+
+func (node *SetExpression) Clone(f NodeFactoryCoercible) *Node {
+	return cloneNode(f.AsNodeFactory().NewSetExpression(node.Elements), node.AsNode(), f.AsNodeFactory().hooks)
+}
+
+func IsSetExpression(node *Node) bool {
+	return node.Kind == KindSetExpression
+}
+
+// ──────────────────────────────────────────────────────────────────────
+// DictExpression
+// ──────────────────────────────────────────────────────────────────────
+
+type DictExpression struct {
+	ExpressionBase
+	Entries *ElementList
+}
+
+func (f *NodeFactory) NewDictExpression(entries *ElementList) *Node {
+	data := &DictExpression{}
+	data.Entries = entries
+	return f.newNode(KindDictExpression, data)
+}
+
+func (f *NodeFactory) UpdateDictExpression(node *DictExpression, entries *ElementList) *Node {
+	if entries != node.Entries {
+		return updateNode(f.NewDictExpression(entries), node.AsNode(), f.hooks)
+	}
+	return node.AsNode()
+}
+
+func (node *DictExpression) ForEachChild(v Visitor) bool {
+	return visitNodeList(v, node.Entries)
+}
+
+func (node *DictExpression) VisitEachChild(v *NodeVisitor) *Node {
+	return v.Factory.UpdateDictExpression(node, v.visitNodes(node.Entries))
+}
+
+func (node *DictExpression) Clone(f NodeFactoryCoercible) *Node {
+	return cloneNode(f.AsNodeFactory().NewDictExpression(node.Entries), node.AsNode(), f.AsNodeFactory().hooks)
+}
+
+func IsDictExpression(node *Node) bool {
+	return node.Kind == KindDictExpression
+}
+
+// ──────────────────────────────────────────────────────────────────────
+// ComprehensionExpression
+// ──────────────────────────────────────────────────────────────────────
+
+type ComprehensionExpression struct {
+	ExpressionBase
+	Open Kind
+	Body *Statement
+}
+
+func (f *NodeFactory) NewComprehensionExpression(open Kind, body *Statement) *Node {
+	data := &ComprehensionExpression{}
+	data.Open = open
+	data.Body = body
+	return f.newNode(KindComprehensionExpression, data)
+}
+
+func (f *NodeFactory) UpdateComprehensionExpression(node *ComprehensionExpression, open Kind, body *Statement) *Node {
+	if open != node.Open || body != node.Body {
+		return updateNode(f.NewComprehensionExpression(open, body), node.AsNode(), f.hooks)
+	}
+	return node.AsNode()
+}
+
+func (node *ComprehensionExpression) ForEachChild(v Visitor) bool {
+	return visit(v, node.Body)
+}
+
+func (node *ComprehensionExpression) VisitEachChild(v *NodeVisitor) *Node {
+	return v.Factory.UpdateComprehensionExpression(node, node.Open, v.visitNode(node.Body))
+}
+
+func (node *ComprehensionExpression) Clone(f NodeFactoryCoercible) *Node {
+	return cloneNode(f.AsNodeFactory().NewComprehensionExpression(node.Open, node.Body), node.AsNode(), f.AsNodeFactory().hooks)
+}
+
+func IsComprehensionExpression(node *Node) bool {
+	return node.Kind == KindComprehensionExpression
+}
+
+// ──────────────────────────────────────────────────────────────────────
+// DictEntry
+// ──────────────────────────────────────────────────────────────────────
+
+type DictEntry struct {
+	ExpressionBase
+	Key   *Expression
+	Value *Expression
+}
+
+func (f *NodeFactory) NewDictEntry(key *Expression, value *Expression) *Node {
+	data := &DictEntry{}
+	data.Key = key
+	data.Value = value
+	return f.newNode(KindDictEntry, data)
+}
+
+func (f *NodeFactory) UpdateDictEntry(node *DictEntry, key *Expression, value *Expression) *Node {
+	if key != node.Key || value != node.Value {
+		return updateNode(f.NewDictEntry(key, value), node.AsNode(), f.hooks)
+	}
+	return node.AsNode()
+}
+
+func (node *DictEntry) ForEachChild(v Visitor) bool {
+	return visit(v, node.Key) || visit(v, node.Value)
+}
+
+func (node *DictEntry) VisitEachChild(v *NodeVisitor) *Node {
+	return v.Factory.UpdateDictEntry(node, v.visitNode(node.Key), v.visitNode(node.Value))
+}
+
+func (node *DictEntry) Clone(f NodeFactoryCoercible) *Node {
+	return cloneNode(f.AsNodeFactory().NewDictEntry(node.Key, node.Value), node.AsNode(), f.AsNodeFactory().hooks)
+}
+
+func IsDictEntry(node *Node) bool {
+	return node.Kind == KindDictEntry
+}
+
+// ──────────────────────────────────────────────────────────────────────
+// KeywordArgument
+// ──────────────────────────────────────────────────────────────────────
+
+type KeywordArgument struct {
+	ExpressionBase
+	Keyword    *IdentifierNode // Optional
+	Expression *Expression
+}
+
+func (f *NodeFactory) NewKeywordArgument(keyword *IdentifierNode, expression *Expression) *Node {
+	data := &KeywordArgument{}
+	data.Keyword = keyword
+	data.Expression = expression
+	return f.newNode(KindKeywordArgument, data)
+}
+
+func (f *NodeFactory) UpdateKeywordArgument(node *KeywordArgument, keyword *IdentifierNode, expression *Expression) *Node {
+	if keyword != node.Keyword || expression != node.Expression {
+		return updateNode(f.NewKeywordArgument(keyword, expression), node.AsNode(), f.hooks)
+	}
+	return node.AsNode()
+}
+
+func (node *KeywordArgument) ForEachChild(v Visitor) bool {
+	return visit(v, node.Keyword) || visit(v, node.Expression)
+}
+
+func (node *KeywordArgument) VisitEachChild(v *NodeVisitor) *Node {
+	return v.Factory.UpdateKeywordArgument(node, v.visitNode(node.Keyword), v.visitNode(node.Expression))
+}
+
+func (node *KeywordArgument) Clone(f NodeFactoryCoercible) *Node {
+	return cloneNode(f.AsNodeFactory().NewKeywordArgument(node.Keyword, node.Expression), node.AsNode(), f.AsNodeFactory().hooks)
+}
+
+func IsKeywordArgument(node *Node) bool {
+	return node.Kind == KindKeywordArgument
 }
 
 // ──────────────────────────────────────────────────────────────────────
@@ -8685,6 +9102,107 @@ func IsJSDocPropertyTag(node *Node) bool {
 }
 
 // ──────────────────────────────────────────────────────────────────────
+// EllipsisTypeNode
+// ──────────────────────────────────────────────────────────────────────
+
+type EllipsisTypeNode struct {
+	TypeNodeBase
+}
+
+func (f *NodeFactory) NewEllipsisTypeNode() *Node {
+	data := &EllipsisTypeNode{}
+	return f.newNode(KindEllipsisType, data)
+}
+
+func (node *EllipsisTypeNode) Clone(f NodeFactoryCoercible) *Node {
+	return cloneNode(f.AsNodeFactory().NewEllipsisTypeNode(), node.AsNode(), f.AsNodeFactory().hooks)
+}
+
+func IsEllipsisTypeNode(node *Node) bool {
+	return node.Kind == KindEllipsisType
+}
+
+// ──────────────────────────────────────────────────────────────────────
+// TypeCallTypeNode
+// ──────────────────────────────────────────────────────────────────────
+
+type TypeCallTypeNode struct {
+	TypeNodeBase
+	Callee    *TypeNode
+	Arguments *TypeList
+}
+
+func (f *NodeFactory) NewTypeCallTypeNode(callee *TypeNode, arguments *TypeList) *Node {
+	data := f.typeCallTypeNodeArena.New()
+	data.Callee = callee
+	data.Arguments = arguments
+	return f.newNode(KindTypeCallType, data)
+}
+
+func (f *NodeFactory) UpdateTypeCallTypeNode(node *TypeCallTypeNode, callee *TypeNode, arguments *TypeList) *Node {
+	if callee != node.Callee || arguments != node.Arguments {
+		return updateNode(f.NewTypeCallTypeNode(callee, arguments), node.AsNode(), f.hooks)
+	}
+	return node.AsNode()
+}
+
+func (node *TypeCallTypeNode) ForEachChild(v Visitor) bool {
+	return visit(v, node.Callee) || visitNodeList(v, node.Arguments)
+}
+
+func (node *TypeCallTypeNode) VisitEachChild(v *NodeVisitor) *Node {
+	return v.Factory.UpdateTypeCallTypeNode(node, v.visitNode(node.Callee), v.visitNodes(node.Arguments))
+}
+
+func (node *TypeCallTypeNode) Clone(f NodeFactoryCoercible) *Node {
+	return cloneNode(f.AsNodeFactory().NewTypeCallTypeNode(node.Callee, node.Arguments), node.AsNode(), f.AsNodeFactory().hooks)
+}
+
+func IsTypeCallTypeNode(node *Node) bool {
+	return node.Kind == KindTypeCallType
+}
+
+// ──────────────────────────────────────────────────────────────────────
+// AttributeAccessTypeNode
+// ──────────────────────────────────────────────────────────────────────
+
+type AttributeAccessTypeNode struct {
+	TypeNodeBase
+	ObjectType *TypeNode
+	Member     *IdentifierNode
+}
+
+func (f *NodeFactory) NewAttributeAccessTypeNode(objectType *TypeNode, member *IdentifierNode) *Node {
+	data := f.attributeAccessTypeNodeArena.New()
+	data.ObjectType = objectType
+	data.Member = member
+	return f.newNode(KindAttributeAccessType, data)
+}
+
+func (f *NodeFactory) UpdateAttributeAccessTypeNode(node *AttributeAccessTypeNode, objectType *TypeNode, member *IdentifierNode) *Node {
+	if objectType != node.ObjectType || member != node.Member {
+		return updateNode(f.NewAttributeAccessTypeNode(objectType, member), node.AsNode(), f.hooks)
+	}
+	return node.AsNode()
+}
+
+func (node *AttributeAccessTypeNode) ForEachChild(v Visitor) bool {
+	return visit(v, node.ObjectType) || visit(v, node.Member)
+}
+
+func (node *AttributeAccessTypeNode) VisitEachChild(v *NodeVisitor) *Node {
+	return v.Factory.UpdateAttributeAccessTypeNode(node, v.visitNode(node.ObjectType), v.visitNode(node.Member))
+}
+
+func (node *AttributeAccessTypeNode) Clone(f NodeFactoryCoercible) *Node {
+	return cloneNode(f.AsNodeFactory().NewAttributeAccessTypeNode(node.ObjectType, node.Member), node.AsNode(), f.AsNodeFactory().hooks)
+}
+
+func IsAttributeAccessTypeNode(node *Node) bool {
+	return node.Kind == KindAttributeAccessType
+}
+
+// ──────────────────────────────────────────────────────────────────────
 // ForEachChild dispatch
 // ──────────────────────────────────────────────────────────────────────
 
@@ -8722,6 +9240,12 @@ func (n *Node) ForEachChild(v Visitor) bool {
 		return n.data.(*CaseOrDefaultClause).ForEachChild(v)
 	case KindThrowStatement:
 		return n.data.(*ThrowStatement).ForEachChild(v)
+	case KindAssertStatement:
+		return n.data.(*AssertStatement).ForEachChild(v)
+	case KindGlobalStatement:
+		return n.data.(*GlobalStatement).ForEachChild(v)
+	case KindNonlocalStatement:
+		return n.data.(*NonlocalStatement).ForEachChild(v)
 	case KindTryStatement:
 		return n.data.(*TryStatement).ForEachChild(v)
 	case KindCatchClause:
@@ -8804,6 +9328,18 @@ func (n *Node) ForEachChild(v Visitor) bool {
 		return n.data.(*PropertyDeclaration).ForEachChild(v)
 	case KindClassStaticBlockDeclaration:
 		return n.data.(*ClassStaticBlockDeclaration).ForEachChild(v)
+	case KindTupleExpression:
+		return n.data.(*TupleExpression).ForEachChild(v)
+	case KindSetExpression:
+		return n.data.(*SetExpression).ForEachChild(v)
+	case KindDictExpression:
+		return n.data.(*DictExpression).ForEachChild(v)
+	case KindComprehensionExpression:
+		return n.data.(*ComprehensionExpression).ForEachChild(v)
+	case KindDictEntry:
+		return n.data.(*DictEntry).ForEachChild(v)
+	case KindKeywordArgument:
+		return n.data.(*KeywordArgument).ForEachChild(v)
 	case KindBinaryExpression:
 		return n.data.(*BinaryExpression).ForEachChild(v)
 	case KindPrefixUnaryExpression:
@@ -9024,6 +9560,10 @@ func (n *Node) ForEachChild(v Visitor) bool {
 		return n.data.(*JSDocTypeLiteral).ForEachChild(v)
 	case KindJSDocParameterTag, KindJSDocPropertyTag:
 		return n.data.(*JSDocParameterOrPropertyTag).ForEachChild(v)
+	case KindTypeCallType:
+		return n.data.(*TypeCallTypeNode).ForEachChild(v)
+	case KindAttributeAccessType:
+		return n.data.(*AttributeAccessTypeNode).ForEachChild(v)
 	default:
 		return false
 	}
@@ -9111,6 +9651,18 @@ func (n *Node) AsCaseOrDefaultClause() *CaseOrDefaultClause {
 
 func (n *Node) AsThrowStatement() *ThrowStatement {
 	return n.data.(*ThrowStatement)
+}
+
+func (n *Node) AsAssertStatement() *AssertStatement {
+	return n.data.(*AssertStatement)
+}
+
+func (n *Node) AsGlobalStatement() *GlobalStatement {
+	return n.data.(*GlobalStatement)
+}
+
+func (n *Node) AsNonlocalStatement() *NonlocalStatement {
+	return n.data.(*NonlocalStatement)
 }
 
 func (n *Node) AsTryStatement() *TryStatement {
@@ -9295,6 +9847,34 @@ func (n *Node) AsClassStaticBlockDeclaration() *ClassStaticBlockDeclaration {
 
 func (n *Node) AsOmittedExpression() *OmittedExpression {
 	return n.data.(*OmittedExpression)
+}
+
+func (n *Node) AsEllipsisExpression() *EllipsisExpression {
+	return n.data.(*EllipsisExpression)
+}
+
+func (n *Node) AsTupleExpression() *TupleExpression {
+	return n.data.(*TupleExpression)
+}
+
+func (n *Node) AsSetExpression() *SetExpression {
+	return n.data.(*SetExpression)
+}
+
+func (n *Node) AsDictExpression() *DictExpression {
+	return n.data.(*DictExpression)
+}
+
+func (n *Node) AsComprehensionExpression() *ComprehensionExpression {
+	return n.data.(*ComprehensionExpression)
+}
+
+func (n *Node) AsDictEntry() *DictEntry {
+	return n.data.(*DictEntry)
+}
+
+func (n *Node) AsKeywordArgument() *KeywordArgument {
+	return n.data.(*KeywordArgument)
 }
 
 func (n *Node) AsKeywordExpression() *KeywordExpression {
@@ -9799,6 +10379,18 @@ func (n *Node) AsJSDocTypeLiteral() *JSDocTypeLiteral {
 
 func (n *Node) AsJSDocParameterOrPropertyTag() *JSDocParameterOrPropertyTag {
 	return n.data.(*JSDocParameterOrPropertyTag)
+}
+
+func (n *Node) AsEllipsisTypeNode() *EllipsisTypeNode {
+	return n.data.(*EllipsisTypeNode)
+}
+
+func (n *Node) AsTypeCallTypeNode() *TypeCallTypeNode {
+	return n.data.(*TypeCallTypeNode)
+}
+
+func (n *Node) AsAttributeAccessTypeNode() *AttributeAccessTypeNode {
+	return n.data.(*AttributeAccessTypeNode)
 }
 
 // ──────────────────────────────────────────────────────────────────────

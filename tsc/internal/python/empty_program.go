@@ -15,6 +15,13 @@ type emptyProgram struct {
 	options core.CompilerOptions
 }
 
+// EmptyProgram is the host without source files; the native pipeline embeds it
+// and adds its own files.
+type EmptyProgram = emptyProgram
+
+// NewEmptyProgram returns a host with no source files.
+func NewEmptyProgram() *EmptyProgram { return newEmptyProgram() }
+
 func newEmptyProgram() *emptyProgram {
 	return &emptyProgram{}
 }

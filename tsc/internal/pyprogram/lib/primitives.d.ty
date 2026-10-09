@@ -1,0 +1,27 @@
+# @no-default-lib
+# The primitive types, declared the way TypeScript declares its intrinsic
+# types: `type Name = intrinsic`, with the meaning supplied by the checker
+# (checker/python_intrinsics.go). Only this library can declare them.
+type str = intrinsic
+type int = intrinsic
+type float = intrinsic
+type bool = intrinsic
+type object = intrinsic
+
+# Provisional: the generic protocol names the legacy environment builds in Go.
+# Declared here from the builtins protocols until their real shape is decided.
+interface Iterator<T>:
+    def __iter__(self) -> { def __next__() -> T }
+    def __next__(self) -> T
+
+interface AsyncIterator<T>:
+    def __aiter__(self) -> { def __anext__() -> Awaitable<T> }
+    def __anext__(self) -> Awaitable<T>
+
+interface Generator<Y, S, R>:
+    def __iter__(self) -> { def __next__() -> Y }
+    def __next__(self) -> Y
+    def send(self, value: S) -> Y
+
+interface Awaitable<T>:
+    def __await__(self) -> Iterator<T>

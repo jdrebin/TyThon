@@ -864,6 +864,7 @@ func (tx *RuntimeSyntaxTransformer) transformConstructorBodyWorker(statementsIn 
 			tryStatement,
 			tx.Factory().UpdateBlock(tryBlock, tryBlockStatementList, tryBlock.MultiLine),
 			tx.Visitor().VisitNode(tryStatement.CatchClause),
+			tryStatement.ElseBlock,
 			tx.Visitor().VisitNode(tryStatement.FinallyBlock),
 		))
 

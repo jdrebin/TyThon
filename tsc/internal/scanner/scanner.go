@@ -192,6 +192,19 @@ var textToToken = func() map[string]ast.Kind {
 		"@":    ast.KindAtToken,
 		"#":    ast.KindHashToken,
 		"`":    ast.KindBacktickToken,
+		// Python language variant operators and keywords. Keywords are deliberately
+		// not in textToKeyword: the standard scanner must keep lexing them as identifiers.
+		"->":       ast.KindMinusGreaterThanToken,
+		"//":       ast.KindSlashSlashToken,
+		"//=":      ast.KindSlashSlashEqualsToken,
+		":=":       ast.KindColonEqualsToken,
+		"@=":       ast.KindAtEqualsToken,
+		"elif":     ast.KindElifKeyword,
+		"lambda":   ast.KindLambdaKeyword,
+		"nonlocal": ast.KindNonlocalKeyword,
+		"pass":     ast.KindPassKeyword,
+		"match":    ast.KindMatchKeyword,
+		"optional": ast.KindOptionalKeyword,
 	}
 	maps.Copy(m, textToKeyword)
 	return m
@@ -205,7 +218,8 @@ type ScannerState struct {
 	tokenValue                string         // Parsed value of current token
 	tokenFlags                ast.TokenFlags // Flags for current token
 	commentDirectives         []ast.CommentDirective
-	skipJSDocLeadingAsterisks int // Leading asterisks to skip when scanning types inside JSDoc. Should be 0 outside JSDoc
+	skipJSDocLeadingAsterisks int     // Leading asterisks to skip when scanning types inside JSDoc. Should be 0 outside JSDoc
+	python                    pyState // Python language variant only; see python.go
 }
 
 type Scanner struct {
@@ -475,6 +489,9 @@ func (s *Scanner) scanASCIIWhile(pred func(byte) bool) {
 }
 
 func (s *Scanner) Scan() ast.Kind {
+	if s.languageVariant == core.LanguageVariantPython {
+		return s.scanPython()
+	}
 	s.fullStartPos = s.pos
 	s.tokenFlags = ast.TokenFlagsNone
 	for {
@@ -1024,7 +1041,7 @@ func (s *Scanner) ReScanGreaterThanToken() ast.Kind {
 func (s *Scanner) reScanGreaterThanTokenInner() {
 	s.pos = s.tokenStart + 1
 	if s.char() == '>' {
-		if s.charAt(1) == '>' {
+		if s.charAt(1) == '>' && !s.isPython() { // Python has no `>>>`
 			if s.charAt(2) == '=' {
 				s.pos += 3
 				s.token = ast.KindGreaterThanGreaterThanGreaterThanEqualsToken
@@ -1046,6 +1063,9 @@ func (s *Scanner) reScanGreaterThanTokenInner() {
 }
 
 func (s *Scanner) ReScanTemplateToken(isTaggedTemplate bool) ast.Kind {
+	if s.isPython() {
+		return s.rescanPythonTemplateToken()
+	}
 	s.pos = s.tokenStart
 	s.token = s.scanTemplateAndSetTokenValue(!isTaggedTemplate)
 	return s.token
@@ -2256,6 +2276,10 @@ var tokenToText = func() [ast.KindCount]string {
 	for text, kind := range textToToken {
 		result[kind] = text
 	}
+	// Layout tokens have no source text; name them for diagnostics.
+	result[ast.KindNewlineToken] = "NEWLINE"
+	result[ast.KindIndentToken] = "INDENT"
+	result[ast.KindDedentToken] = "DEDENT"
 	return result
 }()
 

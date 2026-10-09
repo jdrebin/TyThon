@@ -1357,7 +1357,18 @@ func (c *Checker) NewPythonAttributeKeyType(name *Type) *Type {
 // GetPythonAttributeNameType reads the intrinsic member, including through
 // ordinary interface inheritance and intersections, rather than testing target identity.
 func (c *Checker) GetPythonAttributeNameType(t *Type) (*Type, bool) {
-	if t == nil || c.pythonAttributeNameKey == nil || t.flags&TypeFlagsStructuredType == 0 {
+	if t == nil || t.flags&TypeFlagsStructuredType == 0 {
+		return nil, false
+	}
+	if t.objectFlags&ObjectFlagsReference != 0 && c.pythonAttributeKeyTarget != nil {
+		target := t.Target()
+		if target == c.pythonAttributeKeyTarget || t.symbol != nil && t.symbol == c.pythonAttributeKeyTarget.symbol {
+			if args := c.getTypeArguments(t); len(args) != 0 {
+				return args[0], true
+			}
+		}
+	}
+	if c.pythonAttributeNameKey == nil {
 		return nil, false
 	}
 	// Search declared properties only: an open attribute signature must never

@@ -10,6 +10,12 @@
             "WhitespaceTrivia",
             "ConflictMarkerTrivia",
             "NonTextFileMarkerTrivia",
+            {
+                "comment": "Python logical-line layout tokens (scanner, Python language variant)"
+            },
+            "NewlineToken",
+            "IndentToken",
+            "DedentToken",
             "NumericLiteral",
             "BigIntLiteral",
             "StringLiteral",
@@ -47,11 +53,13 @@
             "EqualsEqualsEqualsToken",
             "ExclamationEqualsEqualsToken",
             "EqualsGreaterThanToken",
+            "MinusGreaterThanToken",
             "PlusToken",
             "MinusToken",
             "AsteriskToken",
             "AsteriskAsteriskToken",
             "SlashToken",
+            "SlashSlashToken",
             "PercentToken",
             "PlusPlusToken",
             "MinusMinusToken",
@@ -81,11 +89,14 @@
                 "comment": "Assignments"
             },
             "EqualsToken",
+            "ColonEqualsToken",
             "PlusEqualsToken",
             "MinusEqualsToken",
             "AsteriskEqualsToken",
             "AsteriskAsteriskEqualsToken",
             "SlashEqualsToken",
+            "SlashSlashEqualsToken",
+            "AtEqualsToken",
             "PercentEqualsToken",
             "LessThanLessThanEqualsToken",
             "GreaterThanGreaterThanEqualsToken",
@@ -116,6 +127,10 @@
             "DeleteKeyword",
             "DoKeyword",
             "ElseKeyword",
+            "ElifKeyword",
+            "LambdaKeyword",
+            "NonlocalKeyword",
+            "PassKeyword",
             "EnumKeyword",
             "ExportKeyword",
             "ExtendsKeyword",
@@ -195,6 +210,8 @@
             "BigIntKeyword",
             "OverrideKeyword",
             "OfKeyword",
+            "MatchKeyword",
+            "OptionalKeyword",
             {
                 "name": "DeferKeyword",
                 "comment": "LastKeyword and LastToken and LastContextualKeyword"
@@ -255,6 +272,12 @@
             "TemplateLiteralTypeSpan",
             "ImportType",
             {
+                "comment": "Python/tython type nodes with no TypeScript counterpart"
+            },
+            "EllipsisType",
+            "TypeCallType",
+            "AttributeAccessType",
+            {
                 "comment": "Binding patterns"
             },
             "ObjectBindingPattern",
@@ -287,6 +310,13 @@
             "SpreadElement",
             "ClassExpression",
             "OmittedExpression",
+            "EllipsisExpression",
+            "KeywordArgument",
+            "TupleExpression",
+            "SetExpression",
+            "DictExpression",
+            "DictEntry",
+            "ComprehensionExpression",
             "ExpressionWithTypeArguments",
             "AsExpression",
             "NonNullExpression",
@@ -318,6 +348,9 @@
             "SwitchStatement",
             "LabeledStatement",
             "ThrowStatement",
+            "AssertStatement",
+            "GlobalStatement",
+            "NonlocalStatement",
             "TryStatement",
             "DebuggerStatement",
             "VariableDeclaration",
@@ -494,7 +527,7 @@
             },
             {
                 "name": "LastTypeNode",
-                "value": "ImportType"
+                "value": "AttributeAccessType"
             },
             {
                 "name": "FirstPunctuation",
@@ -1467,8 +1500,18 @@
                 ],
                 "members": [
                     {
+                        "name": "AwaitModifier",
+                        "type": "AwaitKeyword",
+                        "optional": true
+                    },
+                    {
                         "name": "Expression",
                         "type": "Expression"
+                    },
+                    {
+                        "name": "Target",
+                        "type": "ForInitializer",
+                        "optional": true
                     },
                     {
                         "name": "Statement",
@@ -1549,7 +1592,55 @@
                 "members": [
                     {
                         "name": "Expression",
+                        "type": "Expression",
+                        "optional": true
+                    },
+                    {
+                        "name": "Cause",
+                        "type": "Expression",
+                        "optional": true
+                    }
+                ]
+            },
+            "AssertStatement": {
+                "generateSubtreeFacts": true,
+                "extends": [
+                    "StatementBase",
+                    "CompositeBase"
+                ],
+                "members": [
+                    {
+                        "name": "Test",
                         "type": "Expression"
+                    },
+                    {
+                        "name": "Message",
+                        "type": "Expression",
+                        "optional": true
+                    }
+                ]
+            },
+            "GlobalStatement": {
+                "extends": [
+                    "StatementBase"
+                ],
+                "members": [
+                    {
+                        "name": "Names",
+                        "type": "Identifier",
+                        "list": "NodeList"
+                    }
+                ]
+            },
+            "NonlocalStatement": {
+                "extends": [
+                    "StatementBase"
+                ],
+                "members": [
+                    {
+                        "name": "Names",
+                        "type": "Identifier",
+                        "list": "NodeList"
                     }
                 ]
             },
@@ -1570,6 +1661,11 @@
                         "optional": true
                     },
                     {
+                        "name": "ElseBlock",
+                        "type": "Block",
+                        "optional": true
+                    },
+                    {
                         "name": "FinallyBlock",
                         "type": "Block",
                         "optional": true
@@ -1584,6 +1680,11 @@
                 ],
                 "members": [
                     {
+                        "name": "Exception",
+                        "type": "Expression",
+                        "optional": true
+                    },
+                    {
                         "name": "VariableDeclaration",
                         "type": "VariableDeclaration",
                         "optional": true
@@ -1591,6 +1692,11 @@
                     {
                         "name": "Block",
                         "type": "Block"
+                    },
+                    {
+                        "name": "NextClause",
+                        "type": "CatchClause",
+                        "optional": true
                     }
                 ]
             },
@@ -2672,6 +2778,97 @@
             "OmittedExpression": {
                 "extends": [
                     "ExpressionBase"
+                ]
+            },
+            "EllipsisExpression": {
+                "extends": [
+                    "ExpressionBase"
+                ]
+            },
+            "TupleExpression": {
+                "extends": [
+                    "ExpressionBase"
+                ],
+                "members": [
+                    {
+                        "name": "Elements",
+                        "type": "Expression",
+                        "list": "NodeList"
+                    }
+                ]
+            },
+            "SetExpression": {
+                "extends": [
+                    "ExpressionBase"
+                ],
+                "members": [
+                    {
+                        "name": "Elements",
+                        "type": "Expression",
+                        "list": "NodeList"
+                    }
+                ]
+            },
+            "DictExpression": {
+                "extends": [
+                    "ExpressionBase"
+                ],
+                "members": [
+                    {
+                        "name": "Entries",
+                        "type": "Expression",
+                        "list": "NodeList"
+                    }
+                ]
+            },
+            "ComprehensionExpression": {
+                "extends": [
+                    "ExpressionBase"
+                ],
+                "members": [
+                    {
+                        "name": "Open",
+                        "type": [
+                            "SyntaxKind.OpenBracketToken",
+                            "SyntaxKind.OpenBraceToken",
+                            "SyntaxKind.OpenParenToken"
+                        ]
+                    },
+                    {
+                        "name": "Body",
+                        "type": "Statement"
+                    }
+                ]
+            },
+            "DictEntry": {
+                "extends": [
+                    "ExpressionBase"
+                ],
+                "members": [
+                    {
+                        "name": "Key",
+                        "type": "Expression"
+                    },
+                    {
+                        "name": "Value",
+                        "type": "Expression"
+                    }
+                ]
+            },
+            "KeywordArgument": {
+                "extends": [
+                    "ExpressionBase"
+                ],
+                "members": [
+                    {
+                        "name": "Keyword",
+                        "type": "Identifier",
+                        "optional": true
+                    },
+                    {
+                        "name": "Expression",
+                        "type": "Expression"
+                    }
                 ]
             },
             "KeywordExpression": {
@@ -5135,6 +5332,47 @@
                         "inherited": true
                     }
                 ]
+            },
+            "EllipsisTypeNode": {
+                "kind": "EllipsisType",
+                "extends": [
+                    "TypeNodeBase"
+                ]
+            },
+            "TypeCallTypeNode": {
+                "kind": "TypeCallType",
+                "extends": [
+                    "TypeNodeBase"
+                ],
+                "members": [
+                    {
+                        "name": "Callee",
+                        "type": "TypeNode"
+                    },
+                    {
+                        "name": "Arguments",
+                        "type": "TypeNode",
+                        "list": "NodeList"
+                    }
+                ],
+                "arena": true
+            },
+            "AttributeAccessTypeNode": {
+                "kind": "AttributeAccessType",
+                "extends": [
+                    "TypeNodeBase"
+                ],
+                "members": [
+                    {
+                        "name": "ObjectType",
+                        "type": "TypeNode"
+                    },
+                    {
+                        "name": "Member",
+                        "type": "Identifier"
+                    }
+                ],
+                "arena": true
             }
         },
         "aliases": {
