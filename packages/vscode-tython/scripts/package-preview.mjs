@@ -59,7 +59,7 @@ const copy = async (source, relative) => {
     await cp(source, target, { recursive: true, dereference: true });
 };
 // Explicit allowlist: no workspace settings, caches, credentials, or user code.
-for (const relative of ["README.md", "language-configuration.json", "icons", "syntaxes", "preview", "dist/extension.bundle.js", "dist/extension.bundle.js.map",
+for (const relative of ["README.md", "language-configuration.json", "icon.png", "icons", "syntaxes", "preview", "dist/extension.bundle.js", "dist/extension.bundle.js.map",
     "scripts/contained-server.sh", "scripts/python-provider.py", "scripts/python_declarations.py"]) {
     await copy(path.join(extension, relative), relative);
 }
@@ -74,7 +74,7 @@ delete manifest.scripts;
 delete manifest.devDependencies;
 delete manifest.dependencies; // JS dependencies are bundled or explicitly vendored below.
 manifest.files = ["README.md", "LICENSE.txt", "NOTICE.txt", "LICENSING.md", "THIRD_PARTY_NOTICES.md", "build-info.json", "language-configuration.json",
-    "bin/**", "dist/**", "formatter/**", "icons/**", "library/**", "licenses/**", "preview/**", "scripts/**", "syntaxes/**", "vendor/**"];
+    "icon.png", "bin/**", "dist/**", "formatter/**", "icons/**", "library/**", "licenses/**", "preview/**", "scripts/**", "syntaxes/**", "vendor/**"];
 await writeFile(path.join(stage, "package.json"), JSON.stringify(manifest, null, 2) + "\n");
 await mkdir(path.join(stage, "bin"));
 run("go", ["build", "-trimpath", "-buildvcs=false", "-o", path.join(stage, "bin", target.binary), "./cmd/tsc"], path.join(root, "tsc"), false, goBuild);

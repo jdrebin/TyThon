@@ -1484,3 +1484,52 @@ implements the operation, with the same signature and documentation as hovering
 the call. `a + b` presents `__add__` / `__radd__` the way `a.__add__(b)` would.
 The buffer is not rewritten. The hover is the resolved method, not a restatement
 of the operator token.
+
+### Nominal types via unique keys
+
+Nominal identity today is a compiler keyword. `builtins.d.ty` is the only file
+allowed to write `type name = intrinsic`, and it uses that for `attr_name`,
+`some_type`, `structured_type`, `bytes_type`, `complex_type`, `ellipsis_type`,
+and `not_implemented_type`. User code that writes `intrinsic` is an error. The
+checker already stores those keys with TypeScript unique-symbol identity.
+Matching a public shape does not forge the key, and inheritance carries it.
+
+That keyword is the wrong long-term surface. `intrinsic` is also the TypeScript
+spelling of the string-mapping compilers `Uppercase`, `Lowercase`, `Capitalize`,
+`Uncapitalize`, and `NoInfer`. Those stay compiler-provided. The private brand
+keys are not in that set. They should be ordinary declarations that mint a fresh
+key, so a library or a user file can introduce a nominal group without a new
+checker flag and without the `intrinsic` keyword.
+
+The checker feature is unique-symbol identity. Tython does not grow a runtime
+`symbol` value. The working spelling is a unique key, not a locked token:
+`type user_id = unique`, or the same idea under a `unique symbol` alias if that
+reads more clearly against the existing checker. Identity is the declaration
+site. Two aliases with the same name are two keys.
+
+```ty
+type user_id = unique
+
+interface UserId:
+    (user_id): int
+```
+
+`UserId` is not satisfied by `{}` or by another interface that happens to hold
+an `int`. Extending `UserId` is what carries the key. A key may carry a payload
+the way `attr_name` carries `AttrName`, or it may be only a brand. Public
+`keyof`, completion, and type rendering omit the key, same as `some_type` and
+`attr_name` today. No per-group assignability rule.
+
+Once that declaration exists, the bundled brands leave `intrinsic`:
+
+```ty
+type some_type = unique
+
+interface Some(object):
+    (some_type): unknown
+```
+
+`Some`, `Object`, `*`, and the primitive identities keep the relations they
+have now. Only the way the private key is declared changes. `intrinsic` remains
+for the string-mapping compilers if those stay exposed, and it disappears from
+`builtins.d.ty`.

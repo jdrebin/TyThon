@@ -6,6 +6,11 @@ import { fileURLToPath } from "node:url";
 // Optional argument also checks the manifest/assets in an extracted VSIX.
 const extension = process.argv[2] ?? fileURLToPath(new URL("..", import.meta.url));
 const manifest = JSON.parse(await readFile(path.join(extension, "package.json"), "utf8"));
+assert.equal(manifest.icon, "icon.png");
+const png = await readFile(path.join(extension, manifest.icon));
+assert.equal(png.subarray(0, 8).toString("hex"), "89504e470d0a1a0a");
+assert.equal(png.readUInt32BE(16), 128);
+assert.equal(png.readUInt32BE(20), 128);
 const language = manifest.contributes.languages.find(language => language.id === "tython");
 assert(language.extensions.includes(".ty") && language.extensions.includes(".d.ty"));
 for (const variant of ["light", "dark"]) {

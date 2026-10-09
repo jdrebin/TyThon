@@ -63,7 +63,8 @@ Typeshed is not shipped. Pyright is not a second checker for `.ty` files.
 
 ## File icons
 
-The extension supplies an original blue-purple, paired-snake SVG file icon for
+The extension logo is `icon.png`, the transparent 128×128 mark. That is what the
+Extensions view and the Marketplace listing show. The extension also supplies an original blue-purple, paired-snake SVG file icon for
 `.ty` and `.d.ty`, with separate light/dark palettes. Reload the extension host
 after updating to see it. This is a language-default icon: your active file-icon
 theme can override it or disable language defaults. We do not change that theme.
