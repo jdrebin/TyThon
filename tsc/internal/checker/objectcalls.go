@@ -205,7 +205,7 @@ func (c *Checker) bindObjectCallArguments(signature *Signature, arguments []Obje
 
 	for index, parameter := range parameters {
 		kind := kinds[index]
-		if bound[index] || parameter.Flags&ast.SymbolFlagsOptional != 0 || kind == CallParameterVarPositional || kind == CallParameterVarKeyword {
+		if bound[index] || pythonParameterMayBeOmitted(parameter) || kind == CallParameterVarPositional || kind == CallParameterVarKeyword {
 			continue
 		}
 		diagnostics = append(diagnostics, ObjectCallDiagnostic{Argument: -1, Message: fmt.Sprintf("missing required argument %q of type %s", parameter.Name, c.TypeToString(c.getTypeOfSymbol(parameter)))})
@@ -251,7 +251,7 @@ func (c *Checker) objectCallDomainArguments(signature *Signature, includeOptiona
 	arguments := make([]ObjectCallArgument, 0, len(signature.parameters))
 	for index, parameter := range signature.parameters {
 		kind := kinds[index]
-		if !includeOptional && parameter.Flags&ast.SymbolFlagsOptional != 0 {
+		if !includeOptional && pythonParameterMayBeOmitted(parameter) {
 			continue
 		}
 		argument := ObjectCallArgument{Type: c.anyType}

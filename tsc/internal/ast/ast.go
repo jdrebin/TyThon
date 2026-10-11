@@ -1053,6 +1053,12 @@ func (n *Node) ElementList() *NodeList {
 		return n.AsBindingPattern().Elements
 	case KindArrayLiteralExpression:
 		return n.AsArrayLiteralExpression().Elements
+	case KindTupleExpression:
+		return n.AsTupleExpression().Elements
+	case KindSetExpression:
+		return n.AsSetExpression().Elements
+	case KindDictExpression:
+		return n.AsDictExpression().Entries
 	case KindTupleType:
 		return n.AsTupleTypeNode().Elements
 	}

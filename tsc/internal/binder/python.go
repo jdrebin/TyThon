@@ -17,6 +17,7 @@ package binder
 
 import (
 	"github.com/jdrebin/TyThon/tsc/internal/ast"
+	"github.com/jdrebin/TyThon/tsc/internal/core"
 )
 
 // bindPythonAssignment declares the targets of `name = value` and of tuple
@@ -53,6 +54,50 @@ func (b *Binder) bindPythonTargets(target *ast.Node, declaration *ast.Node) {
 	}
 }
 
+// bindPythonMatchPattern declares the captures of a match case
+// (`User(name=nam)`, `{"score": score}`) into the case-body flow. A literal
+// case (`None`) is not a pattern. Returns false when the clause should be
+// bound as an ordinary expression.
+func (b *Binder) bindPythonMatchPattern(pattern *ast.Node) bool {
+	switch pattern.Kind {
+	case ast.KindCallExpression:
+		b.bind(pattern.Expression())
+		for _, argument := range pattern.Arguments() {
+			if !ast.IsKeywordArgument(argument) {
+				continue
+			}
+			capture := argument.AsKeywordArgument().Expression
+			if ast.IsIdentifier(capture) {
+				b.bindPythonCapture(capture)
+			}
+		}
+		return true
+	case ast.KindDictExpression:
+		entries := pattern.AsDictExpression().Entries
+		if entries == nil {
+			return true
+		}
+		for _, entry := range entries.Nodes {
+			if !ast.IsDictEntry(entry) {
+				continue
+			}
+			dictEntry := entry.AsDictEntry()
+			b.bind(dictEntry.Key)
+			if ast.IsIdentifier(dictEntry.Value) {
+				b.bindPythonCapture(dictEntry.Value)
+			}
+		}
+		return true
+	default:
+		return false
+	}
+}
+
+func (b *Binder) bindPythonCapture(name *ast.Node) {
+	b.declarePythonVariable(name.Text(), name)
+	b.currentFlow = b.createFlowMutation(ast.FlowFlagsAssignment, b.currentFlow, name)
+}
+
 func (b *Binder) declarePythonVariable(name string, declaration *ast.Node) {
 	if b.container.Kind != ast.KindSourceFile && !ast.IsFunctionLike(b.container) {
 		return
@@ -62,6 +107,18 @@ func (b *Binder) declarePythonVariable(name string, declaration *ast.Node) {
 	if symbol == nil {
 		symbol = b.newSymbol(ast.SymbolFlagsFunctionScopedVariable, name)
 		locals[name] = symbol
+	}
+	// Match captures are the pattern identifier. Identifiers have no declaration
+	// data, so the symbol is recorded without writing back onto the node.
+	if declaration.DeclarationData() == nil {
+		symbol.Flags |= ast.SymbolFlagsFunctionScopedVariable
+		if symbol.Declarations == nil {
+			symbol.Declarations = b.newSingleDeclaration(declaration)
+		} else {
+			symbol.Declarations = core.AppendIfUnique(symbol.Declarations, declaration)
+		}
+		SetValueDeclaration(symbol, declaration)
+		return
 	}
 	b.addDeclarationToSymbol(symbol, declaration, ast.SymbolFlagsFunctionScopedVariable)
 }

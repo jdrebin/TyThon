@@ -18,14 +18,22 @@ func (c *Checker) pythonReceiverType(declaration *ast.Node) *Type {
 	if len(parameters) == 0 || parameters[0] != declaration {
 		return nil
 	}
-	owner := method.Parent
-	if owner == nil || !ast.IsClassLike(owner) && owner.Kind != ast.KindInterfaceDeclaration {
-		return nil
-	}
 	if ast.HasStaticModifier(method) {
 		return nil
 	}
-	return c.getDeclaredTypeOfSymbol(c.getSymbolOfDeclaration(owner))
+	owner := method.Parent
+	if owner == nil {
+		return nil
+	}
+	if ast.IsClassLike(owner) || owner.Kind == ast.KindInterfaceDeclaration {
+		return c.getDeclaredTypeOfSymbol(c.getSymbolOfDeclaration(owner))
+	}
+	// A bare first parameter in a type literal is the receiver (`def __init__(self)`).
+	// An annotated one is a real argument (`def describe(prefix: str)`).
+	if owner.Kind == ast.KindTypeLiteral && declaration.Type() == nil {
+		return c.getTypeFromTypeLiteralOrFunctionOrConstructorTypeNode(owner)
+	}
+	return nil
 }
 
 // pythonInterfaceBaseType: a tython class may list an interface among its bases
@@ -58,7 +66,13 @@ func (c *Checker) isPythonReceiverParameter(param *ast.Node) bool {
 		return false
 	}
 	owner := method.Parent
-	return owner != nil && (ast.IsClassLike(owner) || owner.Kind == ast.KindInterfaceDeclaration)
+	if owner == nil {
+		return false
+	}
+	if ast.IsClassLike(owner) || owner.Kind == ast.KindInterfaceDeclaration {
+		return true
+	}
+	return owner.Kind == ast.KindTypeLiteral && param.Type() == nil
 }
 
 // isPythonParameterMarker reports the nameless `/` and bare `*` entries of a
@@ -89,6 +103,28 @@ func (c *Checker) pythonConstructSignatures(classType *Type) []*Signature {
 		constructed.thisParameter = nil
 		constructed.flags |= SignatureFlagsConstruct
 		result = append(result, constructed)
+	}
+	return result
+}
+
+// pythonCallSignatures is the instance's call signatures, taken from `__call__`.
+// The method is an ordinary member; calling the instance (`g("Kate")`) is not
+// property access, so the receiver is already the callee and thisParameter is dropped.
+func (c *Checker) pythonCallSignatures(instanceType *Type) []*Signature {
+	if instanceType.symbol == nil {
+		return nil
+	}
+	call := instanceType.symbol.Members["__call__"]
+	if call == nil {
+		return nil
+	}
+	var result []*Signature
+	for _, signature := range c.getSignaturesOfSymbol(call) {
+		bound := c.cloneSignature(signature)
+		bound.thisParameter = nil
+		bound.resolvedReturnType = c.getReturnTypeOfSignature(signature)
+		bound.resolvedTypePredicate = c.getTypePredicateOfSignature(signature)
+		result = append(result, bound)
 	}
 	return result
 }

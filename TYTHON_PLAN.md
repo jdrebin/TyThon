@@ -1117,7 +1117,10 @@ Implemented in the prototype:
 - unified `keyof`, attribute indexed access, mapped namespace preservation,
   and `Extract`/`Exclude` filtering;
 - removal of the old `Class`, `Dict`, `Dir`, `GetAttr`, and `OmitAttrs`
-  language utilities and their hidden attribute-signature representation.
+  language utilities and their hidden attribute-signature representation;
+- a native scanner/parser/binder/`checkSourceFile` pipeline (`pyparser`,
+  `pyprogram`) on `connect-checker`. Parallel only; CLI/LSP still use the
+  string frontend. Decisions in `docs/PYTHON_FRONTEND_PORT.md`.
 
 ## Checker-reuse tightening
 
@@ -1249,6 +1252,8 @@ the center.
 ## Removing the TypeScript language
 
 The checker stays. The TypeScript language does not. A `.ts`, `.tsx`, `.js`, or `.d.ts` input must fail immediately. The checker does not parse it, bind it, or recover. `lib*.d.ts`, the dummy `/__python_checker__.ts` program, the TypeScript language-service branch, and the TypeScript parser on the Tython path are construction leftovers, not a dependency. Replace the `Program` bootstrap so `NewChecker` starts from `builtins.d.ty`.
+
+That decision now governs the frontend replacement in progress on `connect-checker`. Tython never parses TypeScript, so there is no python-mode flag and no second checker. Language-specific layers (scanner, parser, binder, `checkSourceFile` rules) are overhauled in place and keep TypeScript's concepts when the mechanics actually match; agnostic layers (type graph, relations, inference) get small adjustments as differences appear. Similar-looking mechanics that behave differently (`optional` vs `?`, `None` vs `null`/`undefined`) get different rules, not a forced mapping. The old string parsers and `RuntimeExpr` walker are scaffolding to delete, not a product to keep green. Breakage during the overhaul is expected. Implementation decisions and the concept map live in `docs/PYTHON_FRONTEND_PORT.md`. Phase-2 items (decorators as call-signature folds, files as classes, descriptors) stay out of this work; none of them required a different foundation.
 
 Anything kept only to read later goes to `local/`, which is untracked. The TypeScript repository on GitHub is the archive. If a file is not the port source for the tests and not a reference someone still wants on this machine, delete it.
 

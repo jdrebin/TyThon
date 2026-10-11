@@ -1,6 +1,10 @@
 package checker
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/jdrebin/TyThon/tsc/internal/ast"
+)
 
 // SetPythonNotImplementedType registers the declaration-backed sentinel used
 // by Python's binary protocol. It is deliberately frontend supplied rather
@@ -491,6 +495,13 @@ func (c *Checker) GetPythonIterationType(iterable *Type) (*Type, []ObjectCallDia
 	if c.isTypeAssignableTo(iterable, c.stringType) {
 		return c.stringType, nil
 	}
+	// `[]T` / `(A, B)` are native Array/Tuple types with no `[Symbol.iterator]`.
+	// A type that already has that method keeps the TypeScript iterator path.
+	if !c.hasSymbolIterator(iterable) {
+		if element := c.pythonSequenceIterationType(iterable); element != nil {
+			return element, nil
+		}
+	}
 	value, diagnostics := c.getPythonIterationType(iterable, "__iter__", "__next__")
 	if len(diagnostics) == 0 {
 		return value, nil
@@ -501,6 +512,79 @@ func (c *Checker) GetPythonIterationType(iterable *Type) (*Type, []ObjectCallDia
 		return value, nil
 	}
 	return value, diagnostics
+}
+
+func (c *Checker) hasSymbolIterator(t *Type) bool {
+	return c.getPropertyOfType(t, c.getPropertyNameForKnownSymbolName("iterator")) != nil
+}
+
+// pythonSequenceIterationType is the element type of a native array or tuple
+// used as a Python sequence. Nil when the type is not one.
+func (c *Checker) pythonSequenceIterationType(iterable *Type) *Type {
+	if iterable == nil {
+		return nil
+	}
+	if iterable.flags&TypeFlagsUnion != 0 {
+		elements := make([]*Type, 0, len(iterable.Types()))
+		for _, part := range iterable.Types() {
+			element := c.pythonSequenceIterationType(part)
+			if element == nil {
+				return nil
+			}
+			elements = append(elements, element)
+		}
+		return c.getUnionType(elements)
+	}
+	// Check the reference itself. getPythonSequenceMetadata reduces to the
+	// apparent type first, and an array literal's apparent type is not Array<T>.
+	if element := c.getElementTypeOfArrayType(iterable); element != nil {
+		return element
+	}
+	if isTupleType(iterable) {
+		elements := c.getElementTypes(iterable)
+		if len(elements) == 0 {
+			return c.neverType
+		}
+		return c.getUnionType(elements)
+	}
+	native, _ := c.getPythonSequenceMetadata(iterable)
+	if native == nil || native == iterable {
+		return nil
+	}
+	return c.pythonSequenceIterationType(native)
+}
+
+// pythonIterationElementType is the element type `for` / `yield from` / unpacking
+// should use. Async iteration is `__aiter__`/`__anext__` only. Nil leaves the
+// existing iterator check in place.
+func (c *Checker) pythonIterationElementType(use IterationUse, inputType *Type) *Type {
+	async := use&IterationUseAllowsAsyncIterablesFlag != 0 && (use&IterationUseForOfFlag != 0 || use&IterationUseYieldStarFlag != 0)
+	if async {
+		value, diagnostics := c.GetPythonAsyncIterationType(inputType)
+		if len(diagnostics) != 0 {
+			return nil
+		}
+		return value
+	}
+	if use&IterationUseAllowsSyncIterablesFlag == 0 || use&IterationUseAllowsAsyncIterablesFlag != 0 {
+		return nil
+	}
+	value, diagnostics := c.GetPythonIterationType(inputType)
+	if len(diagnostics) != 0 {
+		return nil
+	}
+	return value
+}
+
+// pythonWithTargetType is the type bound by `with manager as name`.
+func (c *Checker) pythonWithTargetType(node *ast.Node) *Type {
+	data := node.AsWithStatement()
+	manager := c.checkExpression(data.Expression)
+	value, diagnostics := c.GetPythonContextManagerType(manager, data.AwaitModifier != nil)
+	if len(diagnostics) != 0 {
+		return c.errorType
+	}
+	return value
 }
 
 func (c *Checker) GetPythonAsyncIterationType(iterable *Type) (*Type, []ObjectCallDiagnostic) {
@@ -528,6 +612,172 @@ func (c *Checker) GetPythonAsyncIterationType(iterable *Type) (*Type, []ObjectCa
 		return awaited, nil
 	}
 	return c.unknownType, []ObjectCallDiagnostic{{Argument: -1, Message: "__anext__ result is not awaitable"}}
+}
+
+// pythonMappingMethodType is a MappingProtocol member of a dict literal.
+// The literal keeps its item shape; the protocol is not intersected into it.
+func (c *Checker) pythonMappingMethodType(t *Type, name string) *Type {
+	if name == "" || !c.IsPythonMappingType(t) {
+		return nil
+	}
+	mapping := c.getGlobalType("MappingProtocol", 1, false /*reportErrors*/)
+	if mapping == c.emptyGenericType {
+		return nil
+	}
+	prop := c.getPropertyOfType(c.createTypeReference(mapping, []*Type{t}), name)
+	if prop == nil {
+		return nil
+	}
+	return c.BoundPythonCallable(c.getTypeOfSymbol(prop))
+}
+
+// pythonQualifiedAttributeTypeNode is `Type.attr` used as a type. Nil when the
+// name is not that form, so the ordinary type-reference path still runs.
+func (c *Checker) pythonQualifiedAttributeTypeNode(node *ast.Node) *Type {
+	if !ast.IsTypeReferenceNode(node) || len(node.TypeArguments()) != 0 {
+		return nil
+	}
+	return c.pythonQualifiedAttributeType(node.AsTypeReferenceNode().TypeName)
+}
+
+func (c *Checker) pythonQualifiedAttributeType(name *ast.Node) *Type {
+	if name == nil || !ast.IsQualifiedName(name) {
+		return nil
+	}
+	qualified := name.AsQualifiedName()
+	var leftType *Type
+	switch {
+	case ast.IsIdentifier(qualified.Left):
+		symbol := c.resolveEntityName(qualified.Left, ast.SymbolFlagsType, true /*ignoreErrors*/, false /*dontResolveAlias*/, nil)
+		if symbol == nil || symbol == c.unknownSymbol {
+			return nil
+		}
+		leftType = c.getDeclaredTypeOfSymbol(symbol)
+	case ast.IsQualifiedName(qualified.Left):
+		leftType = c.pythonQualifiedAttributeType(qualified.Left)
+	default:
+		return nil
+	}
+	if leftType == nil {
+		return nil
+	}
+	return c.GetAttributeType(leftType, c.getStringLiteralType(qualified.Right.Text()))
+}
+
+// pythonCaughtExceptionType is the instance type of `except ValueError as error`.
+func (c *Checker) pythonCaughtExceptionType(declaration *ast.Node) *Type {
+	catch := declaration.Parent
+	if catch == nil || catch.Kind != ast.KindCatchClause {
+		return nil
+	}
+	exception := catch.AsCatchClause().Exception
+	if exception == nil {
+		return nil
+	}
+	if exception.Kind == ast.KindTupleExpression {
+		var types []*Type
+		for _, element := range exception.Elements() {
+			if instance := c.pythonExceptionInstanceType(c.checkExpression(element)); instance != nil {
+				types = append(types, instance)
+			}
+		}
+		if len(types) == 0 {
+			return nil
+		}
+		return c.getUnionType(types)
+	}
+	return c.pythonExceptionInstanceType(c.checkExpression(exception))
+}
+
+func (c *Checker) pythonExceptionInstanceType(ctor *Type) *Type {
+	if ctor == nil {
+		return nil
+	}
+	if ctor.symbol != nil && ctor.symbol.Flags&ast.SymbolFlagsClass != 0 {
+		return c.getDeclaredTypeOfSymbol(ctor.symbol)
+	}
+	if signatures := c.getSignaturesOfType(ctor, SignatureKindConstruct); len(signatures) != 0 {
+		return c.getReturnTypeOfSignature(signatures[0])
+	}
+	return nil
+}
+
+// pythonObjectSurfaceType is a required ObjectProtocol member. Optional hooks
+// such as `__add__` are not on every value; a type declares those itself.
+func (c *Checker) pythonObjectSurfaceType(name string) *Type {
+	if name == "" {
+		return nil
+	}
+	protocol := c.getGlobalType("ObjectProtocol", 0, false /*reportErrors*/)
+	if protocol == nil || protocol == c.emptyObjectType {
+		return nil
+	}
+	prop := c.getPropertyOfType(protocol, name)
+	if prop == nil || prop.Flags&ast.SymbolFlagsOptional != 0 {
+		return nil
+	}
+	return c.BoundPythonCallable(c.getTypeOfSymbol(prop))
+}
+
+// appendPythonExtraClassBases adds bases after the first. A Python class list
+// is one `extends` clause; TypeScript otherwise keeps only the first element.
+func (c *Checker) appendPythonExtraClassBases(t *Type) {
+	decl := ast.GetClassLikeDeclarationOfSymbol(t.symbol)
+	if decl == nil {
+		return
+	}
+	elements := ast.GetHeritageElements(decl, ast.KindExtendsKeyword)
+	if len(elements) < 2 {
+		return
+	}
+	bases := t.AsInterfaceType().resolvedBaseTypes
+	for _, element := range elements[1:] {
+		var base *Type
+		if interfaceBase := c.pythonInterfaceBaseType(element); interfaceBase != nil {
+			base = interfaceBase
+		} else if element.Expression() != nil {
+			ctor := c.checkExpression(element.Expression())
+			if ctor.symbol != nil && ctor.symbol.Flags&ast.SymbolFlagsClass != 0 {
+				base = c.getTypeFromClassOrInterfaceReference(element, ctor.symbol)
+			} else if sigs := c.getInstantiatedConstructorsForTypeArguments(ctor, element.TypeArguments(), element); len(sigs) != 0 {
+				base = c.getReturnTypeOfSignature(sigs[0])
+			}
+		}
+		if base == nil || c.isErrorType(base) {
+			continue
+		}
+		reduced := c.getReducedType(base)
+		if !c.isValidBaseType(reduced) || t == reduced || c.hasBaseType(reduced, t) {
+			continue
+		}
+		bases = append(bases, reduced)
+	}
+	t.AsInterfaceType().resolvedBaseTypes = bases
+}
+
+// pythonAwaitableType is the call type of `async def f() -> T`.
+func (c *Checker) pythonAwaitableType(result *Type) *Type {
+	awaitable := c.getGlobalType("Awaitable", 1, false /*reportErrors*/)
+	if awaitable == c.emptyGenericType || result == nil {
+		return result
+	}
+	return c.createTypeReference(awaitable, []*Type{result})
+}
+
+// pythonAwaitedResult is T in Awaitable<T>, or nil when t is not that reference.
+func (c *Checker) pythonAwaitedResult(t *Type) *Type {
+	if t == nil {
+		return nil
+	}
+	awaitable := c.getGlobalType("Awaitable", 1, false /*reportErrors*/)
+	if awaitable == c.emptyGenericType || !c.isReferenceToType(t, awaitable) {
+		return nil
+	}
+	arguments := c.getTypeArguments(t)
+	if len(arguments) == 0 {
+		return nil
+	}
+	return arguments[0]
 }
 
 // ResolvePythonAwaitedType first consumes native checker metadata and then the
@@ -560,9 +810,9 @@ func (c *Checker) ResolvePythonAwaitedType(awaitable *Type) (*Type, []ObjectCall
 	if _, _, result := c.GetPythonGeneratorTypes(iterator); result != nil {
 		return result, nil
 	}
-	if _, diagnostics := c.GetPythonIterationType(iterator); len(diagnostics) == 0 {
-		// An unparameterized iterator protocol carries no StopIteration value.
-		return c.anyType, nil
+	if element, diagnostics := c.GetPythonIterationType(iterator); len(diagnostics) == 0 {
+		// Iterator<T> from `__await__` carries the awaited result as its element.
+		return element, nil
 	}
 	return c.unknownType, []ObjectCallDiagnostic{{Argument: -1, Message: "__await__ does not return an iterator"}}
 }

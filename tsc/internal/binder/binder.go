@@ -640,8 +640,6 @@ func (b *Binder) bind(node *ast.Node) bool {
 		b.checkStrictModePostfixUnaryExpression(node)
 	case ast.KindPrefixUnaryExpression:
 		b.checkStrictModePrefixUnaryExpression(node)
-	case ast.KindWithStatement:
-		b.checkStrictModeWithStatement(node)
 	case ast.KindLabeledStatement:
 		b.checkStrictModeLabeledStatement(node)
 	case ast.KindThisType:
@@ -1435,11 +1433,6 @@ func (b *Binder) checkStrictModePrefixUnaryExpression(node *ast.Node) {
 	}
 }
 
-func (b *Binder) checkStrictModeWithStatement(node *ast.Node) {
-	// Grammar checking for withStatement
-	b.errorOnFirstToken(node, diagnostics.X_with_statements_are_not_allowed_in_strict_mode)
-}
-
 func (b *Binder) checkStrictModeLabeledStatement(node *ast.Node) {
 	// Grammar checking for labeledStatement
 	data := node.AsLabeledStatement()
@@ -1825,7 +1818,7 @@ func isLogicalAssignmentExpression(node *ast.Node) bool {
 
 func (b *Binder) bindAssignmentTargetFlow(node *ast.Node) {
 	switch node.Kind {
-	case ast.KindArrayLiteralExpression:
+	case ast.KindArrayLiteralExpression, ast.KindTupleExpression:
 		for _, e := range node.Elements() {
 			if e.Kind == ast.KindSpreadElement {
 				b.bindAssignmentTargetFlow(e.Expression())
@@ -1928,6 +1921,7 @@ func (b *Binder) bindForInOrForOfStatement(node *ast.Node) {
 		// Bail out early and just bind the remaining children with unreachable flow.
 		b.bind(stmt.Initializer)
 		b.bind(stmt.Statement)
+		b.bind(stmt.ElseBlock)
 		return
 	}
 	preLoopLabel := b.setContinueTarget(node, b.createLoopLabel())
@@ -1937,13 +1931,30 @@ func (b *Binder) bindForInOrForOfStatement(node *ast.Node) {
 	if node.Kind == ast.KindForOfStatement {
 		b.bind(stmt.AwaitModifier)
 	}
-	b.addAntecedent(postLoopLabel, b.currentFlow)
+	if stmt.ElseBlock == nil {
+		b.addAntecedent(postLoopLabel, b.currentFlow)
+		b.bind(stmt.Initializer)
+		if stmt.Initializer.Kind != ast.KindVariableDeclarationList {
+			b.bindAssignmentTargetFlow(stmt.Initializer)
+		}
+		b.bindIterativeStatement(stmt.Statement, postLoopLabel, preLoopLabel)
+		b.addAntecedent(preLoopLabel, b.currentFlow)
+		b.currentFlow = b.finishFlowLabel(postLoopLabel)
+		return
+	}
+	// Python for-else runs when the loop ends without break. Exhaustion is the
+	// existing "may be empty" edge; break skips the else.
+	exhausted := b.createBranchLabel()
+	b.addAntecedent(exhausted, b.currentFlow)
 	b.bind(stmt.Initializer)
 	if stmt.Initializer.Kind != ast.KindVariableDeclarationList {
 		b.bindAssignmentTargetFlow(stmt.Initializer)
 	}
 	b.bindIterativeStatement(stmt.Statement, postLoopLabel, preLoopLabel)
 	b.addAntecedent(preLoopLabel, b.currentFlow)
+	b.currentFlow = b.finishFlowLabel(exhausted)
+	b.bind(stmt.ElseBlock)
+	b.addAntecedent(postLoopLabel, b.currentFlow)
 	b.currentFlow = b.finishFlowLabel(postLoopLabel)
 }
 
@@ -2170,10 +2181,12 @@ func (b *Binder) bindCaseBlock(node *ast.Node) {
 func (b *Binder) bindCaseOrDefaultClause(node *ast.Node) {
 	clause := node.AsCaseOrDefaultClause()
 	if clause.Expression != nil {
-		saveCurrentFlow := b.currentFlow
-		b.currentFlow = b.preSwitchCaseFlow
-		b.bind(clause.Expression)
-		b.currentFlow = saveCurrentFlow
+		if !b.bindPythonMatchPattern(clause.Expression) {
+			saveCurrentFlow := b.currentFlow
+			b.currentFlow = b.preSwitchCaseFlow
+			b.bind(clause.Expression)
+			b.currentFlow = saveCurrentFlow
+		}
 	}
 	b.bindEach(clause.Statements.Nodes)
 }
@@ -2357,7 +2370,9 @@ func (b *Binder) bindConditionalExpressionFlow(node *ast.Node) {
 
 func (b *Binder) bindVariableDeclarationFlow(node *ast.Node) {
 	b.bindEachChild(node)
-	if node.Initializer() != nil || ast.IsForInOrOfStatement(node.Parent.Parent) {
+	if node.Initializer() != nil || ast.IsForInOrOfStatement(node.Parent.Parent) || node.Parent.Parent.Kind == ast.KindWithStatement || node.Parent.Kind == ast.KindCatchClause {
+		// `with manager as name` and `except ValueError as error` assign the name,
+		// the same way `for x of xs` assigns x.
 		b.bindInitializedVariableFlow(node)
 	}
 }
@@ -2706,7 +2721,7 @@ func isNarrowingBinaryExpression(expr *ast.BinaryExpression) bool {
 	switch expr.OperatorToken.Kind {
 	case ast.KindEqualsToken, ast.KindBarBarEqualsToken, ast.KindAmpersandAmpersandEqualsToken, ast.KindQuestionQuestionEqualsToken:
 		return containsNarrowableReference(expr.Left)
-	case ast.KindEqualsEqualsToken, ast.KindExclamationEqualsToken, ast.KindEqualsEqualsEqualsToken, ast.KindExclamationEqualsEqualsToken:
+	case ast.KindEqualsEqualsToken, ast.KindExclamationEqualsToken, ast.KindEqualsEqualsEqualsToken, ast.KindExclamationEqualsEqualsToken, ast.KindIsKeyword:
 		left := ast.SkipParentheses(expr.Left)
 		right := ast.SkipParentheses(expr.Right)
 		return isNarrowableOperand(left) || isNarrowableOperand(right) ||

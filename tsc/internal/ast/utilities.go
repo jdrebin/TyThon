@@ -132,7 +132,7 @@ func GetRightMostAssignedExpression(node *Node) *Node {
 func IsDestructuringAssignment(node *Node) bool {
 	if IsAssignmentExpression(node, true /*excludeCompoundAssignment*/) {
 		kind := node.AsBinaryExpression().Left.Kind
-		return kind == KindObjectLiteralExpression || kind == KindArrayLiteralExpression
+		return kind == KindObjectLiteralExpression || kind == KindArrayLiteralExpression || kind == KindTupleExpression
 	}
 	return false
 }
@@ -157,7 +157,8 @@ func IsArrayBindingOrAssignmentElement(node *Node) bool {
 		KindObjectLiteralExpression,
 		KindIdentifier,
 		KindPropertyAccessExpression,
-		KindElementAccessExpression:
+		KindElementAccessExpression,
+		KindTupleExpression:
 		return true
 	}
 	return IsAssignmentExpression(node, true /*excludeCompoundAssignment*/)
@@ -205,7 +206,7 @@ func GetAssignmentTarget(node *Node) *Node {
 				return parent
 			}
 			return nil
-		case KindParenthesizedExpression, KindArrayLiteralExpression, KindSpreadElement, KindNonNullExpression:
+		case KindParenthesizedExpression, KindArrayLiteralExpression, KindTupleExpression, KindSpreadElement, KindNonNullExpression:
 			node = parent
 		case KindSpreadAssignment:
 			node = parent.Parent
@@ -3891,14 +3892,14 @@ func hasComment(kind Kind) bool {
 }
 
 func IsAssignmentPattern(node *Node) bool {
-	return node.Kind == KindArrayLiteralExpression || node.Kind == KindObjectLiteralExpression
+	return node.Kind == KindArrayLiteralExpression || node.Kind == KindObjectLiteralExpression || node.Kind == KindTupleExpression
 }
 
 func GetElementsOfBindingOrAssignmentPattern(name *Node) []*Node {
 	switch name.Kind {
-	case KindObjectBindingPattern, KindArrayBindingPattern, KindArrayLiteralExpression:
+	case KindObjectBindingPattern, KindArrayBindingPattern, KindArrayLiteralExpression, KindTupleExpression:
 		// `a` in `{a}`
-		// `a` in `[a]`
+		// `a` in `[a]` / `(a, b)`
 		return name.Elements()
 	case KindObjectLiteralExpression:
 		// `a` in `{a}`

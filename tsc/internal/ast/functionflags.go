@@ -21,7 +21,7 @@ func GetFunctionFlags(node *Node) FunctionFlags {
 	flags := FunctionFlagsNormal
 	switch node.Kind {
 	case KindFunctionDeclaration, KindFunctionExpression, KindMethodDeclaration:
-		if data.AsteriskToken != nil {
+		if data.AsteriskToken != nil || pythonBodyHasYield(data.Body) {
 			flags |= FunctionFlagsGenerator
 		}
 		fallthrough
@@ -34,4 +34,26 @@ func GetFunctionFlags(node *Node) FunctionFlags {
 		flags |= FunctionFlagsInvalid
 	}
 	return flags
+}
+
+// Python generators are spelled with `yield` in the body, not `function*`.
+// Nested function-likes are skipped so an inner generator does not mark the outer def.
+func pythonBodyHasYield(body *Node) bool {
+	if body == nil {
+		return false
+	}
+	var walk func(*Node) bool
+	walk = func(n *Node) bool {
+		if n == nil {
+			return false
+		}
+		if n.Kind == KindYieldExpression {
+			return true
+		}
+		if IsFunctionLike(n) {
+			return false
+		}
+		return n.ForEachChild(walk)
+	}
+	return walk(body)
 }

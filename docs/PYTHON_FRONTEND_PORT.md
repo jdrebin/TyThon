@@ -10,18 +10,120 @@ to guess from neighbouring characters. TypeScript solves this with
 `canFollowTypeArgumentsInExpression` after a speculative `tryParse`. A string frontend
 has no way to do that.
 
+This is how "the checker stays, the TypeScript language does not"
+(`TYTHON_PLAN.md` § Removing the TypeScript language) is carried out. The language
+design in the plan is the spec; this file is the implementation decisions for the
+port. Do not invent generic-Python semantics when the plan already decided.
+
+## Decisions
+
+These are closed. Relitigate only if a later construct proves the foundation is wrong.
+
+**Architecture**
+
+- Use TypeScript's own machinery (scanner `Mark`/`Rewind`/`ReScan*`, parser
+  `tryParse`/`lookAhead`/`parseList`, `ast.NodeFactory`, binder containers,
+  `checkSourceFile`). Do not take a Python tokenizer from Black or Ruff; TypeScript
+  does not reuse an existing JS parser either.
+- As close to that source as possible. Diverge only where tython or Python differ.
+- No partial transition and no permanent lowering layer into `TypeExpr`/`RuntimeExpr`.
+  Native tree, staged by construct. Old structs remain as differential oracles and
+  are deleted as each construct goes native.
+- No fallback frontend once the native path is the one that serves files.
+- Language-specific layers get major overhauls that keep the TypeScript *concept*
+  when the mechanics actually match. Agnostic layers (type graph, relations,
+  inference) get small adjustments as differences come up.
+- Do not force a TypeScript rule onto a Python fact just to have an equivalent.
+  Similar-looking mechanics that behave differently get different rules. Examples
+  already in the plan: `optional` is presence metadata, not `T | undefined`;
+  `None` is an explicit value, not TS `null`/`undefined`. Keep the TS node or
+  algorithm only when it is doing the same job.
+- There is no python-mode flag on the checker. This repo does not parse TypeScript
+  (`emptyProgram`, no `internal/parser`). A flag would guard dead JS behavior. Edit
+  the binder and checker directly; delete TS-only rules that cannot fire.
+- The `b.python` binder flag is the same mistake and should stay gone: no block
+  scope is the binder's rule, not a switch.
+- Breakage during the overhaul is expected. The test of progress is "is this piece
+  the TypeScript design with tython spelling," not "does the legacy path stay green."
+- CLI/LSP/erasure stay on the legacy walker until the native path can replace it.
+  `pyprogram` is the parallel host (`primitives.d.ty` then `builtins.d.ty`, then user
+  files), analogous to TS starting from `lib.d.ts`. Do not merge to `main` as the
+  product frontend until that path is the one that actually checks files.
+- Future items (decorators as input/output call signatures, files as classes,
+  class bodies as both code and definition, ordered keys) are context only. Do not
+  implement or prepare for them now. None of them required a different bottom.
+
+**Concept map (TypeScript idea → tython spelling)**
+
+| TypeScript | Tython |
+| --- | --- |
+| default lib `type Name = intrinsic` | `pyprogram/lib/primitives.d.ty` and private keys in `builtins.d.ty` |
+| `constructor()` / `new C(...)` | `__init__` as `ConstructorDeclaration`; `C(...)` is a call that uses construct signatures |
+| implicit `this` / `this` parameter | first parameter of an instance method (`self` or any name) |
+| `this.x =` in a constructor | `self.x =` on that receiver (`JSDeclarationKindThisProperty`) |
+| `T[K]` / `keyof T` as JS property keys | item vs attribute key algebra (`GetPythonIndexedAccessType`, `GetItemKeyType`, `*` interface) |
+| quoted name in a type literal is a property | quoted name is an *item* key; bare name is an *attribute* (`*<"id">` vs `"id"`) |
+| rest parameter is an array | `*args` is a list/tuple; `**kwargs` is a mapping |
+| `var` function-scoped, rebinding allowed | Python assignment and `for` targets (array binding patterns) |
+| `else if` | `elif` as an `IfStatement` in the else slot |
+| no block scope for `var` | no block scope at all (`Block`/`For*`/`Catch`/`CaseBlock` are not containers) |
+| definite assignment in `constructor` | `__init__` assertions; the TS constructor check is skipped until that is ported |
+| overload signatures vs implementation | `@overload` stub bodies are omitted like `declare function f();` |
+| `?` meaning `T \| undefined` | `optional` is presence only; the value type is unchanged |
+| `null` / `undefined` | `None` is an explicit value; implicit return is `None`, not `undefined` |
+| parameter `= default` | omittable at the call site; not `T \| undefined` |
+| `function*` / `NodeFlagsYieldContext` | every `def` body is a yield context; `yield` in the body makes it a generator |
+| `Generator<Y, TReturn, TNext>` | Python `Generator<Y, S, R>` is yield, send, return — different argument order |
+
+New node kinds exist only where TypeScript has no equivalent: `TupleExpression`,
+`SetExpression`, `DictExpression`, `DictEntry`, `KeywordArgument`,
+`EllipsisExpression`, `EllipsisType`, `TypeCallType`, `AttributeAccessType`.
+
+**Not decided (preserve current behavior; do not invent during the port)**
+
+- `isinstance` against structural classes (today structural via `narrowRuntimeType`).
+- List variance and import-cycle partial initialization.
+- Whether `__init__` must also remain a callable method on the class (`Class.__init__`)
+  now that it is a `ConstructorDeclaration`. Construction `C(...)` works; the method
+  form is unproven.
+- Nested class binding: currently class `locals`, not `members`.
+
+**Why this held (evidence, not extra work)**
+
+- The `<` delimiter class is why a string frontend cannot stand: TypeScript
+  resolves it with speculative `tryParse` plus `canFollowTypeArgumentsInExpression`.
+  Black/Ruff would not give us that, and they are not tython's grammar.
+- Phase-2 items (decorators as call-signature folds, files as classes, class
+  bodies as both code and definition, ordered keys) all sit on the same binder
+  and checker. None of them needed a different bottom, so they stay out of this
+  work without forcing a later rewrite of scanner/parser.
+- `emptyProgram` already documents that Tython never parses TypeScript. A
+  python-mode flag would guard JS-only paths that this repo does not run.
+- The native-checker prototype in the plan already showed primitives, relations,
+  and flow analysis work on the TypeScript type graph. The remaining work is
+  frontend metadata and language-specific rules, not a second type engine.
+- Dual key namespaces (`*<Name>` vs item keys) and `type Name = intrinsic` are
+  already the plan's model; the port installs them the way TS installs `Array`.
+- Running unmodified `checkSourceFile` on parsed files is what exposed the real
+  gaps (undeclared primitives, circular `x =`, `self` as `any`, construct
+  `this`, quoted item keys). Those gaps are missing frontend wiring, not proof
+  the architecture is wrong.
+- A WSL freeze from an unbounded f-string `TemplateHead` loop is why every
+  parser/checker probe runs under `ulimit -v` and `timeout`. `parseList` now
+  advances when an element consumes nothing.
+
 ## Layers
 
 | Layer | Package | Status |
 | --- | --- | --- |
 | Python scanner (layout, strings, f-strings, numbers, operators, keywords) | `scanner` (`python.go`, `LanguageVariantPython`) | done, tested |
-| New AST kinds | `tools/scripts/tsc/ast.json` | token kinds done; type kinds done |
+| New AST kinds | `tools/scripts/tsc/ast.json` | done (new kinds only where TS has none) |
 | Parser: infrastructure | `pyparser/parser.go` | done |
 | Parser: type grammar | `pyparser/types.go`, `mapping.go` | done, differential-tested |
-| Parser: expressions | `pyparser` | next |
-| Parser: statements, declarations, imports | `pyparser` | after |
-| Consumer: binder/checker/language service on TS nodes | `python`, `checker`, `ls` | **open decision, see below** |
-| Delete legacy parsers | `python` | after the consumer moves |
+| Parser: expressions, statements, declarations, imports | `pyparser` | first-and-second slices done; `match` still missing |
+| Binder (no block scope, assignment targets, this-property) | `binder` | Python `GetContainerFlags`; this-property without JS-file gate |
+| Consumer: `checkSourceFile` on the native tree | `pyprogram`, `checker` | parallel host; not the CLI/LSP path yet |
+| Delete legacy parsers | `python` | after the native path serves files |
 
 ## Scanner divergences from TypeScript
 
@@ -101,43 +203,17 @@ Mapped onto TypeScript nodes where the semantics match, new kinds otherwise.
   `SpreadElement` (`*x`), `CallExpression` (with type arguments via the speculative
   `canFollowTypeArgumentsInExpression` rule), `AsExpression`, `SatisfiesExpression`,
   `TemplateExpression` (f-strings), `BinaryExpression` (walrus is `:=`).
-- New kinds needed: comprehensions (list/set/dict/generator + clauses), chained comparison
+- New kinds (implemented except `match`): comprehensions, chained comparison
   (`a < b < c` is not nested binary), keyword arguments, slices, `try` with several
-  `except` clauses / `except*`, `with ... as`, `match` and patterns, `assert`,
-  `global`/`nonlocal`, loop `else`, `del` targets, starred assignment targets, class-body
-  statements that are neither methods nor annotated attributes.
+  `except` clauses / `except*`, `with ... as`, `assert`, `global`/`nonlocal`, loop
+  `else`, `del` targets, starred assignment targets. `match` and patterns still missing.
 
-## Decision: what consumes the new tree
+## What still consumes the old tree
 
-Finding from the port work: `tsc/internal/python` does not run the TypeScript binder or
-`checkSourceFile` on Python source. It builds `checker.Type`s from its own `TypeExpr`
-trees (`checker_environment.go`, 2.1k lines) and types expressions itself
-(`implementation_checker.go`, 3.5k lines, on `RuntimeExpr`). The TypeScript checker is
-used as a type-relation engine with Python hooks (`objectfacets.go`,
-`pythonoperations.go`, ...).
-
-Options:
-
-1. **Lower** the new tree into the existing `TypeExpr`/`RuntimeExpr`/declaration structs.
-   Fixes the root parsing bugs and deletes the string frontend (~5k lines) but keeps the
-   adapter layer.
-2. **Native**: binder and `checkExpression` over the TypeScript nodes. This removes the
-   adapters entirely and is the original goal, but it rewrites the Python semantics in
-   `implementation_checker.go` and `checker_environment.go` against `ast.Node`.
-3. Option 1 first, then migrate consumers to the nodes one at a time and delete the
-   lowering as each goes.
-
-**Chosen: native (option 2), staged by construct.** No permanent lowering layer. The old
-structs survive only as a test oracle (the differential harnesses) and are deleted as each
-construct goes native. Order: types, then declarations, then expressions and statements.
-
-## Scope rule
-
-The port reproduces current behavior only. Phase-2 and later items (general decorators,
-descriptors, files as classes, ordered fields) are context for direction, not work items and
-not things to prepare for. They are recorded below only so a future need to change direction
-at the bottom layers is visible. Nothing discussed so far requires that: every item maps onto
-the TypeScript binder/checker without a new foundation.
+`tsc/internal/python` still builds `checker.Type`s from `TypeExpr` /
+`RuntimeExpr` (`checker_environment.go`, `implementation_checker.go`) and is
+the live CLI/LSP checker. Native `checkSourceFile` runs only in `pyprogram`.
+Consumer choice is closed: native, staged by construct; see Decisions.
 
 ## Structural commitment (current behavior)
 
@@ -224,16 +300,13 @@ Node mapping (TypeScript kinds wherever one exists):
 Binder: tuple/list/starred assignment targets declare every name (`bindPythonTargets`). Loop
 targets need no Python code at all: `var` is already function-scoped with rebinding allowed.
 
-Probe over the repo's 39 `.ty`/`.d.ty` files: 25 parse without diagnostics (0 at the start of
-this increment). The rest fail only on constructs listed below, plus the legacy-syntax fixture
-`python-declarations/advanced.d.ty` (`Dict({...})`, `()(int)`), which is not tython syntax.
+Parser coverage after increment 2 plus later slices: `try`/`with`/`async`, `del`,
+`global`/`nonlocal`, `assert`, `raise`, `break`/`continue`, lambda, comprehensions,
+slices, f-string fields, `not in`/`is not`, chained comparisons, walrus, `await`/`yield`,
+loop `else`, `match` (`SwitchStatement`; class and mapping patterns bind captures). Legacy-syntax fixture
+`python-declarations/advanced.d.ty` (`Dict({...})`, `()(int)`) is not tython syntax.
 
-Not parsed yet (reported as parse errors, never silently mis-parsed): `try`/`with`/`match`,
-`async def`, `del`, `global`/`nonlocal`, `assert`, `raise`, `break`/`continue`, lambda,
-comprehensions, slices, f-string fields, `not in`/`is not`, chained comparisons, walrus,
-`await`/`yield`, loop `else`, `import a, b`, `from m import *`.
-
-### Checker spike (measured; throwaway test, not kept)
+### Checker spike (historical; first unmodified `checkSourceFile` run)
 
 The unmodified TypeScript `checkSourceFile` was run over the repo files that parse (20 in the
 demo and preview folders, no builtins library, empty host). Result: 1 clean, and these gaps, which
@@ -268,10 +341,40 @@ rules keep the TS concept:
 | `*args` must be an array | `**kwargs` is a mapping, not an array |
 | definite assignment in `constructor` | `__init__` assertions (TS constructor check skipped) |
 
-Progress meter: `go test ./internal/pyprogram -run TestNativeCheckerProgress`. Library
-diagnostics are 0. Remaining user diagnostics cluster on item-key access of quoted
-members, `__call__` / unbound methods, `yield`/`with`/`async`, modules, `@overload`,
-and dunder protocols.
+Progress meter: `go test ./internal/pyprogram -run TestNativeCheckerProgress` (always
+under `ulimit -v` and `timeout`). Last measured: 32 of 32 corpus files parse, 25 check
+clean, library diagnostics 0, 35 distinct user diagnostics. Quoted item keys, dual
+namespaces, int indexing of `[]T`, implicit `-> None` returns, keyword/`*`/`**`
+call binding (`ResolveObjectCall`), instance-bound methods, `__call__` as instance
+call signatures, tuple unpack assignment, `as const` on tuple/dict/set literals,
+`with` (`__enter__`/`__exit__`), iteration of native `[]T` / tuples (`for`,
+`yield from`), starred assignment (`a, *rest = xs`, rest is a list of the
+tail), class-body data attributes on the class value (`User.kind`, including
+inherited), `async def`, required `ObjectProtocol` members, `set<T>`, `+` via
+`__add__`, extra class bases, on-demand mapping methods, `Type.attr` in type
+position, `except E as e` (instance type, assigned), contextual dict literals,
+bare `self` on a type-literal method, `is` / `is not` narrowing, `for`/`else`,
+and `match` (literal cases, class patterns `User(name=nam)`, mapping patterns)
+are in. Methods are not copied onto the class; `@classmethod` /
+`@staticmethod` / `@property` are still deferred. `async def f() -> T` is `Awaitable<T>` at the
+call and `T` in the body. An async generator's annotation is the iterator
+(`AsyncIterator<Y>`), and with no TS `AsyncGenerator` global that is the type
+produced. Defaulted parameters may be omitted without becoming
+`T | undefined`. `def` bodies are yield/await contexts (Python does not use `function*`).
+`yield from` a Python iterable completes as `None` and does not look up
+`[Symbol.iterator]`. Generator type-argument order is Python's (yield, send, return),
+not TS `Generator<Y, R, N>` — do not coerce. `trimLeft` on `str` in the bytes
+overload demo is an intentional error. Dotted imports resolve to a sibling
+`.d.ty` (`catalog`, `sample_package.models`); an ambient declaration file is a
+module and its top-level names are the exports. `pathlib` is the embedded
+`lib/pathlib.d.ty`. `@overload` is not a priority. Class-side decorators stay
+deferred. What remains on the meter is those deferred gaps plus the intentional
+error fixtures (`diagnostic_gallery.ty`, `type_error.ty`, `value_hierarchy.ty`).
+
+Those remaining clusters are language-specific overhauls of the same TS concepts
+(call signatures, overload groups, iteration protocols). They are not a fork. Do
+not coerce JS rules (property-vs-index, number keys, `undefined` returns) to make
+them look solved.
 
 ## Future context (not in scope, recorded only)
 
@@ -279,8 +382,5 @@ General decorators as call-signature folds, descriptor-based member types, files
 and class bodies as both code and definition are phase 2 or later. None of them signals a
 different foundation; they sit on the same binder and checker.
 
-## Unspecified in the plan (preserve current behavior, do not decide during the port)
-
-- `isinstance` against structural classes: today structural via `narrowRuntimeType`.
-- List variance and partially initialized modules in import cycles: whatever the current
-  implementation does. The differential harness defines "current".
+Open language questions that are not this port's job are listed under Decisions
+("Not decided"). The differential harness still defines "current" for those.

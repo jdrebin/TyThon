@@ -28,6 +28,9 @@ func TestParseSimpleAndCompoundStatements(t *testing.T) {
 			"(TryStatement (Block EmptyStatement) (CatchClause `A` (VariableDeclaration `e`) (Block EmptyStatement) (CatchClause (TupleExpression `B` `C`) (Block EmptyStatement))) (Block EmptyStatement) (Block EmptyStatement))"},
 		{"with a as x, b:\n    pass\n", "(WithStatement `a` (VariableDeclarationList (VariableDeclaration `x`)) (WithStatement `b` (Block EmptyStatement)))"},
 		{"async def f():\n    async with c as z:\n        pass\n", "(FunctionDeclaration AsyncKeyword `f` (Block (WithStatement AwaitKeyword `c` (VariableDeclarationList (VariableDeclaration `z`)) (Block EmptyStatement))))"},
+		{"match value:\n    case None:\n        pass\n", "(SwitchStatement `value` (CaseBlock (CaseClause NullKeyword EmptyStatement)))"},
+		{"for x in xs:\n    break\nelse:\n    pass\n", "(ForOfStatement (VariableDeclarationList (VariableDeclaration `x`)) `xs` (Block BreakStatement) (Block EmptyStatement))"},
+		{"match = 1\n", "(ExpressionStatement (BinaryExpression `match` EqualsToken 1))"},
 	}
 	for _, c := range cases {
 		file := ParseSourceFile("/test.ty", c.src)

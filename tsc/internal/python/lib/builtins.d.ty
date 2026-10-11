@@ -216,6 +216,9 @@ interface SetProtocol<T>:
     def __isub__(self, other: object) -> any
     def __ixor__(self, other: object) -> any
 
+interface set<T>(SetProtocol<T>):
+    def __iter__(self) -> Iterator<T>
+
 interface IteratorProtocol<T>:
     def __iter__(self) -> { def __next__() -> T }
     def __next__(self) -> T

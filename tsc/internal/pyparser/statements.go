@@ -126,6 +126,10 @@ func (p *Parser) parseStatement() *ast.Node {
 		return p.parseWhileStatement()
 	case ast.KindForKeyword:
 		return p.parseForStatement()
+	case ast.KindMatchKeyword:
+		if p.lookAhead((*Parser).isMatchStatement) {
+			return p.parseMatchStatement()
+		}
 	case ast.KindTryKeyword:
 		return p.parseTryStatement()
 	case ast.KindWithKeyword:
@@ -206,7 +210,13 @@ func (p *Parser) parseFunctionDeclaration(pos int, modifiers *ast.ModifierList) 
 	} else {
 		bodyPos := p.nodePos()
 		p.inClassBody = false
+		saveContextFlags := p.contextFlags
+		p.contextFlags |= ast.NodeFlagsYieldContext
+		if modifiers != nil && modifiers.ModifierFlags&ast.ModifierFlagsAsync != 0 {
+			p.contextFlags |= ast.NodeFlagsAwaitContext
+		}
 		statements := p.parseSuiteStatements()
+		p.contextFlags = saveContextFlags
 		p.inClassBody = inClass
 		body = p.finishNode(p.factory.NewBlock(statements, true), bodyPos)
 		if (p.contextFlags&ast.NodeFlagsAmbient != 0 || isOverload) && isStubBody(statements) {
@@ -668,7 +678,18 @@ func (p *Parser) parseForStatementWith(pos int, awaitModifier *ast.Node) *ast.No
 	p.parseExpected(ast.KindInKeyword)
 	iterable := p.parseExpressionList()
 	body := p.parseBlock()
-	return p.finishNode(p.factory.NewForInOrOfStatement(ast.KindForOfStatement, awaitModifier, initializer, iterable, body), pos)
+	var elseBlock *ast.Node
+	if p.token == ast.KindElseKeyword {
+		p.nextToken()
+		elseBlock = p.parseBlock()
+	}
+	node := p.finishNode(p.factory.NewForInOrOfStatement(ast.KindForOfStatement, awaitModifier, initializer, iterable, body), pos)
+	if elseBlock != nil {
+		// Attached after finishNode, so the parent link is not set by ForEachChild.
+		elseBlock.Parent = node
+		node.AsForInOrOfStatement().ElseBlock = elseBlock
+	}
+	return node
 }
 
 func (p *Parser) parseForTarget() *ast.Node {

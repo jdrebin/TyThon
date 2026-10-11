@@ -7,6 +7,23 @@ import (
 	"github.com/jdrebin/TyThon/tsc/internal/collections"
 )
 
+func pythonDeclarationIsOptional(node *ast.Node) bool {
+	if node == nil {
+		return false
+	}
+	if ast.HasQuestionToken(node) {
+		return true
+	}
+	if modifiers := node.Modifiers(); modifiers != nil {
+		for _, modifier := range modifiers.Nodes {
+			if modifier.Kind == ast.KindOptionalKeyword {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 // pythonItemProperty projects a Python key onto a native property symbol.
 // Only key matching is Python-specific; optionality, readonly, and structural
 // compatibility are handled by the ordinary property relation.

@@ -3720,8 +3720,8 @@ func (c *Checker) checkAllCodePathsInNonVoidFunctionReturnOrThrow(fn *ast.Node, 
 		t = c.unwrapReturnType(returnType, functionFlags)
 	}
 	// Functions with an explicitly specified return type that includes `void` or is exactly `any` or `undefined` don't
-	// need any return statements.
-	if t != nil && (c.maybeTypeOfKind(t, TypeFlagsVoid) || t.flags&(TypeFlagsAny|TypeFlagsUndefined) != 0) {
+	// need any return statements. Python's implicit return is None, not undefined.
+	if t != nil && (c.maybeTypeOfKind(t, TypeFlagsVoid) || t.flags&(TypeFlagsAny|TypeFlagsUndefined) != 0 || c.isTypeAssignableTo(c.nullType, t)) {
 		return
 	}
 	// If all we have is a function signature, or an arrow function with an expression body, then there is nothing to check.
@@ -3746,7 +3746,7 @@ func (c *Checker) checkAllCodePathsInNonVoidFunctionReturnOrThrow(fn *ast.Node, 
 		// minimal check: function has syntactic return type annotation and no explicit return statements in the body
 		// this function does not conform to the specification.
 		c.error(errorNode, diagnostics.A_function_whose_declared_type_is_neither_undefined_void_nor_any_must_return_a_value)
-	case t != nil && c.strictNullChecks && !c.isTypeAssignableTo(c.undefinedType, t):
+	case t != nil && c.strictNullChecks && !c.isTypeAssignableTo(c.undefinedType, t) && !c.isTypeAssignableTo(c.nullType, t):
 		c.error(errorNode, diagnostics.Function_lacks_ending_return_statement_and_return_type_does_not_include_undefined)
 	case c.compilerOptions.NoImplicitReturns == core.TSTrue:
 		if t == nil {
@@ -3767,7 +3767,7 @@ func (c *Checker) checkAllCodePathsInNonVoidFunctionReturnOrThrow(fn *ast.Node, 
 
 func (c *Checker) isUnwrappedReturnTypeUndefinedVoidOrAny(fn *ast.Node, returnType *Type) bool {
 	t := c.unwrapReturnType(returnType, ast.GetFunctionFlags(fn))
-	return t != nil && (c.maybeTypeOfKind(t, TypeFlagsVoid) || t.flags&(TypeFlagsAny|TypeFlagsUndefined) != 0)
+	return t != nil && (c.maybeTypeOfKind(t, TypeFlagsVoid) || t.flags&(TypeFlagsAny|TypeFlagsUndefined) != 0 || c.isTypeAssignableTo(c.nullType, t))
 }
 
 func (c *Checker) checkBlock(node *ast.Node) {
@@ -4060,6 +4060,9 @@ func (c *Checker) checkForOfStatement(node *ast.Node) {
 		}
 	}
 	c.checkSourceElement(data.Statement)
+	if data.ElseBlock != nil {
+		c.checkSourceElement(data.ElseBlock)
+	}
 	if node.Locals() != nil {
 		c.registerForUnusedIdentifiersCheck(node)
 	}
@@ -4142,18 +4145,18 @@ func (c *Checker) checkReturnExpression(container *ast.Node, unwrappedReturnType
 }
 
 func (c *Checker) checkWithStatement(node *ast.Node) {
-	if !c.checkGrammarStatementInAmbientContext(node) {
-		if node.Flags&ast.NodeFlagsAwaitContext != 0 {
-			c.grammarErrorOnFirstToken(node, diagnostics.X_with_statements_are_not_allowed_in_an_async_function_block)
+	// Python `with` binds the context manager's enter value. It does not open a
+	// JavaScript `with` scope, and `async with` is legal inside `async def`.
+	c.checkGrammarStatementInAmbientContext(node)
+	data := node.AsWithStatement()
+	managerType := c.checkExpression(data.Expression)
+	_, callDiagnostics := c.GetPythonContextManagerType(managerType, data.AwaitModifier != nil)
+	for _, diagnostic := range callDiagnostics {
+		if diagnostic.Message != "" {
+			c.error(data.Expression, diagnostics.NewAdHocMessage(diagnostic.Message))
 		}
 	}
-	c.checkExpression(node.Expression())
-	sourceFile := ast.GetSourceFileOfNode(node)
-	if !c.hasParseDiagnostics(sourceFile) {
-		start := scanner.SkipTrivia(sourceFile.Text(), node.Pos())
-		end := node.Statement().Pos()
-		c.grammarErrorAtPos(sourceFile.AsNode(), start, end-start, diagnostics.The_with_statement_is_not_supported_All_symbols_in_a_with_block_will_have_type_any)
-	}
+	c.checkSourceElement(data.Statement)
 }
 
 func (c *Checker) checkSwitchStatement(node *ast.Node) {
@@ -4173,7 +4176,7 @@ func (c *Checker) checkSwitchStatement(node *ast.Node) {
 				hasDuplicateDefaultClause = true
 			}
 		}
-		if ast.IsCaseClause(clause) {
+		if ast.IsCaseClause(clause) && !isPythonMatchPattern(clause.Expression()) {
 			caseType := c.checkExpression(clause.Expression())
 			if !c.isTypeEqualityComparableTo(expressionType, caseType) {
 				// expressionType is not comparable to caseType, try the reversed check and report errors if it fails
@@ -4856,9 +4859,15 @@ func (c *Checker) checkIndexConstraints(t *Type, symbol *ast.Symbol, isStaticInd
 		return
 	}
 	for _, prop := range c.getPropertiesOfObjectType(t) {
-		if !(isStaticIndex && prop.Flags&ast.SymbolFlagsPrototype != 0) {
-			c.checkIndexConstraintForProperty(t, prop, c.getLiteralTypeFromProperty(prop, TypeFlagsStringOrNumberLiteralOrUnique, true /*includeNonPublic*/), c.getNonMissingTypeOfSymbol(prop))
+		if isStaticIndex && prop.Flags&ast.SymbolFlagsPrototype != 0 {
+			continue
 		}
+		if c.IsPythonPrivateAttributeName(prop.Name) || c.IsPythonProtocolProperty(t, prop.Name) {
+			continue
+		}
+		// Attributes live in *<"name">, not the item-key namespace. A quoted
+		// `"name": int` item does not constrain the `name` attribute.
+		c.checkIndexConstraintForProperty(t, prop, c.NewPythonAttributeKeyType(c.getStringLiteralType(prop.Name)), c.getNonMissingTypeOfSymbol(prop))
 	}
 	typeDeclaration := symbol.ValueDeclaration
 	if typeDeclaration != nil && ast.IsClassLike(typeDeclaration) {
@@ -6249,6 +6258,12 @@ func (c *Checker) getIteratedTypeOrElementType(use IterationUse, inputType *Type
 	}
 	iterableExists := c.getGlobalIterableType() != c.emptyGenericType
 	possibleOutOfBounds := c.compilerOptions.NoUncheckedIndexedAccess == core.TSTrue && use&IterationUsePossiblyOutOfBounds != 0
+	if pythonType := c.pythonIterationElementType(use, inputType); pythonType != nil {
+		if possibleOutOfBounds {
+			return c.includeUndefinedInIndexSignature(pythonType)
+		}
+		return pythonType
+	}
 	if iterableExists || allowAsyncIterables {
 		iterationTypes := c.getIterationTypesOfIterable(inputType, use, core.IfElse(iterableExists, errorNode, nil))
 		if checkAssignability {
@@ -7898,6 +7913,14 @@ func (c *Checker) checkExpressionWorker(node *ast.Node, checkMode CheckMode) *Ty
 		return c.checkRegularExpressionLiteral(node)
 	case ast.KindArrayLiteralExpression:
 		return c.checkArrayLiteral(node, checkMode)
+	case ast.KindTupleExpression:
+		return c.checkTupleExpression(node, checkMode)
+	case ast.KindSetExpression:
+		return c.checkSetExpression(node, checkMode)
+	case ast.KindDictExpression:
+		return c.checkDictExpression(node, checkMode)
+	case ast.KindKeywordArgument:
+		return c.checkExpressionEx(node.AsKeywordArgument().Expression, checkMode)
 	case ast.KindObjectLiteralExpression:
 		return c.checkObjectLiteral(node, checkMode)
 	case ast.KindPropertyAccessExpression:
@@ -8637,6 +8660,7 @@ func (c *Checker) resolveCallExpression(node *ast.Node, candidatesOutArray *[]*S
 	} else {
 		callChainFlags = SignatureFlagsNone
 	}
+	_ = callChainFlags
 	funcType = c.checkNonNullTypeWithReporter(funcType, node.Expression(), (*Checker).reportCannotInvokePossiblyNullOrUndefinedError)
 	if funcType == c.silentNeverType {
 		return c.silentNeverSignature
@@ -8670,7 +8694,7 @@ func (c *Checker) resolveCallExpression(node *ast.Node, candidatesOutArray *[]*S
 		if numConstructSignatures != 0 {
 			// Construction is a call: `C(...)` is TypeScript's `new C(...)`.
 			constructSignatures := c.getSignaturesOfType(apparentType, SignatureKindConstruct)
-			return c.resolveCall(node, constructSignatures, candidatesOutArray, checkMode, SignatureFlagsNone, nil)
+			return c.resolvePythonCall(node, constructSignatures, checkMode)
 		} else {
 			var relatedInformation *ast.Diagnostic
 			if len(node.Arguments()) == 1 {
@@ -8700,7 +8724,7 @@ func (c *Checker) resolveCallExpression(node *ast.Node, candidatesOutArray *[]*S
 		c.skippedGenericFunction(node, checkMode)
 		return c.resolvingSignature
 	}
-	return c.resolveCall(node, callSignatures, candidatesOutArray, checkMode, callChainFlags, nil)
+	return c.resolvePythonCall(node, callSignatures, checkMode)
 }
 
 func (c *Checker) resolveNewExpression(node *ast.Node, candidatesOutArray *[]*Signature, checkMode CheckMode) *Signature {
@@ -11168,6 +11192,11 @@ func (c *Checker) checkYieldExpression(node *ast.Node) *Type {
 	}
 	if node.AsYieldExpression().AsteriskToken != nil {
 		use := core.IfElse(isAsync, IterationUseAsyncYieldStar, IterationUseYieldStar)
+		// `yield from` a Python iterable does not look up `[Symbol.iterator]`.
+		// A list's delegated iteration completes as None.
+		if c.pythonIterationElementType(use, yieldExpressionType) != nil {
+			return c.nullType
+		}
 		return core.OrElse(c.getIterationTypeOfIterable(use, IterationTypeKindReturn, yieldExpressionType, node.Expression()), c.anyType)
 	}
 	if returnType != nil {
@@ -11505,6 +11534,12 @@ func (c *Checker) checkPropertyAccessExpressionOrQualifiedName(node *ast.Node, l
 			indexInfo = c.getApplicableIndexInfoForName(apparentType, right.Text())
 		}
 		if indexInfo == nil {
+			if method := c.pythonMappingMethodType(apparentType, right.Text()); method != nil {
+				return method
+			}
+			if surface := c.pythonObjectSurfaceType(right.Text()); surface != nil {
+				return surface
+			}
 			isUncheckedJS := c.isUncheckedJSSuggestion(node, leftType.symbol, true /*excludeClasses*/)
 			if !isUncheckedJS && c.isJSLiteralType(leftType) {
 				return c.anyType
@@ -11560,6 +11595,7 @@ func (c *Checker) checkPropertyAccessExpressionOrQualifiedName(node *ast.Node, l
 		default:
 			propType = c.getTypeOfSymbol(prop)
 		}
+		propType = c.pythonBoundMethodAccessType(apparentType, prop, propType)
 	}
 	return c.getFlowTypeOfAccessExpression(node, prop, propType, right, checkMode)
 }
@@ -12528,7 +12564,7 @@ func (c *Checker) checkBinaryLikeExpression(left *ast.Node, operatorToken *ast.N
 		// must be comparable, narrowing is by reference or literal identity.
 		operator = ast.KindEqualsEqualsEqualsToken
 	}
-	if operator == ast.KindEqualsToken && (left.Kind == ast.KindObjectLiteralExpression || left.Kind == ast.KindArrayLiteralExpression) {
+	if operator == ast.KindEqualsToken && (left.Kind == ast.KindObjectLiteralExpression || left.Kind == ast.KindArrayLiteralExpression || left.Kind == ast.KindTupleExpression) {
 		return c.checkDestructuringAssignment(left, c.checkExpressionEx(right, checkMode), checkMode, right.Kind == ast.KindThisKeyword)
 	}
 	leftType := c.checkExpressionEx(left, checkMode)
@@ -12637,6 +12673,9 @@ func (c *Checker) checkBinaryLikeExpression(left *ast.Node, operatorToken *ast.N
 			return resultType
 		}
 		if resultType == nil {
+			if pythonResult, diagnostics := c.ResolvePythonBinaryOperation("+", leftType, rightType); len(diagnostics) == 0 {
+				return pythonResult
+			}
 			// Types that have a reasonably good chance of being a valid operand type.
 			// If both types have an awaited type of one of these, we'll assume the user
 			// might be missing an await without doing an exhaustive check that inserting
@@ -12773,7 +12812,7 @@ func (c *Checker) checkDestructuringAssignment(node *ast.Node, sourceType *Type,
 	if ast.IsObjectLiteralExpression(target) {
 		return c.checkObjectLiteralAssignment(target, sourceType, rightIsThis)
 	}
-	if ast.IsArrayLiteralExpression(target) {
+	if ast.IsArrayLiteralExpression(target) || ast.IsTupleExpression(target) {
 		return c.checkArrayLiteralAssignment(target, sourceType, checkMode)
 	}
 	return c.checkReferenceAssignment(target, sourceType, checkMode)
@@ -13835,8 +13874,8 @@ func (c *Checker) isConstContext(node *ast.Node) bool {
 	return ast.IsConstAssertion(parent) ||
 		c.isInlineImportAttributes(node) ||
 		c.isValidConstAssertionArgument(node) && c.isConstTypeVariable(c.getContextualType(node, ContextFlagsNone), 0) ||
-		(ast.IsParenthesizedExpression(parent) || ast.IsArrayLiteralExpression(parent) || ast.IsSpreadElement(parent)) && c.isConstContext(parent) ||
-		(ast.IsPropertyAssignment(parent) || ast.IsShorthandPropertyAssignment(parent) || ast.IsTemplateSpan(parent)) && c.isConstContext(parent.Parent)
+		(ast.IsParenthesizedExpression(parent) || ast.IsArrayLiteralExpression(parent) || ast.IsTupleExpression(parent) || ast.IsSetExpression(parent) || ast.IsSpreadElement(parent)) && c.isConstContext(parent) ||
+		(ast.IsPropertyAssignment(parent) || ast.IsShorthandPropertyAssignment(parent) || ast.IsTemplateSpan(parent) || ast.IsDictEntry(parent) || ast.IsKeywordArgument(parent)) && c.isConstContext(parent.Parent)
 }
 
 func (c *Checker) isInlineImportAttributes(node *ast.Node) bool {
@@ -13858,7 +13897,8 @@ func (c *Checker) isInlineImportAttributes(node *ast.Node) bool {
 func (c *Checker) isValidConstAssertionArgument(node *ast.Node) bool {
 	switch node.Kind {
 	case ast.KindStringLiteral, ast.KindNoSubstitutionTemplateLiteral, ast.KindNumericLiteral, ast.KindBigIntLiteral, ast.KindTrueKeyword,
-		ast.KindFalseKeyword, ast.KindArrayLiteralExpression, ast.KindObjectLiteralExpression, ast.KindTemplateExpression:
+		ast.KindFalseKeyword, ast.KindArrayLiteralExpression, ast.KindObjectLiteralExpression, ast.KindTemplateExpression,
+		ast.KindTupleExpression, ast.KindDictExpression, ast.KindSetExpression:
 		return true
 	case ast.KindParenthesizedExpression:
 		return c.isValidConstAssertionArgument(node.Expression())
@@ -16949,6 +16989,8 @@ func (c *Checker) getTypeOfVariableOrParameterOrPropertyWorker(symbol *ast.Symbo
 		}
 	case ast.KindBinaryExpression:
 		result = c.getPythonAssignmentDeclarationType(symbol)
+	case ast.KindIdentifier:
+		result = c.pythonPatternCaptureType(declaration)
 	case ast.KindCallExpression:
 		result = c.getWidenedTypeForAssignmentDeclaration(symbol)
 	case ast.KindJsxAttribute:
@@ -16996,6 +17038,8 @@ func (c *Checker) getTypeForVariableLikeDeclaration(declaration *ast.Node, inclu
 			// [Symbol.iterator] or next). This may be because we accessed properties from anyType,
 			// or it may have led to an error inside getElementTypeOfIterable.
 			return c.checkRightHandSideOfForOf(grandParent)
+		case ast.KindWithStatement:
+			return c.pythonWithTargetType(grandParent)
 		}
 	} else if ast.IsBindingElement(declaration) {
 		return c.getTypeForBindingElement(declaration)
@@ -17005,6 +17049,9 @@ func (c *Checker) getTypeForVariableLikeDeclaration(declaration *ast.Node, inclu
 	// Use type from type annotation if one is present
 	declaredType := c.tryGetTypeFromTypeNode(declaration)
 	if ast.IsCatchClauseVariableDeclarationOrBindingElement(declaration) {
+		if caught := c.pythonCaughtExceptionType(declaration); caught != nil {
+			return caught
+		}
 		if declaredType != nil {
 			// If the catch clause is explicitly annotated with any or unknown, accept it, otherwise error.
 			if declaredType.flags&TypeFlagsAnyOrUnknown != 0 {
@@ -19627,6 +19674,7 @@ func (c *Checker) resolveBaseTypesOfClass(t *Type) {
 			if !c.isErrorType(reduced) && c.isValidBaseType(reduced) && t != reduced && !c.hasBaseType(reduced, t) {
 				t.AsInterfaceType().resolvedBaseTypes = []*Type{reduced}
 			}
+			c.appendPythonExtraClassBases(t)
 			return
 		}
 	}
@@ -19674,6 +19722,7 @@ func (c *Checker) resolveBaseTypesOfClass(t *Type) {
 		return
 	}
 	t.AsInterfaceType().resolvedBaseTypes = []*Type{reducedBaseType}
+	c.appendPythonExtraClassBases(t)
 }
 
 func getBaseTypeNodeOfClass(t *Type) *ast.Node {
@@ -20035,6 +20084,9 @@ func (c *Checker) resolveDeclaredMembers(t *Type) *InterfaceType {
 		d.declaredMembersResolved = true
 		d.declaredMembers = members
 		d.declaredCallSignatures = c.getSignaturesOfSymbol(d.declaredMembers[ast.InternalSymbolNameCall])
+		if len(d.declaredCallSignatures) == 0 {
+			d.declaredCallSignatures = c.pythonCallSignatures(t)
+		}
 		d.declaredConstructSignatures = c.getSignaturesOfSymbol(d.declaredMembers[ast.InternalSymbolNameNew])
 		d.declaredIndexInfos = c.getIndexInfosOfSymbol(t.symbol)
 	}
@@ -20073,6 +20125,7 @@ func (c *Checker) getIndexInfosOfIndexSymbol(indexSymbol *ast.Symbol, siblingSym
 					forEachType(c.getTypeFromTypeNode(typeNode), func(keyType *Type) {
 						if c.isValidIndexKeyType(keyType) && findIndexInfo(indexInfos, keyType) == nil {
 							indexInfo := c.newIndexInfo(keyType, valueType, ast.HasModifier(declaration, ast.ModifierFlagsReadonly), declaration, nil)
+							indexInfo.pythonOptional = pythonDeclarationIsOptional(declaration)
 							indexInfos = append(indexInfos, indexInfo)
 						}
 					})
@@ -20204,10 +20257,10 @@ func (c *Checker) isNumericComputedName(name *ast.Node) bool {
 }
 
 func (c *Checker) isValidIndexKeyType(t *Type) bool {
-	return t.flags&(TypeFlagsString|TypeFlagsNumber|TypeFlagsBigInt|TypeFlagsESSymbol) != 0 ||
-		c.isPythonAttributeKeyType(t) ||
-		c.isPatternLiteralType(t) ||
-		t.flags&TypeFlagsIntersection != 0 && !c.isGenericType(t) && core.Some(t.Types(), c.isValidIndexKeyType)
+	// Python item keys are not JavaScript property names. A quoted member
+	// `"nickname": str`, `None: int`, a type parameter, or a user type are all
+	// legal keys. `never` contributes no signature.
+	return t != nil && t.flags&TypeFlagsNever == 0
 }
 
 func (c *Checker) findIndexInfo(indexInfos []*IndexInfo, keyType *Type) *IndexInfo {
@@ -20468,6 +20521,13 @@ func (c *Checker) getReturnTypeOfSignature(sig *Signature) *Type {
 				t = c.getReturnTypeFromBody(sig.declaration, CheckModeNormal)
 			} else {
 				t = c.anyType
+			}
+		} else if sig.declaration != nil {
+			// `async def f() -> T` annotates the awaited result. The call type is Awaitable<T>.
+			// An async generator's annotation is the iterator itself (`AsyncIterator<Y>`).
+			flags := ast.GetFunctionFlags(sig.declaration)
+			if flags&ast.FunctionFlagsAsync != 0 && flags&ast.FunctionFlagsGenerator == 0 {
+				t = c.pythonAwaitableType(t)
 			}
 		}
 	}
@@ -20782,8 +20842,13 @@ func (c *Checker) checkAndAggregateYieldOperandTypes(fn *ast.Node, checkMode Che
 		yieldTypes = core.AppendIfUnique(yieldTypes, c.getYieldedTypeOfYieldExpression(yieldExpr, yieldExprType, c.anyType, isAsync))
 		var nextType *Type
 		if yieldExpr.AsYieldExpression().AsteriskToken != nil {
-			iterationTypes := c.getIterationTypesOfIterable(yieldExprType, core.IfElse(isAsync, IterationUseAsyncYieldStar, IterationUseYieldStar), yieldExpr.Expression())
-			nextType = iterationTypes.nextType
+			use := core.IfElse(isAsync, IterationUseAsyncYieldStar, IterationUseYieldStar)
+			// Python iteration has no `[Symbol.iterator]`. `__next__` takes no sent value;
+			// `send` belongs to generators and is not this slot.
+			if c.pythonIterationElementType(use, yieldExprType) == nil {
+				iterationTypes := c.getIterationTypesOfIterable(yieldExprType, use, yieldExpr.Expression())
+				nextType = iterationTypes.nextType
+			}
 		} else {
 			nextType = c.getContextualType(yieldExpr, ContextFlagsNone)
 		}
@@ -20849,6 +20914,9 @@ func (c *Checker) unwrapReturnType(returnType *Type, functionFlags ast.FunctionF
 		return returnIterationType
 	}
 	if isAsync {
+		if result := c.pythonAwaitedResult(returnType); result != nil {
+			return result
+		}
 		return core.OrElse(c.getAwaitedTypeNoAlias(returnType), c.errorType)
 	}
 	return returnType
@@ -20887,6 +20955,12 @@ func (c *Checker) createGeneratorType(yieldType *Type, returnType *Type, nextTyp
 	yieldType = core.OrElse(resolver.resolveIterationType(yieldType, nil /*errorNode*/), c.unknownType)
 	returnType = core.OrElse(resolver.resolveIterationType(returnType, nil /*errorNode*/), c.unknownType)
 	if globalGeneratorType == c.emptyGenericType {
+		// No TS AsyncGenerator in this program. An async generator is AsyncIterator<Y>.
+		if isAsyncGenerator {
+			if asyncIterator := c.getGlobalType("AsyncIterator", 1, false /*reportErrors*/); asyncIterator != c.emptyGenericType {
+				return c.createTypeReference(asyncIterator, []*Type{yieldType})
+			}
+		}
 		// Fall back to the global IterableIterator type.
 		globalIterableIteratorType := resolver.getGlobalIterableIteratorType()
 		if globalIterableIteratorType != c.emptyGenericType {
@@ -21164,12 +21238,28 @@ func (c *Checker) resolveAnonymousTypeMembers(t *Type) {
 	if symbol.Flags&ast.SymbolFlagsClass != 0 {
 		classType := c.getDeclaredTypeOfClassOrInterface(symbol)
 		baseConstructorType := c.getBaseConstructorTypeOfClass(classType)
+		cloned := false
 		if baseConstructorType.flags&(TypeFlagsObject|TypeFlagsIntersection|TypeFlagsTypeVariable) != 0 {
 			members = maps.Clone(members)
+			cloned = true
 			c.addInheritedMembers(members, c.getPropertiesOfType(baseConstructorType))
-			c.setStructuredTypeMembers(t, members, nil, nil, nil)
 		} else if baseConstructorType == c.anyType {
 			baseConstructorIndexInfo = c.anyBaseTypeIndexInfo
+		}
+		// A class-body attribute is on the instance and on the class value.
+		// Methods stay on the instance; `@classmethod` / `@staticmethod` are separate.
+		for _, prop := range c.getPropertiesOfType(classType) {
+			if !pythonClassAttributeOnClassValue(prop) || members[prop.Name] != nil {
+				continue
+			}
+			if !cloned {
+				members = maps.Clone(members)
+				cloned = true
+			}
+			members[prop.Name] = prop
+		}
+		if cloned {
+			c.setStructuredTypeMembers(t, members, nil, nil, nil)
 		}
 	}
 	indexSymbol := members[ast.InternalSymbolNameIndex]
@@ -21387,9 +21477,7 @@ func (c *Checker) resolveMappedTypeMembers(t *Type) {
 	shouldLinkPropDeclarations := c.getMappedTypeNameTypeKind(mappedType) != MappedTypeNameTypeKindRemapping
 	templateType := c.getTemplateTypeFromMappedType(mappedType)
 	modifiersType := c.getApparentType(c.getModifiersTypeFromMappedType(t))
-	// The 'T' in 'keyof T'
 	templateModifiers := getMappedTypeModifiers(t)
-	include := TypeFlagsStringOrNumberLiteralOrUnique
 	addMemberForKeyTypeWorker := func(keyType *Type, propNameType *Type) {
 		// A remapped never key contributes no member. The native property and
 		// index-key predicates already exclude it; Python's wider key domain
@@ -21397,61 +21485,8 @@ func (c *Checker) resolveMappedTypeMembers(t *Type) {
 		if propNameType.flags&TypeFlagsNever != 0 {
 			return
 		}
-		// Ordinary TypeScript mapped types keep the exact upstream member
-		// materialization rules. Only mapped types lowered by the Python
-		// frontend interpret a generated key as either an item key or *<Name>.
-		if !mappedType.AsMappedType().synthetic {
-			if isTypeUsableAsPropertyName(propNameType) {
-				propName := getPropertyNameFromType(propNameType)
-				if existingProp := members[propName]; existingProp != nil {
-					valueLinks := c.valueSymbolLinks.Get(existingProp)
-					valueLinks.nameType = c.getUnionType([]*Type{valueLinks.nameType, propNameType})
-					mappedLinks := c.mappedSymbolLinks.Get(existingProp)
-					mappedLinks.keyType = c.getUnionType([]*Type{mappedLinks.keyType, keyType})
-				} else {
-					var modifiersProp *ast.Symbol
-					if isTypeUsableAsPropertyName(keyType) {
-						modifiersProp = c.getPropertyOfType(modifiersType, getPropertyNameFromType(keyType))
-					}
-					isOptional := templateModifiers&MappedTypeModifiersIncludeOptional != 0 || templateModifiers&MappedTypeModifiersExcludeOptional == 0 && modifiersProp != nil && modifiersProp.Flags&ast.SymbolFlagsOptional != 0
-					isReadonly := templateModifiers&MappedTypeModifiersIncludeReadonly != 0 || templateModifiers&MappedTypeModifiersExcludeReadonly == 0 && modifiersProp != nil && c.isReadonlySymbol(modifiersProp)
-					stripOptional := c.strictNullChecks && !isOptional && modifiersProp != nil && modifiersProp.Flags&ast.SymbolFlagsOptional != 0
-					var lateFlag ast.CheckFlags
-					if modifiersProp != nil {
-						lateFlag = modifiersProp.CheckFlags & ast.CheckFlagsLate
-					}
-					prop := c.newSymbol(ast.SymbolFlagsProperty|core.IfElse(isOptional, ast.SymbolFlagsOptional, 0), propName)
-					prop.CheckFlags = lateFlag | ast.CheckFlagsMapped | core.IfElse(isReadonly, ast.CheckFlagsReadonly, 0) | core.IfElse(stripOptional, ast.CheckFlagsStripOptional, 0)
-					valueLinks := c.valueSymbolLinks.Get(prop)
-					valueLinks.containingType = t
-					valueLinks.nameType = propNameType
-					mappedLinks := c.mappedSymbolLinks.Get(prop)
-					mappedLinks.keyType = keyType
-					if modifiersProp != nil {
-						mappedLinks.syntheticOrigin = modifiersProp
-						if shouldLinkPropDeclarations {
-							prop.Declarations = modifiersProp.Declarations
-						}
-					}
-					members[propName] = prop
-				}
-			} else if c.isValidIndexKeyType(propNameType) || propNameType.flags&(TypeFlagsAny|TypeFlagsEnum) != 0 {
-				indexKeyType := propNameType
-				switch {
-				case propNameType.flags&(TypeFlagsAny|TypeFlagsString) != 0:
-					indexKeyType = c.stringType
-				case propNameType.flags&(TypeFlagsNumber|TypeFlagsEnum) != 0:
-					indexKeyType = c.numberType
-				}
-				propType := c.instantiateType(templateType, appendTypeMapping(t.AsMappedType().mapper, typeParameter, keyType))
-				modifiersIndexInfo := c.getApplicableIndexInfo(modifiersType, propNameType)
-				isReadonly := templateModifiers&MappedTypeModifiersIncludeReadonly != 0 || templateModifiers&MappedTypeModifiersExcludeReadonly == 0 && modifiersIndexInfo != nil && modifiersIndexInfo.isReadonly
-				indexInfo := c.newIndexInfo(indexKeyType, propType, isReadonly, nil, nil)
-				indexInfos = c.appendIndexInfo(indexInfos, indexInfo, true /*union*/)
-			}
-			return
-		}
-
+		// Generated keys choose the item vs attribute facet. String-literal
+		// keys stay items; they are not JS properties.
 		attributeNameType, isAttribute := c.GetPythonAttributeNameType(propNameType)
 		if !isAttribute {
 			propType := c.instantiateType(templateType, appendTypeMapping(t.AsMappedType().mapper, typeParameter, keyType))
@@ -21517,17 +21552,11 @@ func (c *Checker) resolveMappedTypeMembers(t *Type) {
 			addMemberForKeyTypeWorker(keyType, t)
 		})
 	}
-	if c.isMappedTypeWithKeyofConstraintDeclaration(t) {
-		// We have a { [P in keyof T]: X }
-		c.forEachMappedTypePropertyKeyTypeAndIndexSignatureKeyType(modifiersType, include, false /*stringsOnly*/, addMemberForKeyType)
-	} else {
-		forEachType(c.getLowerBoundOfKeyType(constraintType), addMemberForKeyType)
-	}
+	// keyof already resolved through GetItemKeyType. Do not rewrite those keys
+	// as JS property names.
+	forEachType(c.getLowerBoundOfKeyType(constraintType), addMemberForKeyType)
 	c.setStructuredTypeMembers(t, members, nil, nil, indexInfos)
-	if mappedType.AsMappedType().synthetic {
-		structured := t.AsStructuredType()
-		structured.separateAttributeAndItem = true
-	}
+	t.AsStructuredType().separateAttributeAndItem = true
 }
 
 func (c *Checker) getTypeOfMappedSymbol(symbol *ast.Symbol) *Type {
@@ -21541,13 +21570,7 @@ func (c *Checker) getTypeOfMappedSymbol(symbol *ast.Symbol) *Type {
 		templateType := c.getTemplateTypeFromMappedType(core.OrElse(mappedType.AsMappedType().target, mappedType))
 		mapper := appendTypeMapping(mappedType.AsMappedType().mapper, c.getTypeParameterFromMappedType(mappedType), c.mappedSymbolLinks.Get(symbol).keyType)
 		propType := c.instantiateType(templateType, mapper)
-		// When creating an optional property in strictNullChecks mode, if 'undefined' isn't assignable to the
-		// type, we include 'undefined' in the type. Similarly, when creating a non-optional property in strictNullChecks
-		// mode, if the underlying property is optional we remove 'undefined' from the type.
-		switch {
-		case c.strictNullChecks && !mappedType.AsMappedType().synthetic && symbol.Flags&ast.SymbolFlagsOptional != 0 && !c.maybeTypeOfKind(propType, TypeFlagsUndefined|TypeFlagsVoid):
-			propType = c.getOptionalType(propType, true /*isProperty*/)
-		case symbol.CheckFlags&ast.CheckFlagsStripOptional != 0:
+		if symbol.CheckFlags&ast.CheckFlagsStripOptional != 0 {
 			propType = c.removeMissingOrUndefinedType(propType)
 		}
 		if c.popTypeResolution() {
@@ -21570,11 +21593,14 @@ func (c *Checker) getTypeOfMappedSymbol(symbol *ast.Symbol) *Type {
 func (c *Checker) getLowerBoundOfKeyType(t *Type) *Type {
 	switch {
 	case t.flags&TypeFlagsIndex != 0:
-		t := c.getApparentType(t.AsIndexType().target)
-		if c.isGenericTupleType(t) {
-			return c.getKnownKeysOfTupleType(t)
+		target := c.getApparentType(t.AsIndexType().target)
+		if c.isGenericTupleType(target) {
+			return c.getKnownKeysOfTupleType(target)
 		}
-		return c.getIndexType(t)
+		if t.AsIndexType().pythonKeys {
+			return c.GetItemKeyType(target)
+		}
+		return c.getIndexType(target)
 	case t.flags&TypeFlagsConditional != 0:
 		if t.AsConditionalType().root.isDistributive {
 			checkType := t.AsConditionalType().checkType
@@ -23352,7 +23378,8 @@ func (c *Checker) getTemplateTypeFromMappedType(t *Type) *Type {
 	m := t.AsMappedType()
 	if m.templateType == nil {
 		if m.declaration != nil && m.declaration.Type != nil {
-			m.templateType = c.instantiateType(c.addOptionalityEx(c.getTypeFromTypeNode(m.declaration.Type) /*isProperty*/, true, getMappedTypeModifiers(t)&MappedTypeModifiersIncludeOptional != 0), m.mapper)
+			// optional is presence metadata, not T | undefined.
+			m.templateType = c.instantiateType(c.getTypeFromTypeNode(m.declaration.Type), m.mapper)
 		} else {
 			m.templateType = c.errorType
 		}
@@ -23600,6 +23627,9 @@ func (c *Checker) getTypeFromTypeLiteralOrFunctionOrConstructorTypeNode(node *as
 		} else {
 			t := c.newObjectType(ObjectFlagsAnonymous, node.Symbol())
 			t.alias = alias
+			if node.Kind == ast.KindTypeLiteral {
+				t.AsStructuredType().separateAttributeAndItem = true
+			}
 			links.resolvedType = t
 		}
 	}
@@ -23667,6 +23697,9 @@ func (c *Checker) getTypeFromTypeReference(node *ast.Node) *Type {
 		// handle LS queries on the `const` in `x as const` by resolving to the type of `x`
 		if isConstTypeReference(node) && ast.IsAssertionExpression(node.Parent) {
 			links.resolvedType = c.checkExpressionCached(node.Parent.Expression())
+		} else if t := c.pythonQualifiedAttributeTypeNode(node); t != nil {
+			// `Registry.version` in type position is the attribute type, not a namespace access.
+			links.resolvedType = t
 		} else if t := c.getIntendedTypeFromJSDocTypeReference(node); t != nil {
 			links.resolvedType = t
 		} else {
@@ -24930,6 +24963,7 @@ func (c *Checker) getTypeFromMappedTypeNode(node *ast.Node) *Type {
 	if links.resolvedType == nil {
 		t := c.newObjectType(ObjectFlagsMapped, node.Symbol())
 		t.AsMappedType().declaration = node.AsMappedTypeNode()
+		t.AsStructuredType().separateAttributeAndItem = true
 		t.alias = c.getAliasForTypeNode(node)
 		links.resolvedType = t
 		// Eagerly resolve the constraint type which forces an error if the constraint type circularly
@@ -30057,6 +30091,10 @@ func (c *Checker) getContextualType(node *ast.Node, contextFlags ContextFlags) *
 	case ast.KindPropertyAssignment,
 		ast.KindShorthandPropertyAssignment:
 		return c.getContextualTypeForObjectLiteralElement(parent, contextFlags)
+	case ast.KindDictEntry:
+		if parent.AsDictEntry().Value == node {
+			return c.pythonDictEntryContextualType(parent, contextFlags)
+		}
 	case ast.KindSpreadAssignment:
 		return c.getContextualType(parent.Parent, contextFlags)
 	case ast.KindArrayLiteralExpression:

@@ -625,7 +625,9 @@ func (c *Checker) getPythonSequenceMetadata(t *Type) (*Type, PythonSequenceKind)
 	t = c.getReducedApparentType(t)
 	if t.flags&TypeFlagsObject != 0 {
 		structured := c.resolveStructuredTypeMembers(t)
-		return structured.pythonSequenceType, structured.pythonSequenceKind
+		if structured.pythonSequenceType != nil {
+			return structured.pythonSequenceType, structured.pythonSequenceKind
+		}
 	}
 	if t.flags&TypeFlagsIntersection != 0 {
 		for _, part := range t.Types() {
@@ -633,6 +635,20 @@ func (c *Checker) getPythonSequenceMetadata(t *Type) (*Type, PythonSequenceKind)
 				return native, kind
 			}
 		}
+	}
+	// `[]T` / `[A, B]` / `()T` / `(A, B)` resolve to native Array/Tuple types.
+	// Python indexes them with int (bigint), not JS number; do not coerce.
+	if c.isArrayType(t) {
+		if c.isReadonlyArrayType(t) {
+			return t, PythonSequenceTuple
+		}
+		return t, PythonSequenceList
+	}
+	if isTupleType(t) {
+		if t.TargetTupleType().readonly {
+			return t, PythonSequenceTuple
+		}
+		return t, PythonSequenceList
 	}
 	return nil, PythonSequenceNone
 }
@@ -803,9 +819,19 @@ func (c *Checker) BoundPythonCallable(callable *Type) *Type {
 	}
 	var signatures []*Signature
 	for _, signature := range c.getSignaturesOfType(callable, SignatureKindCall) {
-		bound := c.SignatureWithoutReceiver(signature)
-		if predicate := c.getTypePredicateOfSignature(signature); predicate != nil && predicate.kind == TypePredicateKindAssertsIdentifier && predicate.parameterIndex == 0 {
-			bound.resolvedTypePredicate = c.newTypePredicate(TypePredicateKindAssertsThis, predicate.parameterName, -1, predicate.t)
+		var bound *Signature
+		if signature.thisParameter != nil {
+			// Native methods already store the receiver as thisParameter; dropping
+			// parameters[0] would drop the first real argument (name, not self).
+			bound = c.cloneSignature(signature)
+			bound.thisParameter = nil
+			bound.resolvedReturnType = c.getReturnTypeOfSignature(signature)
+			bound.resolvedTypePredicate = c.getTypePredicateOfSignature(signature)
+		} else {
+			bound = c.SignatureWithoutReceiver(signature)
+			if predicate := c.getTypePredicateOfSignature(signature); predicate != nil && predicate.kind == TypePredicateKindAssertsIdentifier && predicate.parameterIndex == 0 {
+				bound.resolvedTypePredicate = c.newTypePredicate(TypePredicateKindAssertsThis, predicate.parameterName, -1, predicate.t)
+			}
 		}
 		signatures = append(signatures, bound)
 	}

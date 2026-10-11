@@ -135,6 +135,66 @@ func (p *Parser) parseWithTarget() *ast.Node {
 	return p.parseBinaryExpressionOrHigher(precBitOr)
 }
 
+// isMatchStatement: `match` is a soft keyword. It opens a match statement when
+// the header ends in a colon (`match value:`), and stays a name in `match = 1`.
+func (p *Parser) isMatchStatement() bool {
+	p.nextToken()
+	depth := 0
+	for {
+		switch p.token {
+		case ast.KindEndOfFile, ast.KindNewlineToken, ast.KindDedentToken:
+			return false
+		case ast.KindEqualsToken, ast.KindColonEqualsToken:
+			if depth == 0 {
+				return false
+			}
+		case ast.KindOpenParenToken, ast.KindOpenBracketToken, ast.KindOpenBraceToken:
+			depth++
+		case ast.KindCloseParenToken, ast.KindCloseBracketToken, ast.KindCloseBraceToken:
+			if depth == 0 {
+				return false
+			}
+			depth--
+		case ast.KindColonToken:
+			return depth == 0
+		}
+		p.nextToken()
+	}
+}
+
+// parseMatchStatement parses `match subject: case pattern:`. The statement is a
+// SwitchStatement: each case pattern is the clause expression and the suite is
+// its statement list. Class, mapping and capture patterns share the expression
+// grammar (`User(name=nam)`, `{"name": name}`).
+func (p *Parser) parseMatchStatement() *ast.Node {
+	pos := p.nodePos()
+	p.nextToken() // match
+	subject := p.parseExpression()
+	p.parseExpected(ast.KindColonToken)
+	if p.token == ast.KindNewlineToken {
+		p.nextToken()
+	}
+	clausePos := p.nodePos()
+	var clauses []*ast.Node
+	if p.parseExpected(ast.KindIndentToken) {
+		for p.token == ast.KindCaseKeyword {
+			clauses = append(clauses, p.parseMatchCase())
+		}
+		p.parseExpected(ast.KindDedentToken)
+	}
+	list := p.newNodeList(core.NewTextRange(clausePos, p.nodePos()), clauses)
+	block := p.finishNode(p.factory.NewCaseBlock(list), clausePos)
+	return p.finishNode(p.factory.NewSwitchStatement(subject, block), pos)
+}
+
+func (p *Parser) parseMatchCase() *ast.Node {
+	pos := p.nodePos()
+	p.nextToken() // case
+	pattern := p.parseExpression()
+	statements := p.parseSuite((*Parser).parseStatement)
+	return p.finishNode(p.factory.NewCaseOrDefaultClause(ast.KindCaseClause, pattern, statements), pos)
+}
+
 // parseAsyncStatement: `async def`, `async for`, `async with`.
 func (p *Parser) parseAsyncStatement() *ast.Node {
 	pos := p.nodePos()

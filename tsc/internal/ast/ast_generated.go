@@ -1034,6 +1034,7 @@ type ForInOrOfStatement struct {
 	Initializer   *ForInitializer
 	Expression    *Expression
 	Statement     *Statement
+	ElseBlock     *BlockNode // Optional, Python for-else
 }
 
 func (f *NodeFactory) NewForInOrOfStatement(kind Kind, awaitModifier *AwaitKeyword, initializer *ForInitializer, expression *Expression, statement *Statement) *Node {
@@ -1056,15 +1057,26 @@ func (node *ForInOrOfStatement) ForEachChild(v Visitor) bool {
 	return visit(v, node.AwaitModifier) ||
 		visit(v, node.Initializer) ||
 		visit(v, node.Expression) ||
-		visit(v, node.Statement)
+		visit(v, node.Statement) ||
+		visit(v, node.ElseBlock)
 }
 
 func (node *ForInOrOfStatement) VisitEachChild(v *NodeVisitor) *Node {
-	return v.Factory.UpdateForInOrOfStatement(node, v.visitNode(node.AwaitModifier), v.visitNode(node.Initializer), v.visitNode(node.Expression), v.visitIterationBody(node.Statement))
+	updated := v.Factory.UpdateForInOrOfStatement(node, v.visitNode(node.AwaitModifier), v.visitNode(node.Initializer), v.visitNode(node.Expression), v.visitIterationBody(node.Statement))
+	elseBlock := v.visitNode(node.ElseBlock)
+	if updated != node.AsNode() || elseBlock != node.ElseBlock {
+		if updated == node.AsNode() {
+			updated = v.Factory.UpdateForInOrOfStatement(node, node.AwaitModifier, node.Initializer, node.Expression, node.Statement)
+		}
+		updated.AsForInOrOfStatement().ElseBlock = elseBlock
+	}
+	return updated
 }
 
 func (node *ForInOrOfStatement) Clone(f NodeFactoryCoercible) *Node {
-	return cloneNode(f.AsNodeFactory().NewForInOrOfStatement(node.Kind, node.AwaitModifier, node.Initializer, node.Expression, node.Statement), node.AsNode(), f.AsNodeFactory().hooks)
+	cloned := cloneNode(f.AsNodeFactory().NewForInOrOfStatement(node.Kind, node.AwaitModifier, node.Initializer, node.Expression, node.Statement), node.AsNode(), f.AsNodeFactory().hooks)
+	cloned.AsForInOrOfStatement().ElseBlock = node.ElseBlock
+	return cloned
 }
 
 func IsForInStatement(node *Node) bool {
