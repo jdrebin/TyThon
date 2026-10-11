@@ -885,6 +885,12 @@ func (b *Binder) bindJsxAttribute(node *ast.Node, symbolFlags ast.SymbolFlags, s
 }
 
 func (b *Binder) setExportContextFlag(node *ast.Node) {
+	// Python has no export keyword. A module file exports every top-level name,
+	// which is the ambient export context TypeScript already uses for .d.ts.
+	if node == b.file.AsNode() && b.file.LanguageVariant == core.LanguageVariantPython && ast.IsExternalModule(b.file) {
+		node.Flags |= ast.NodeFlagsExportContext
+		return
+	}
 	// A declaration source file or ambient module declaration that contains no export declarations (but possibly regular
 	// declarations with export modifiers) is an export context in which declarations are implicitly exported.
 	if node.Flags&ast.NodeFlagsAmbient != 0 && !b.hasExportDeclarations(node) {

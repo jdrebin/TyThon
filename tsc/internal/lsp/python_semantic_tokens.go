@@ -4,8 +4,8 @@ import (
 	"context"
 	"path/filepath"
 
-	"github.com/jdrebin/TyThon/tsc/internal/ast"
 	"github.com/jdrebin/TyThon/tsc/internal/lsp/lsproto"
+	"github.com/jdrebin/TyThon/tsc/internal/pyprogram"
 	pythonfrontend "github.com/jdrebin/TyThon/tsc/internal/python"
 )
 
@@ -44,16 +44,14 @@ func (s *pythonLanguageService) computeSemanticTokens(ctx context.Context, uri l
 	if !ok {
 		return lsproto.SemanticTokensOrNull{}, nil
 	}
-	program, done, err := s.buildPythonProgram(ctx, sources)
-	if err != nil {
-		return lsproto.SemanticTokensOrNull{}, err
+	inputs := make([]pythonfrontend.SourceInput, 0, len(sources))
+	for name, text := range sources {
+		inputs = append(inputs, pythonfrontend.SourceInput{FileName: name, Text: text})
 	}
-	defer done()
-	if len(program.Modules) == 0 {
-		return lsproto.SemanticTokensOrNull{}, nil
-	}
+	session := pyprogram.Open(ctx, inputs)
+	defer session.Close()
 	entries := []FrontendSemanticToken{}
-	for _, info := range program.SemanticIdentifiers(fileName, source) {
+	for _, info := range session.SemanticIdentifiers(fileName) {
 		start, startOK := pythonPositionAt(source, info.Range.Start, encoding)
 		end, endOK := pythonPositionAt(source, info.Range.End, encoding)
 		if !startOK || !endOK {
@@ -62,29 +60,8 @@ func (s *pythonLanguageService) computeSemanticTokens(ctx context.Context, uri l
 		if requested != nil && (start.Line < requested.Start.Line || start.Line == requested.Start.Line && start.Character < requested.Start.Character || end.Line > requested.End.Line || end.Line == requested.End.Line && end.Character > requested.End.Character) {
 			continue
 		}
-		kind := ast.KindUnknown
-		switch info.Kind {
-		case pythonfrontend.QuickInfoVariable:
-			kind = ast.KindVariableDeclaration
-		case pythonfrontend.QuickInfoParameter:
-			kind = ast.KindParameter
-		case pythonfrontend.QuickInfoProperty:
-			kind = ast.KindPropertyDeclaration
-		case pythonfrontend.QuickInfoFunction:
-			kind = ast.KindFunctionDeclaration
-		case pythonfrontend.QuickInfoMethod:
-			kind = ast.KindMethodDeclaration
-		case pythonfrontend.QuickInfoClass:
-			kind = ast.KindClassDeclaration
-		case pythonfrontend.QuickInfoInterface:
-			kind = ast.KindInterfaceDeclaration
-		case pythonfrontend.QuickInfoType, pythonfrontend.QuickInfoTypeFunction:
-			kind = ast.KindTypeAliasDeclaration
-		case pythonfrontend.QuickInfoTypeParameter:
-			kind = ast.KindTypeParameter
-		}
-		entries = append(entries, FrontendSemanticToken{Range: lsproto.Range{Start: start, End: end}, DeclarationKind: kind, Type: info.Type, Readonly: info.Readonly, Async: info.Async})
+		entries = append(entries, FrontendSemanticToken{Range: lsproto.Range{Start: start, End: end}, DeclarationKind: info.Kind, Type: info.Type, Readonly: info.Readonly, Async: info.Async})
 	}
-	data := SemanticTokensForFrontend(ctx, program.Modules[0].Types.Checker(), entries)
+	data := SemanticTokensForFrontend(ctx, session.Checker(), entries)
 	return lsproto.SemanticTokensOrNull{SemanticTokens: &lsproto.SemanticTokens{Data: data}}, nil
 }

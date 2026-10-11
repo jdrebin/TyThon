@@ -712,6 +712,9 @@ func (c *Checker) expandKnownObjectCallArguments(arguments []ObjectCallArgument)
 }
 
 func (c *Checker) fixedPositionalSpreadValues(t *Type) ([]*Type, bool) {
+	if t == nil {
+		return nil, false
+	}
 	type indexedValue struct {
 		index int
 		value *Type
@@ -752,6 +755,9 @@ type namedObjectCallValue struct {
 }
 
 func (c *Checker) fixedKeywordSpreadValues(t *Type) ([]namedObjectCallValue, bool) {
+	if t == nil {
+		return nil, false
+	}
 	values := make([]namedObjectCallValue, 0)
 	for _, info := range c.getIndexInfosOfType(t) {
 		if info.keyType.flags&TypeFlagsStringLiteral == 0 {

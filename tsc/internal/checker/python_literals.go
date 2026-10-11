@@ -101,3 +101,27 @@ func (c *Checker) pythonDictEntryContextualType(entry *ast.Node, contextFlags Co
 	}
 	return c.GetItemType(contextual, c.checkExpression(entry.AsDictEntry().Key))
 }
+
+// pythonDictKeyContextualType is the declared item-key union, so an incomplete
+// key completes from the same index signatures that type the dict.
+func (c *Checker) pythonDictKeyContextualType(entry *ast.Node, contextFlags ContextFlags) *Type {
+	dict := entry.Parent
+	if dict == nil || !ast.IsDictExpression(dict) {
+		return nil
+	}
+	contextual := c.getApparentTypeOfContextualType(dict, contextFlags)
+	if contextual == nil {
+		return nil
+	}
+	var keys []*Type
+	for _, info := range c.getIndexInfosOfType(contextual) {
+		if _, attribute := c.GetPythonAttributeNameType(info.keyType); attribute {
+			continue
+		}
+		keys = append(keys, info.keyType)
+	}
+	if len(keys) == 0 {
+		return nil
+	}
+	return c.getUnionType(keys)
+}

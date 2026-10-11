@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/jdrebin/TyThon/tsc/internal/ast"
 	"github.com/jdrebin/TyThon/tsc/internal/checker"
 	"github.com/jdrebin/TyThon/tsc/internal/python"
 )
@@ -191,8 +192,133 @@ func TestNativeSplitNamespaces(t *testing.T) {
 	}
 }
 
+func TestNativeDefinition(t *testing.T) {
+	source := "foo = \"bar\"\nfoo\ndef greet(name: str) -> str:\n    return name\nvalue = greet(\"Ada\")\nlabel = value.strip()\nclass Box:\n    pass\nbox = Box()\ntext = box.__str__\ntype Key = *<\"id\">\n"
+	session := Open(t.Context(), []python.SourceInput{{FileName: "/t.ty", Text: source}})
+	defer session.Close()
+	assertDef := func(at, file, text string) {
+		t.Helper()
+		target, span, ok := session.Definition("/t.ty", strings.Index(source, at))
+		if !ok {
+			t.Fatalf("no definition at %q", at)
+		}
+		body := source
+		if target == "/lib/builtins.d.ty" {
+			body = python.BuiltinDeclarationSource()
+		}
+		if target != file || span.End > len(body) || body[span.Start:span.End] != text {
+			got := ""
+			if span.Start >= 0 && span.End <= len(body) {
+				got = body[span.Start:span.End]
+			}
+			t.Fatalf("definition at %q = %s %q, want %s %q", at, target, got, file, text)
+		}
+	}
+	assertDef("foo\n", "/t.ty", "foo")
+	assertDef("greet(", "/t.ty", "greet")
+	assertDef("strip", "/lib/builtins.d.ty", "strip")
+	assertDef("__str__", "/lib/builtins.d.ty", "__str__")
+	assertDef("*<", "/lib/builtins.d.ty", "*")
+
+	app := "from pkg.helper import greet\nprint(greet(\"Ada\"))\n"
+	helper := "def greet(name: str) -> str:\n    return name\n"
+	session = Open(t.Context(), []python.SourceInput{
+		{FileName: "/app/app.ty", Text: app},
+		{FileName: "/app/pkg/__init__.ty", Text: ""},
+		{FileName: "/app/pkg/helper.ty", Text: helper},
+	})
+	defer session.Close()
+	target, span, ok := session.Definition("/app/app.ty", strings.Index(app, "greet("))
+	if !ok || target != "/app/pkg/helper.ty" || helper[span.Start:span.End] != "greet" {
+		t.Fatalf("import definition = %s %#v %v", target, span, ok)
+	}
+}
+
+func TestNativeSignatureHelp(t *testing.T) {
+	source := "def identity<T>(value: T) -> T:\n    return value\ngeneric = identity(\"hello\")\n"
+	session := Open(t.Context(), []python.SourceInput{{FileName: "/t.ty", Text: source}})
+	defer session.Close()
+	help, ok := session.SignatureHelp("/t.ty", strings.Index(source, "\"hello\")"))
+	if !ok || help.Label != `(value: "hello") -> "hello"` || help.ActiveParameter != 0 {
+		t.Fatalf("signature help = %#v %v", help, ok)
+	}
+}
+
+func TestNativeAttributeCompletion(t *testing.T) {
+	source := "type User(T) = {\n    name: str,\n    age: int,\n    \"item-only\": bool,\n}\ndef show(user: User(str)):\n    result = user.__completion__\n"
+	session := Open(t.Context(), []python.SourceInput{{FileName: "/t.ty", Text: source}})
+	defer session.Close()
+	at := strings.Index(source, "user.__") + len("user") - 1
+	node := session.nodeAt("/t.ty", at)
+	entries := session.AttributeCompletions("/t.ty", python.AttributeCompletionQuery{Prefix: "na", ReceiverOffset: at})
+	kind := "nil"
+	text := ""
+	if node != nil {
+		kind = node.Kind.String()
+		text = session.typeText(session.checker.GetTypeAtLocation(node))
+	}
+	if len(entries) != 1 || entries[0].Label != "name" {
+		t.Fatalf("entries %#v kind %v type %q", entries, kind, text)
+	}
+}
+
+func TestNativeSemanticIdentifiers(t *testing.T) {
+	source := "type Copy(T) = {\n    (K): T[K]\n    for K in keyof T\n}\ntype Attrs(T) = T[*]\ntype Attr = *\nvalue = 1\n"
+	session := Open(t.Context(), []python.SourceInput{{FileName: "/tokens.ty", Text: source}})
+	defer session.Close()
+	tokens := session.SemanticIdentifiers("/tokens.ty")
+	for _, test := range []struct {
+		fragment, name string
+		kind           ast.Kind
+	}{
+		{"K in", "K", ast.KindTypeParameter},
+		{"K]", "K", ast.KindTypeParameter},
+		{"*]", "*", ast.KindInterfaceDeclaration},
+		{"*\n", "*", ast.KindInterfaceDeclaration},
+		{"value", "value", ast.KindVariableDeclaration},
+	} {
+		start := strings.Index(source, test.fragment)
+		found := false
+		for _, token := range tokens {
+			if token.Range.Start == start && source[token.Range.Start:token.Range.End] == test.name && token.Kind == test.kind {
+				found = true
+			}
+		}
+		if !found {
+			t.Errorf("missing %s %s at %d in %v", test.name, test.kind, start, tokens)
+		}
+	}
+}
+
+func TestNativeHover(t *testing.T) {
+	source := "def f(x: int) -> str:\n    return \"\"\nvalue = f(1)\n"
+	session := Open(t.Context(), []python.SourceInput{{FileName: "/t.ty", Text: source}})
+	defer session.Close()
+	function, _, ok := session.Hover("/t.ty", strings.Index(source, "f"), nil)
+	if !ok || !strings.Contains(function, "(x: int) -> str") {
+		t.Fatalf("function hover: %q", function)
+	}
+	value, _, ok := session.Hover("/t.ty", strings.Index(source, "value"), nil)
+	if !ok || !strings.Contains(value, "str") || strings.Contains(value, "=>") {
+		t.Fatalf("value hover: %q", value)
+	}
+}
+
+func TestNativeProjectImports(t *testing.T) {
+	diagnostics := Check(t.Context(), []python.SourceInput{
+		{FileName: "/app/app.ty", Text: "from pkg.helper import greet\nprint(greet(\"Ada\"))\n"},
+		{FileName: "/app/pkg/__init__.ty", Text: "x = 1\n"},
+		{FileName: "/app/pkg/helper.ty", Text: "from .values import label\ndef greet(name: str) -> str:\n    return label + name\n"},
+		{FileName: "/app/pkg/values.ty", Text: "label = \"Hi \"\n"},
+		{FileName: "/app/pkg/values.d.ty", Text: "label: str\n"},
+	})
+	for _, diagnostic := range diagnostics {
+		t.Errorf("%s: %s", diagnostic.FileName, diagnostic.Message)
+	}
+}
+
 func TestNativeKeywordArguments(t *testing.T) {
-	_, user, parseErrors := checkNative("/t.ty", "def configure(value: str, /, label: str = \"value\", *, enabled: bool = True) -> str:\n    return value\nresult = configure(\"ready\", label=\"status\", enabled=True)\nomitted = configure(\"ready\")\n")
+	_, user, parseErrors := checkNative("/t.ty", "def configure(value: str, /, label: str = \"value\", *, enabled: bool = True) -> str:\n    return value\nresult = configure(\"ready\", label=\"status\", enabled=True)\nomitted = configure(\"ready\")\nskipped = configure(\"ready\", enabled=True)\n")
 	if parseErrors != 0 {
 		t.Fatal("parse errors")
 	}

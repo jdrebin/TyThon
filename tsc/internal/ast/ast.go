@@ -508,6 +508,8 @@ func (n *Node) TypeArgumentList() *NodeList {
 		return n.AsImportTypeNode().TypeArguments
 	case KindTypeQuery:
 		return n.AsTypeQueryNode().TypeArguments
+	case KindTypeCallType:
+		return n.AsTypeCallTypeNode().Arguments
 	case KindJsxOpeningElement:
 		return n.AsJsxOpeningElement().TypeArguments
 	case KindJsxSelfClosingElement:

@@ -8660,7 +8660,6 @@ func (c *Checker) resolveCallExpression(node *ast.Node, candidatesOutArray *[]*S
 	} else {
 		callChainFlags = SignatureFlagsNone
 	}
-	_ = callChainFlags
 	funcType = c.checkNonNullTypeWithReporter(funcType, node.Expression(), (*Checker).reportCannotInvokePossiblyNullOrUndefinedError)
 	if funcType == c.silentNeverType {
 		return c.silentNeverSignature
@@ -8694,7 +8693,7 @@ func (c *Checker) resolveCallExpression(node *ast.Node, candidatesOutArray *[]*S
 		if numConstructSignatures != 0 {
 			// Construction is a call: `C(...)` is TypeScript's `new C(...)`.
 			constructSignatures := c.getSignaturesOfType(apparentType, SignatureKindConstruct)
-			return c.resolvePythonCall(node, constructSignatures, checkMode)
+			return c.resolveCall(node, constructSignatures, candidatesOutArray, checkMode, SignatureFlagsNone, nil)
 		} else {
 			var relatedInformation *ast.Diagnostic
 			if len(node.Arguments()) == 1 {
@@ -8724,7 +8723,7 @@ func (c *Checker) resolveCallExpression(node *ast.Node, candidatesOutArray *[]*S
 		c.skippedGenericFunction(node, checkMode)
 		return c.resolvingSignature
 	}
-	return c.resolvePythonCall(node, callSignatures, checkMode)
+	return c.resolveCall(node, callSignatures, candidatesOutArray, checkMode, callChainFlags, nil)
 }
 
 func (c *Checker) resolveNewExpression(node *ast.Node, candidatesOutArray *[]*Signature, checkMode CheckMode) *Signature {
@@ -9265,6 +9264,12 @@ func (c *Checker) hasCorrectArity(node *ast.Node, args []*ast.Node, signature *S
 	if ast.IsJsxOpeningFragment(node) {
 		return true
 	}
+	// Named arguments and /, *, ** are checked in isSignatureApplicable. A
+	// positional count would reject a skipped optional or a keyword-only
+	// parameter before that binding runs.
+	if c.signatureNeedsPythonArgumentBinding(signature, args) {
+		return true
+	}
 	var argCount int
 	callIsIncomplete := false
 	// In incomplete call we want to be lenient when we have too few arguments
@@ -9459,6 +9464,9 @@ func (c *Checker) isSignatureApplicable(node *ast.Node, args []*ast.Node, signat
 		if !c.checkTypeRelatedToEx(thisArgumentType, thisType, relation, errorNode, headMessage, diagnosticOutput) {
 			return false
 		}
+	}
+	if c.signatureNeedsPythonArgumentBinding(signature, args) {
+		return c.applyPythonCallArguments(node, args, signature, relation, checkMode, reportErrors, diagnosticOutput)
 	}
 	headMessage := diagnostics.Argument_of_type_0_is_not_assignable_to_parameter_of_type_1
 	restType := c.getNonArrayRestType(signature)
@@ -9664,6 +9672,10 @@ func (c *Checker) inferTypeArguments(node *ast.Node, signature *Signature, args 
 	if thisType != nil && c.couldContainTypeVariables(thisType) {
 		thisArgumentNode := c.getThisArgumentOfCall(node)
 		c.inferTypes(context.inferences, c.getThisArgumentType(thisArgumentNode), thisType, InferencePriorityNone, false)
+	}
+	if c.signatureNeedsPythonArgumentBinding(signature, args) {
+		c.inferPythonCallArguments(signature, args, checkMode, context)
+		return c.getInferredTypes(context)
 	}
 	for i := range argCount {
 		arg := args[i]
@@ -11534,11 +11546,13 @@ func (c *Checker) checkPropertyAccessExpressionOrQualifiedName(node *ast.Node, l
 			indexInfo = c.getApplicableIndexInfoForName(apparentType, right.Text())
 		}
 		if indexInfo == nil {
-			if method := c.pythonMappingMethodType(apparentType, right.Text()); method != nil {
-				return method
+			if prop := c.pythonMappingMethod(apparentType, right.Text()); prop != nil {
+				c.symbolNodeLinks.Get(node).resolvedSymbol = prop
+				return c.BoundPythonCallable(c.getTypeOfSymbol(prop))
 			}
-			if surface := c.pythonObjectSurfaceType(right.Text()); surface != nil {
-				return surface
+			if prop := c.pythonObjectSurfaceProperty(right.Text()); prop != nil {
+				c.symbolNodeLinks.Get(node).resolvedSymbol = prop
+				return c.BoundPythonCallable(c.getTypeOfSymbol(prop))
 			}
 			isUncheckedJS := c.isUncheckedJSSuggestion(node, leftType.symbol, true /*excludeClasses*/)
 			if !isUncheckedJS && c.isJSLiteralType(leftType) {
@@ -22342,13 +22356,13 @@ func (c *Checker) getApparentType(t *Type) *Type {
 	case t.flags&TypeFlagsIntersection != 0:
 		return c.getApparentTypeOfIntersectionType(t, originalType)
 	case t.flags&TypeFlagsStringLike != 0:
-		return c.globalStringType
+		return c.pythonPrimitiveApparentType(t, c.globalStringType)
 	case t.flags&TypeFlagsNumberLike != 0:
-		return c.globalNumberType
+		return c.pythonPrimitiveApparentType(t, c.globalNumberType)
 	case t.flags&TypeFlagsBigIntLike != 0:
-		return c.getGlobalBigIntType()
+		return c.pythonPrimitiveApparentType(t, c.getGlobalBigIntType())
 	case t.flags&TypeFlagsBooleanLike != 0:
-		return c.globalBooleanType
+		return c.pythonPrimitiveApparentType(t, c.globalBooleanType)
 	case t.flags&TypeFlagsESSymbolLike != 0:
 		return c.getGlobalESSymbolType()
 	case t.flags&TypeFlagsNonPrimitive != 0:
@@ -23579,6 +23593,10 @@ func (c *Checker) getTypeFromTypeNodeWorker(node *ast.Node) *Type {
 		return c.getTypeFromInferTypeNode(node)
 	case ast.KindImportType:
 		return c.getTypeFromImportTypeNode(node)
+	case ast.KindTypeCallType:
+		// `User(str)` is a type-argument list. Parentheses are the spelling;
+		// resolution is the type-reference path.
+		return c.getTypeFromTypeReference(node)
 	default:
 		return c.errorType
 	}
@@ -24396,6 +24414,8 @@ func getTypeReferenceName(node *ast.Node) *ast.Node {
 		if ast.IsEntityNameExpression(expr) {
 			return expr
 		}
+	case ast.KindTypeCallType:
+		return getTypeReferenceName(node.AsTypeCallTypeNode().Callee)
 	}
 	return nil
 }
@@ -30079,6 +30099,10 @@ func (c *Checker) getContextualType(node *ast.Node, contextFlags ContextFlags) *
 		return c.getContextualTypeForAwaitOperand(parent, contextFlags)
 	case ast.KindCallExpression, ast.KindNewExpression:
 		return c.getContextualTypeForArgument(parent, node)
+	case ast.KindKeywordArgument:
+		if parent.AsKeywordArgument().Expression == node {
+			return c.getContextualType(parent, contextFlags)
+		}
 	case ast.KindDecorator:
 		return c.getContextualTypeForDecorator(parent)
 	case ast.KindTypeAssertionExpression, ast.KindAsExpression:
@@ -30092,8 +30116,11 @@ func (c *Checker) getContextualType(node *ast.Node, contextFlags ContextFlags) *
 		ast.KindShorthandPropertyAssignment:
 		return c.getContextualTypeForObjectLiteralElement(parent, contextFlags)
 	case ast.KindDictEntry:
-		if parent.AsDictEntry().Value == node {
+		switch node {
+		case parent.AsDictEntry().Value:
 			return c.pythonDictEntryContextualType(parent, contextFlags)
+		case parent.AsDictEntry().Key:
+			return c.pythonDictKeyContextualType(parent, contextFlags)
 		}
 	case ast.KindSpreadAssignment:
 		return c.getContextualType(parent.Parent, contextFlags)
@@ -30480,6 +30507,11 @@ func (c *Checker) getContextualTypeForAwaitOperand(node *ast.Node, contextFlags 
 
 // In a typed function call, an argument or substitution expression is contextually typed by the type of the corresponding parameter.
 func (c *Checker) getContextualTypeForArgument(callTarget *ast.Node, arg *ast.Node) *Type {
+	if ast.IsKeywordArgument(arg) && arg.AsKeywordArgument().Keyword != nil {
+		if t := c.getContextualTypeForPythonKeywordArgument(callTarget, arg); t != nil {
+			return t
+		}
+	}
 	args := c.getEffectiveCallArguments(callTarget)
 	argIndex := slices.Index(args, arg)
 	// -1 for e.g. the expression of a CallExpression, or the tag of a TaggedTemplateExpression

@@ -118,7 +118,23 @@ func (b *Binder) declarePythonVariable(name string, declaration *ast.Node) {
 			symbol.Declarations = core.AppendIfUnique(symbol.Declarations, declaration)
 		}
 		SetValueDeclaration(symbol, declaration)
+		b.exportPythonModuleName(name, symbol)
 		return
 	}
 	b.addDeclarationToSymbol(symbol, declaration, ast.SymbolFlagsFunctionScopedVariable)
+	b.exportPythonModuleName(name, symbol)
+}
+
+// exportPythonModuleName publishes a module-level assignment. Function and class
+// declarations already go through declareModuleMember; an assignment does not.
+func (b *Binder) exportPythonModuleName(name string, symbol *ast.Symbol) {
+	if b.container.Kind != ast.KindSourceFile || b.container.Flags&ast.NodeFlagsExportContext == 0 || b.container.Symbol() == nil {
+		return
+	}
+	exports := ast.GetExports(b.container.Symbol())
+	if exports[name] != nil {
+		return
+	}
+	symbol.ExportSymbol = symbol
+	exports[name] = symbol
 }

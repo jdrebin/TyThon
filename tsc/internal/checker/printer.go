@@ -69,6 +69,15 @@ func (c *Checker) TypeToStringForFrontend(t *Type, vc *VerbosityContext, render 
 	return c.typeToStringWithRenderer(t, nil, TypeFormatFlagsAllowUniqueESSymbolType|TypeFormatFlagsUseAliasDefinedOutsideCurrentScope, vc, render)
 }
 
+// SignatureToStringForFrontend prints a resolved signature through the same
+// declaration builder as TypeToStringForFrontend.
+func (c *Checker) SignatureToStringForFrontend(signature *Signature, render func(*ast.Node, *printer.EmitContext) string) string {
+	if signature == nil {
+		return ""
+	}
+	return c.TypeToStringForFrontend(c.getOrCreateTypeFromSignature(signature), nil, render)
+}
+
 func (c *Checker) IsGenericMappedType(t *Type) bool {
 	return c.isGenericMappedType(t)
 }

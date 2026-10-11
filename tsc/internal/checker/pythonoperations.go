@@ -614,9 +614,9 @@ func (c *Checker) GetPythonAsyncIterationType(iterable *Type) (*Type, []ObjectCa
 	return c.unknownType, []ObjectCallDiagnostic{{Argument: -1, Message: "__anext__ result is not awaitable"}}
 }
 
-// pythonMappingMethodType is a MappingProtocol member of a dict literal.
+// pythonMappingMethod is a MappingProtocol member of a dict literal.
 // The literal keeps its item shape; the protocol is not intersected into it.
-func (c *Checker) pythonMappingMethodType(t *Type, name string) *Type {
+func (c *Checker) pythonMappingMethod(t *Type, name string) *ast.Symbol {
 	if name == "" || !c.IsPythonMappingType(t) {
 		return nil
 	}
@@ -624,7 +624,11 @@ func (c *Checker) pythonMappingMethodType(t *Type, name string) *Type {
 	if mapping == c.emptyGenericType {
 		return nil
 	}
-	prop := c.getPropertyOfType(c.createTypeReference(mapping, []*Type{t}), name)
+	return c.getPropertyOfType(c.createTypeReference(mapping, []*Type{t}), name)
+}
+
+func (c *Checker) pythonMappingMethodType(t *Type, name string) *Type {
+	prop := c.pythonMappingMethod(t, name)
 	if prop == nil {
 		return nil
 	}
@@ -702,9 +706,9 @@ func (c *Checker) pythonExceptionInstanceType(ctor *Type) *Type {
 	return nil
 }
 
-// pythonObjectSurfaceType is a required ObjectProtocol member. Optional hooks
-// such as `__add__` are not on every value; a type declares those itself.
-func (c *Checker) pythonObjectSurfaceType(name string) *Type {
+// pythonObjectSurfaceProperty is a required ObjectProtocol member. Optional
+// hooks such as `__add__` are not on every value; a type declares those itself.
+func (c *Checker) pythonObjectSurfaceProperty(name string) *ast.Symbol {
 	if name == "" {
 		return nil
 	}
@@ -714,6 +718,14 @@ func (c *Checker) pythonObjectSurfaceType(name string) *Type {
 	}
 	prop := c.getPropertyOfType(protocol, name)
 	if prop == nil || prop.Flags&ast.SymbolFlagsOptional != 0 {
+		return nil
+	}
+	return prop
+}
+
+func (c *Checker) pythonObjectSurfaceType(name string) *Type {
+	prop := c.pythonObjectSurfaceProperty(name)
+	if prop == nil {
 		return nil
 	}
 	return c.BoundPythonCallable(c.getTypeOfSymbol(prop))

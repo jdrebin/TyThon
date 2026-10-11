@@ -3,6 +3,7 @@ package pyprogram
 import (
 	_ "embed"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 
@@ -38,7 +39,11 @@ func NewNativeProgram(inputs []python.SourceInput) *NativeProgram {
 		pyparser.ParseSourceFile("/lib/builtins.d.ty", python.BuiltinDeclarationSource()),
 	)
 	for _, input := range inputs {
-		program.files = append(program.files, pyparser.ParseSourceFile(input.FileName, input.Text))
+		file := pyparser.ParseSourceFile(input.FileName, input.Text)
+		// A Python file is a module: top-level names are its exports. The
+		// indicator is what makes the binder treat the file that way.
+		file.ExternalModuleIndicator = file.AsNode()
+		program.files = append(program.files, file)
 	}
 	return program
 }
@@ -60,9 +65,9 @@ func (p *NativeProgram) GetSourceFile(fileName string) *ast.SourceFile {
 	return p.modules[fileName]
 }
 
-// GetResolvedModule maps a dotted Python import (`sample_package.models`) onto
-// the `.d.ty` beside the importing file. A declaration file is a module: its
-// top-level names are the exports.
+// GetResolvedModule maps a Python import onto a .ty or .d.ty file. Relative
+// dots walk parent directories. A bare name walks up from the importer, then
+// falls back to a unique module already in the program.
 func (p *NativeProgram) GetResolvedModule(from ast.HasFileName, spec string, _ core.ResolutionMode) *module.ResolvedModule {
 	if from == nil || spec == "" {
 		return nil
@@ -74,24 +79,51 @@ func (p *NativeProgram) GetResolvedModule(from ast.HasFileName, spec string, _ c
 		}
 		return &module.ResolvedModule{ResolvedFileName: path, Extension: ".d.ts"}
 	}
-	path := pythonDeclarationPath(from.FileName(), spec)
-	if path == "" || p.ensureModule(path) == nil {
+	resolved := p.resolvePythonModule(from.FileName(), spec)
+	if resolved == "" || (p.GetSourceFile(resolved) == nil && p.ensureModule(resolved) == nil) {
 		return nil
 	}
-	return &module.ResolvedModule{ResolvedFileName: path, Extension: ".d.ts"}
+	return &module.ResolvedModule{ResolvedFileName: resolved, Extension: ".d.ts"}
 }
 
 func (p *NativeProgram) GetSourceFileForResolvedModule(fileName string) *ast.SourceFile {
 	return p.GetSourceFile(fileName)
 }
 
-func pythonDeclarationPath(fromFile, spec string) string {
-	rel := filepath.Join(strings.Split(spec, ".")...) + ".d.ty"
+func (p *NativeProgram) resolvePythonModule(fromFile, spec string) string {
+	level, name := pythonImportSpec(spec)
+	requested := ""
+	if name != "" {
+		requested = filepath.Join(strings.Split(name, ".")...)
+	}
+	if level > 0 {
+		base := filepath.Dir(fromFile)
+		for range level - 1 {
+			parent := filepath.Dir(base)
+			if parent == base {
+				return ""
+			}
+			base = parent
+		}
+		if requested == "" {
+			base = filepath.Join(base, "__init__")
+		} else {
+			base = filepath.Join(base, requested)
+		}
+		if resolved := p.pickModuleFile(base); resolved != "" {
+			return resolved
+		}
+		return p.pickModuleFile(filepath.Join(base, "__init__"))
+	}
 	dir := filepath.Dir(fromFile)
 	for range 8 {
-		candidate := filepath.Join(dir, rel)
-		if _, err := os.Stat(candidate); err == nil {
-			return candidate
+		if requested != "" {
+			if resolved := p.pickModuleFile(filepath.Join(dir, requested)); resolved != "" {
+				return resolved
+			}
+			if resolved := p.pickModuleFile(filepath.Join(dir, requested, "__init__")); resolved != "" {
+				return resolved
+			}
 		}
 		parent := filepath.Dir(dir)
 		if parent == dir {
@@ -99,7 +131,78 @@ func pythonDeclarationPath(fromFile, spec string) string {
 		}
 		dir = parent
 	}
+	return p.uniqueKnownModule(requested)
+}
+
+func pythonImportSpec(spec string) (level int, name string) {
+	for level < len(spec) && spec[level] == '.' {
+		level++
+	}
+	return level, spec[level:]
+}
+
+// pickModuleFile prefers a .ty implementation over a .d.ty for the same stem.
+func (p *NativeProgram) pickModuleFile(stem string) string {
+	stem = filepath.Clean(stem)
+	var implementation, declaration string
+	for _, file := range p.files {
+		got, ok := python.ModuleStem(file.FileName())
+		if !ok || filepath.Clean(got) != stem {
+			continue
+		}
+		if python.GetFileKind(file.FileName()) == python.FileKindDeclaration {
+			declaration = file.FileName()
+		} else {
+			implementation = file.FileName()
+		}
+	}
+	switch {
+	case implementation != "":
+		return implementation
+	case declaration != "":
+		return declaration
+	}
+	for _, suffix := range []string{".ty", ".d.ty"} {
+		candidate := stem + suffix
+		if _, err := os.Stat(candidate); err == nil {
+			return candidate
+		}
+	}
 	return ""
+}
+
+func (p *NativeProgram) uniqueKnownModule(requested string) string {
+	if requested == "" {
+		return ""
+	}
+	requested = filepath.ToSlash(requested)
+	var stem string
+	for _, file := range p.files {
+		got, ok := python.ModuleStem(file.FileName())
+		if !ok {
+			continue
+		}
+		slash := filepath.ToSlash(filepath.Clean(got))
+		packageStem := slash
+		if path.Base(slash) == "__init__" {
+			packageStem = path.Dir(slash)
+		}
+		if slash != requested && packageStem != requested && !strings.HasSuffix(slash, "/"+requested) && !strings.HasSuffix(packageStem, "/"+requested) {
+			continue
+		}
+		next := slash
+		if packageStem == requested || strings.HasSuffix(packageStem, "/"+requested) {
+			next = packageStem
+		}
+		if stem != "" && stem != next {
+			return ""
+		}
+		stem = next
+	}
+	if stem == "" {
+		return ""
+	}
+	return p.pickModuleFile(filepath.FromSlash(stem))
 }
 
 func (p *NativeProgram) ensureModule(path string) *ast.SourceFile {

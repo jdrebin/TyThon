@@ -6,94 +6,210 @@ import (
 	"github.com/jdrebin/TyThon/tsc/internal/diagnostics"
 )
 
-// pythonCallArgumentsFromNode is the native-AST half of Python call binding:
-// keyword names, *args, and **kwargs. Types and inference stay in ResolveObjectCall.
-func (c *Checker) pythonCallArgumentsFromNode(node *ast.Node, checkMode CheckMode) []ObjectCallArgument {
-	args := node.Arguments()
-	result := make([]ObjectCallArgument, 0, len(args))
-	for _, arg := range args {
-		result = append(result, c.pythonCallArgument(arg, checkMode))
-	}
-	return result
-}
-
-func (c *Checker) pythonCallArgument(arg *ast.Node, checkMode CheckMode) ObjectCallArgument {
-	expr := pythonCallValue(arg)
-	t := c.checkExpressionEx(expr, checkMode|CheckModeSkipContextSensitive)
-	check := func(contextual *Type, _ bool) *Type {
-		if contextual == nil {
-			return c.checkExpressionEx(expr, checkMode)
-		}
-		return c.checkExpressionWithContextualType(expr, contextual, nil, checkMode)
-	}
-	switch arg.Kind {
-	case ast.KindKeywordArgument:
-		keyword := arg.AsKeywordArgument().Keyword
-		if keyword == nil {
-			return ObjectCallArgument{Kind: ObjectCallArgumentKeywordSpread, Type: t, Check: check}
-		}
-		return ObjectCallArgument{Kind: ObjectCallArgumentKeyword, Name: keyword.Text(), Type: t, Check: check}
-	case ast.KindSpreadElement:
-		return ObjectCallArgument{Kind: ObjectCallArgumentSpread, Type: t, Check: check}
-	default:
-		return ObjectCallArgument{Kind: ObjectCallArgumentPositional, Type: t, Check: check}
-	}
-}
-
-func pythonCallValue(arg *ast.Node) *ast.Node {
-	switch arg.Kind {
-	case ast.KindKeywordArgument:
-		return arg.AsKeywordArgument().Expression
-	case ast.KindSpreadElement:
-		return arg.Expression()
-	default:
-		return arg
-	}
-}
-
-// resolvePythonCall selects a signature with Python parameter categories rather
-// than TypeScript's positional chooseOverload. Construction uses the same binder;
-// C(...) is already a call of construct signatures.
-func (c *Checker) resolvePythonCall(node *ast.Node, signatures []*Signature, checkMode CheckMode) *Signature {
-	if len(signatures) == 0 {
-		return c.unknownSignature
-	}
-	arguments := c.pythonCallArgumentsFromNode(node, checkMode)
-	var typeArgs []*Type
-	if args := node.TypeArguments(); len(args) != 0 {
-		typeArgs = make([]*Type, len(args))
-		for i, a := range args {
-			typeArgs[i] = c.getTypeFromTypeNode(a)
-		}
-	}
-	callable := c.NewObjectTypeFromCallSignatures(signatures)
-	resolution, callDiagnostics := c.ResolveObjectCallWithContext(callable, arguments, typeArgs, nil)
-	c.reportPythonCallDiagnostics(node, callDiagnostics)
-	if resolution.Signature != nil {
-		return resolution.Signature
-	}
-	return c.unknownSignature
-}
-
-func (c *Checker) reportPythonCallDiagnostics(node *ast.Node, callDiagnostics []ObjectCallDiagnostic) {
-	args := node.Arguments()
-	for _, d := range callDiagnostics {
-		errorNode := node
-		if d.Argument >= 0 && d.Argument < len(args) {
-			if value := pythonCallValue(args[d.Argument]); value != nil {
-				errorNode = value
-			} else {
-				errorNode = args[d.Argument]
+// signatureNeedsPythonArgumentBinding is true when positional argument i is
+// not parameter i: the signature has /, *, or **, or the call passes a name.
+// resolveCall still chooses the overload and checks assignability. This only
+// selects which parameter an argument corresponds to.
+func (c *Checker) signatureNeedsPythonArgumentBinding(signature *Signature, args []*ast.Node) bool {
+	if len(signature.parameterKinds) == len(signature.parameters) {
+		for _, kind := range signature.parameterKinds {
+			if kind != CallParameterPositionalOrKeyword {
+				return true
 			}
 		}
-		if d.Source != nil && d.Target != nil {
-			c.error(errorNode, diagnostics.Argument_of_type_0_is_not_assignable_to_parameter_of_type_1, c.TypeToString(d.Source), c.TypeToString(d.Target))
-			continue
-		}
-		if d.Message != "" {
-			c.error(errorNode, diagnostics.NewAdHocMessage(d.Message))
+	}
+	for _, arg := range args {
+		if arg != nil && arg.Kind == ast.KindKeywordArgument {
+			return true
 		}
 	}
+	return false
+}
+
+// pythonArgumentsForBinding classifies call arguments the way bindObjectCallArguments
+// expects. Known tuple and mapping spreads become one argument per element, matching
+// getEffectiveCallArguments. Types are filled only for those expanded elements;
+// ordinary arguments are checked later, under the parameter's contextual type.
+func (c *Checker) pythonArgumentsForBinding(args []*ast.Node) (arguments []ObjectCallArgument, nodes []*ast.Node) {
+	for _, arg := range args {
+		switch arg.Kind {
+		case ast.KindKeywordArgument:
+			keyword := arg.AsKeywordArgument()
+			if keyword.Keyword == nil {
+				t := c.getContextFreeTypeOfExpression(keyword.Expression)
+				values, known := c.fixedKeywordSpreadValues(t)
+				if !known {
+					arguments = append(arguments, ObjectCallArgument{Kind: ObjectCallArgumentKeywordSpread})
+					nodes = append(nodes, keyword.Expression)
+					continue
+				}
+				for _, value := range values {
+					synthetic := c.createSyntheticExpression(arg, value.t, false, nil)
+					arguments = append(arguments, ObjectCallArgument{Kind: ObjectCallArgumentKeyword, Name: value.name, Type: value.t, optional: value.optional})
+					nodes = append(nodes, synthetic)
+				}
+				continue
+			}
+			arguments = append(arguments, ObjectCallArgument{Kind: ObjectCallArgumentKeyword, Name: keyword.Keyword.Text()})
+			nodes = append(nodes, keyword.Expression)
+		case ast.KindSpreadElement:
+			t := c.getContextFreeTypeOfExpression(arg.Expression())
+			values, known := c.fixedPositionalSpreadValues(t)
+			if !known {
+				arguments = append(arguments, ObjectCallArgument{Kind: ObjectCallArgumentSpread})
+				nodes = append(nodes, arg.Expression())
+				continue
+			}
+			for _, value := range values {
+				synthetic := c.createSyntheticExpression(arg, value, false, nil)
+				arguments = append(arguments, ObjectCallArgument{Kind: ObjectCallArgumentPositional, Type: value})
+				nodes = append(nodes, synthetic)
+			}
+		default:
+			arguments = append(arguments, ObjectCallArgument{Kind: ObjectCallArgumentPositional})
+			nodes = append(nodes, arg)
+		}
+	}
+	return arguments, nodes
+}
+
+// getContextualTypeForPythonKeywordArgument is the parameter type selected by
+// the same argument binding resolveCall uses. Positional indexes do not name
+// the parameter a keyword argument fills.
+func (c *Checker) getContextualTypeForPythonKeywordArgument(call *ast.Node, arg *ast.Node) *Type {
+	if !ast.IsCallExpression(call) && !ast.IsNewExpression(call) {
+		return nil
+	}
+	if c.signatureLinks.Get(call).resolvedSignature == c.resolvingSignature {
+		return c.anyType
+	}
+	signature := c.getResolvedSignature(call, nil, CheckModeNormal)
+	if signature == nil || len(signature.parameters) == 0 {
+		return nil
+	}
+	arguments, nodes := c.pythonArgumentsForBinding(c.getEffectiveCallArguments(call))
+	bindings, bindingDiagnostics := c.bindObjectCallArguments(signature, arguments)
+	if len(bindingDiagnostics) != 0 {
+		return nil
+	}
+	expr := arg.AsKeywordArgument().Expression
+	packPositions := map[int]int{}
+	for _, binding := range bindings {
+		if binding.argumentIndex < 0 || binding.argumentIndex >= len(nodes) || nodes[binding.argumentIndex] != expr {
+			continue
+		}
+		return c.objectCallBindingParameterType(signature, binding, packPositions)
+	}
+	return nil
+}
+
+func (c *Checker) applyPythonCallArguments(node *ast.Node, args []*ast.Node, signature *Signature, relation *Relation, checkMode CheckMode, reportErrors bool, diagnosticOutput *[]*ast.Diagnostic) bool {
+	arguments, nodes := c.pythonArgumentsForBinding(args)
+	bindings, bindingDiagnostics := c.bindObjectCallArguments(signature, arguments)
+	if len(bindingDiagnostics) != 0 {
+		if reportErrors {
+			for _, d := range bindingDiagnostics {
+				errorNode := node
+				if d.Argument >= 0 && d.Argument < len(nodes) {
+					errorNode = nodes[d.Argument]
+				}
+				c.reportPythonBindingDiagnostic(errorNode, d.Message, diagnosticOutput)
+			}
+		}
+		return false
+	}
+	headMessage := diagnostics.Argument_of_type_0_is_not_assignable_to_parameter_of_type_1
+	packPositions := map[int]int{}
+	keywordBindings := map[int][]objectCallBinding{}
+	for _, binding := range bindings {
+		parameterType := c.objectCallBindingParameterType(signature, binding, packPositions)
+		argumentNode := nodes[binding.argumentIndex]
+		argType := c.checkExpressionWithContextualType(argumentNode, parameterType, nil /*inferenceContext*/, checkMode)
+		var checkArgType *Type
+		if checkMode&CheckModeSkipContextSensitive != 0 {
+			checkArgType = c.getRegularTypeOfObjectLiteral(argType)
+		} else {
+			checkArgType = argType
+		}
+		errorNode := c.getEffectiveCheckNode(argumentNode)
+		if !c.checkTypeRelatedToAndOptionallyElaborate(checkArgType, parameterType, relation, core.IfElse(reportErrors, errorNode, nil), errorNode, headMessage, diagnosticOutput) {
+			return false
+		}
+		binding.argument.Type = argType
+		if objectCallParameterKind(signature, binding.parameterIndex) == CallParameterVarKeyword {
+			keywordBindings[binding.parameterIndex] = append(keywordBindings[binding.parameterIndex], binding)
+		}
+	}
+	for index, parameter := range signature.parameters {
+		if objectCallParameterKind(signature, index) != CallParameterVarKeyword {
+			continue
+		}
+		var items []ObjectFacetIndex
+		for _, info := range c.getIndexInfosOfType(c.getTypeOfSymbol(parameter)) {
+			if info.keyType.flags&TypeFlagsStringLiteral != 0 {
+				items = append(items, ObjectFacetIndex{Key: info.keyType, Value: info.valueType, Optional: info.pythonOptional})
+			}
+		}
+		if len(items) == 0 {
+			continue
+		}
+		source := c.objectCallPackType(CallParameterVarKeyword, keywordBindings[index], false)
+		target := c.NewObjectTypeFromFacets(ObjectFacets{Items: items})
+		errorNode := node
+		if !reportErrors {
+			errorNode = nil
+		}
+		if !c.checkTypeRelatedToEx(source, target, relation, errorNode, headMessage, diagnosticOutput) {
+			return false
+		}
+	}
+	return true
+}
+
+func (c *Checker) inferPythonCallArguments(signature *Signature, args []*ast.Node, checkMode CheckMode, context *InferenceContext) {
+	arguments, nodes := c.pythonArgumentsForBinding(args)
+	bindings, bindingDiagnostics := c.bindObjectCallArguments(signature, arguments)
+	if len(bindingDiagnostics) != 0 {
+		return
+	}
+	packBindings := map[int][]objectCallBinding{}
+	for _, binding := range bindings {
+		kind := objectCallParameterKind(signature, binding.parameterIndex)
+		parameterType := c.getTypeOfSymbol(signature.parameters[binding.parameterIndex])
+		if kind == CallParameterVarPositional || kind == CallParameterVarKeyword {
+			argumentNode := nodes[binding.argumentIndex]
+			binding.argument.Type = c.checkExpressionWithContextualType(argumentNode, nil, context, checkMode)
+			packBindings[binding.parameterIndex] = append(packBindings[binding.parameterIndex], binding)
+			continue
+		}
+		if !c.couldContainTypeVariables(parameterType) {
+			continue
+		}
+		argumentNode := nodes[binding.argumentIndex]
+		contextual := c.instantiateType(parameterType, context.nonFixingMapper)
+		argType := c.checkExpressionWithContextualType(argumentNode, contextual, context, checkMode)
+		c.inferTypes(context.inferences, argType, parameterType, InferencePriorityNone, false)
+	}
+	for parameterIndex, parameter := range signature.parameters {
+		kind := objectCallParameterKind(signature, parameterIndex)
+		if kind != CallParameterVarPositional && kind != CallParameterVarKeyword {
+			continue
+		}
+		target := c.getTypeOfSymbol(parameter)
+		if c.couldContainTypeVariables(target) {
+			source := c.objectCallPackType(kind, packBindings[parameterIndex], !c.isConstTypeVariable(target, 0))
+			c.inferTypes(context.inferences, source, target, InferencePriorityNone, false)
+		}
+	}
+}
+
+func (c *Checker) reportPythonBindingDiagnostic(node *ast.Node, message string, diagnosticOutput *[]*ast.Diagnostic) {
+	diagnostic := NewDiagnosticForNode(node, diagnostics.NewAdHocMessage(message))
+	if diagnosticOutput != nil {
+		*diagnosticOutput = append(*diagnosticOutput, diagnostic)
+		return
+	}
+	c.addDiagnostic(diagnostic)
 }
 
 // pythonBoundMethodAccessType binds an instance method: the receiver is already

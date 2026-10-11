@@ -153,3 +153,57 @@ func (c *Checker) PythonPrimitiveProtocol(t *Type) *Type {
 	}
 	return nil
 }
+
+// pythonPrimitiveApparentType is the declared protocol for a primitive, the
+// same role the global String interface has for a TypeScript string.
+func (c *Checker) pythonPrimitiveApparentType(t *Type, javascript *Type) *Type {
+	if protocol := c.PythonPrimitiveProtocol(t); protocol != nil {
+		return protocol
+	}
+	return javascript
+}
+
+// InstallPythonLibrary reads the bundled declarations the binder already
+// entered as globals and installs them as the value hierarchy. The same
+// tables the declaration environment used to hand over after its own bind.
+func (c *Checker) InstallPythonLibrary() {
+	some := c.pythonLibraryType("Some", 0)
+	structured := c.pythonLibraryType("Object", 0)
+	stringProtocol := c.pythonLibraryType("StringProtocol", 0)
+	intProtocol := c.pythonLibraryType("IntProtocol", 0)
+	floatProtocol := c.pythonLibraryType("FloatProtocol", 0)
+	boolProtocol := c.pythonLibraryType("BoolProtocol", 0)
+	if some == nil || structured == nil || stringProtocol == nil || intProtocol == nil || floatProtocol == nil || boolProtocol == nil {
+		return
+	}
+	atomics := make([]*Type, 0, 4)
+	for _, name := range []string{"bytes", "complex", "NotImplementedType", "EllipsisType"} {
+		t := c.pythonLibraryType(name, 0)
+		if t == nil {
+			return
+		}
+		atomics = append(atomics, t)
+	}
+	if star := c.pythonLibraryType("*", 1); star != nil {
+		c.SetPythonAttributeInterface(star)
+	}
+	c.SetPythonValueHierarchy(some, structured, atomics, map[*Type]*Type{
+		c.stringType:  stringProtocol,
+		c.bigintType:  intProtocol,
+		c.numberType:  floatProtocol,
+		c.booleanType: boolProtocol,
+	})
+	c.SetPythonNotImplementedType(c.pythonLibraryType("NotImplementedType", 0))
+}
+
+func (c *Checker) pythonLibraryType(name string, arity int) *Type {
+	symbol := c.getGlobalSymbol(name, ast.SymbolFlagsType, nil)
+	if symbol == nil || symbol.Flags&(ast.SymbolFlagsClass|ast.SymbolFlagsInterface) == 0 {
+		return nil
+	}
+	t := c.getDeclaredTypeOfSymbol(symbol)
+	if t == nil || t.flags&TypeFlagsObject == 0 || len(t.AsInterfaceType().TypeParameters()) != arity {
+		return nil
+	}
+	return t
+}

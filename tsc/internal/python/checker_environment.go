@@ -414,9 +414,14 @@ func (e *CheckerTypeEnvironment) Resolve(expression TypeExpr) (*checker.Type, []
 }
 
 func (e *CheckerTypeEnvironment) declareCheckerSymbol(symbol *CheckerTypeSymbol, loc TextRange) {
-	if _, exists := e.symbols[symbol.Name]; exists {
-		e.reportChecker(loc, fmt.Sprintf("duplicate type declaration %q", symbol.Name))
-		return
+	if existing, exists := e.symbols[symbol.Name]; exists {
+		// Names such as set are seeded so they resolve before the library file
+		// is bound. The declaration in that file replaces the placeholder.
+		placeholder := e.installingBuiltins && existing.BuiltinArity != 0 && existing.Interface == nil && existing.Class == nil && existing.Alias == nil
+		if !placeholder {
+			e.reportChecker(loc, fmt.Sprintf("duplicate type declaration %q", symbol.Name))
+			return
+		}
 	}
 	e.symbols[symbol.Name] = symbol
 }

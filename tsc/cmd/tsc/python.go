@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/jdrebin/TyThon/tsc/internal/outputpaths"
+	"github.com/jdrebin/TyThon/tsc/internal/pyprogram"
 	pythonfrontend "github.com/jdrebin/TyThon/tsc/internal/python"
 	"github.com/jdrebin/TyThon/tsc/internal/tspath"
 )
@@ -104,26 +105,15 @@ func runPython(args []string) int {
 			return 2
 		}
 	}
-	c, done := pythonfrontend.NewChecker()
-	defer done()
-	program := pythonfrontend.BuildProgram(c, inputs)
 	texts := make(map[string]string, len(inputs))
 	for _, input := range inputs {
 		texts[input.FileName] = input.Text
 	}
-	sortedDiagnostics := append([]pythonfrontend.ProgramDiagnostic(nil), program.Diagnostics...)
-	sort.Slice(sortedDiagnostics, func(i, j int) bool {
-		left, right := sortedDiagnostics[i], sortedDiagnostics[j]
-		if left.FileName != right.FileName {
-			return left.FileName < right.FileName
-		}
-		if left.Range.Start != right.Range.Start {
-			return left.Range.Start < right.Range.Start
-		}
-		return left.Message < right.Message
-	})
-	seen := make(map[string]struct{}, len(sortedDiagnostics))
-	for _, diagnostic := range sortedDiagnostics {
+	session := pyprogram.Open(context.Background(), inputs)
+	defer session.Close()
+	diagnostics := session.Diagnostics()
+	seen := make(map[string]struct{}, len(diagnostics))
+	for _, diagnostic := range diagnostics {
 		key := diagnostic.FileName + "\x00" + fmt.Sprint(diagnostic.Range.Start) + "\x00" + diagnostic.Message
 		if _, ok := seen[key]; ok {
 			continue
@@ -138,22 +128,22 @@ func runPython(args []string) int {
 			fmt.Fprintln(os.Stderr, err)
 			return 2
 		}
-		if hover, ok := program.HoverAt(target, typeAt); ok {
+		if hover, _, ok := session.Hover(target, typeAt, nil); ok {
 			fmt.Fprintln(os.Stdout, hover)
 			return 0
 		}
 		return 1
 	}
-	if len(program.Diagnostics) != 0 {
+	if len(diagnostics) != 0 {
 		return 1
 	}
 	if emit {
-		if err := emitPythonProgram(program, inputs, rootDir, outDir); err != nil {
+		if err := emitPythonProgram(inputs, rootDir, outDir); err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			return 1
 		}
 	}
-	fmt.Fprintf(os.Stdout, "Checked %d Python module(s) with no errors.\n", len(program.Modules))
+	fmt.Fprintf(os.Stdout, "Checked %d Python module(s) with no errors.\n", len(inputs))
 	return 0
 }
 
@@ -235,10 +225,9 @@ func collectPythonInputsAtRoot(args []string, rootDir string) ([]pythonfrontend.
 	return inputs, nil
 }
 
-// Keep Python erasure in the frontend and path relocation in the existing TS
-// output mapper. Only filesystem validation belongs here; neither import
-// expressions nor runtime behavior are rewritten. Ordinary .py files are not inputs.
-func emitPythonProgram(program *pythonfrontend.PythonProgram, inputs []pythonfrontend.SourceInput, rootDir, outDir string) error {
+// Keep erasure on the source text. Declaration files have no runtime output.
+// Path relocation stays in the TypeScript output mapper.
+func emitPythonProgram(inputs []pythonfrontend.SourceInput, rootDir, outDir string) error {
 	root, err := filepath.Abs(rootDir)
 	if err != nil {
 		return err
@@ -270,16 +259,15 @@ func emitPythonProgram(program *pythonfrontend.PythonProgram, inputs []pythonfro
 	}
 	type outputFile struct{ name, text string }
 	outputs := []outputFile{}
-	for _, module := range program.Modules {
-		source := module.Files.TypedImplementation
-		if source == "" { // Declaration-only modules have no runtime output.
+	for _, input := range inputs {
+		if pythonfrontend.GetFileKind(input.FileName) != pythonfrontend.FileKindTypedImplementation {
 			continue
 		}
-		text, diagnostics := pythonfrontend.EraseTypedPython(module.TypedSource)
+		text, diagnostics := pythonfrontend.EraseTypedPython(input.Text)
 		if len(diagnostics) != 0 {
-			return fmt.Errorf("cannot emit %s: %s", source, diagnostics[0].Message)
+			return fmt.Errorf("cannot emit %s: %s", input.FileName, diagnostics[0].Message)
 		}
-		name := filepath.FromSlash(outputpaths.GetSourceFilePathInNewDir(filepath.ToSlash(source), filepath.ToSlash(out), filepath.ToSlash(root), tspath.EnsureTrailingDirectorySeparator(filepath.ToSlash(root)), true))
+		name := filepath.FromSlash(outputpaths.GetSourceFilePathInNewDir(filepath.ToSlash(input.FileName), filepath.ToSlash(out), filepath.ToSlash(root), tspath.EnsureTrailingDirectorySeparator(filepath.ToSlash(root)), true))
 		name, _ = pythonfrontend.OutputFileName(name)
 		if !inside(out, name) {
 			return fmt.Errorf("output %s escapes the output directory", name)

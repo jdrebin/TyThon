@@ -13,6 +13,7 @@ import (
 	"github.com/jdrebin/TyThon/tsc/internal/checker"
 	"github.com/jdrebin/TyThon/tsc/internal/ls/lsconv"
 	"github.com/jdrebin/TyThon/tsc/internal/lsp/lsproto"
+	"github.com/jdrebin/TyThon/tsc/internal/pyprogram"
 	pythonfrontend "github.com/jdrebin/TyThon/tsc/internal/python"
 	"github.com/jdrebin/TyThon/tsc/internal/vfs"
 )
@@ -169,7 +170,6 @@ func (s *pythonLanguageService) computeCompletion(ctx context.Context, params *l
 	var typeQuery pythonfrontend.TypeCompletionQuery
 	var callQuery pythonfrontend.CallCompletionQuery
 	var visibleQuery pythonfrontend.VisibleNameCompletionQuery
-	var definitionQuery pythonfrontend.DefinitionCompletionQuery
 	var stringQuery pythonfrontend.StringCompletionQuery
 	stringOK := false
 	itemOK, typeOK, callOK, visibleOK, definitionOK := false, false, false, false, false
@@ -184,7 +184,7 @@ func (s *pythonLanguageService) computeCompletion(ctx context.Context, params *l
 	}
 	if !attributeOK && !itemOK && !stringOK {
 		typeQuery, typeOK = pythonfrontend.PrepareTypeCompletion(source, offset)
-		definitionQuery, definitionOK = pythonfrontend.PrepareDefinitionCompletion(source, offset)
+		_, definitionOK = pythonfrontend.PrepareDefinitionCompletion(source, offset)
 		if typeOK {
 			recovered = source
 		} else if definitionOK {
@@ -205,29 +205,28 @@ func (s *pythonLanguageService) computeCompletion(ctx context.Context, params *l
 		}
 	}
 	sources[fileName] = recovered
-	program, done, err := s.buildPythonProgram(ctx, sources)
-	if err != nil {
-		return lsproto.CompletionItemsOrListOrNull{}, err
+	inputs := make([]pythonfrontend.SourceInput, 0, len(sources))
+	for name, text := range sources {
+		inputs = append(inputs, pythonfrontend.SourceInput{FileName: name, Text: text})
 	}
-	defer done()
+	session := pyprogram.Open(ctx, inputs)
+	defer session.Close()
 	var entries []pythonfrontend.CompletionEntry
 	switch {
 	case attributeOK:
-		entries = program.AttributeCompletionsAt(fileName, attributeQuery)
+		entries = session.AttributeCompletions(fileName, attributeQuery)
 	case itemOK:
-		entries = program.ItemCompletionsAt(fileName, itemQuery)
+		entries = session.ItemCompletions(fileName, itemQuery)
 	case typeOK:
-		entries = program.TypeCompletionsAt(fileName, typeQuery)
-	case definitionOK:
-		entries = program.DefinitionCompletionsAt(fileName, definitionQuery)
+		entries = session.TypeCompletions(fileName, typeQuery)
 	case stringOK:
-		entries = program.StringCompletionsAt(fileName, stringQuery)
+		entries = session.StringCompletions(fileName, stringQuery)
 	default:
 		if callOK {
-			entries = append(entries, program.KeywordArgumentCompletionsAt(fileName, callQuery)...)
+			entries = append(entries, session.KeywordArgumentCompletions(fileName, callQuery)...)
 		}
 		if visibleOK {
-			entries = append(entries, program.VisibleNameCompletionsAt(fileName, visibleQuery)...)
+			entries = append(entries, session.VisibleNameCompletions(fileName, visibleQuery)...)
 		}
 	}
 	items := make([]*lsproto.CompletionItem, 0, len(entries))
@@ -314,28 +313,28 @@ func (s *pythonLanguageService) computeHover(ctx context.Context, params *lsprot
 	if !ok {
 		return lsproto.HoverOrNull{}, nil
 	}
-	program, done, err := s.buildPythonProgram(ctx, sources)
-	if err != nil {
-		return lsproto.HoverOrNull{}, err
+	inputs := make([]pythonfrontend.SourceInput, 0, len(sources))
+	for name, text := range sources {
+		inputs = append(inputs, pythonfrontend.SourceInput{FileName: name, Text: text})
 	}
-	defer done()
-	info, c, ok := program.QuickInfoAt(fileName, offset)
-	if !ok {
-		return lsproto.HoverOrNull{}, nil
-	}
+	session := pyprogram.Open(ctx, inputs)
+	defer session.Close()
 	verbosityLevel := 0
 	if params.VerbosityLevel != nil {
 		verbosityLevel = int(*params.VerbosityLevel)
 	}
 	verbosity := &checker.VerbosityContext{Level: verbosityLevel, MaxTruncationLength: 500}
-	display := pythonfrontend.FormatQuickInfoWithVerbosity(c, info, verbosity)
+	display, span, ok := session.Hover(fileName, offset, verbosity)
+	if !ok {
+		return lsproto.HoverOrNull{}, nil
+	}
 	contentKind := lsproto.PreferredMarkupKind(lsproto.GetClientCapabilities(ctx).TextDocument.Hover.ContentFormat)
 	content := display
 	if contentKind == lsproto.MarkupKindMarkdown {
 		content = "```python\n" + display + "\n```"
 	}
-	start, startOK := pythonPositionAt(source, info.Range.Start, encoding)
-	end, endOK := pythonPositionAt(source, info.Range.End, encoding)
+	start, startOK := pythonPositionAt(source, span.Start, encoding)
+	end, endOK := pythonPositionAt(source, span.End, encoding)
 	var hoverRange *lsproto.Range
 	if startOK && endOK {
 		hoverRange = &lsproto.Range{Start: start, End: end}
@@ -362,19 +361,20 @@ func (s *pythonLanguageService) computeDefinition(ctx context.Context, params *l
 	if !ok {
 		return lsproto.DefinitionResponse{}, nil
 	}
-	program, done, err := s.buildPythonProgram(ctx, sources)
-	if err != nil {
-		return lsproto.DefinitionResponse{}, err
+	inputs := make([]pythonfrontend.SourceInput, 0, len(sources))
+	for name, text := range sources {
+		inputs = append(inputs, pythonfrontend.SourceInput{FileName: name, Text: text})
 	}
-	defer done()
-	target, span, ok := program.TypeDefinitionAt(fileName, offset)
+	session := pyprogram.Open(ctx, inputs)
+	defer session.Close()
+	target, span, ok := session.Definition(fileName, offset)
 	if !ok {
 		return lsproto.DefinitionResponse{}, nil
 	}
 	uri := lsconv.FileNameToDocumentURI(target)
 	text := sources[target]
-	if target == pythonfrontend.BuiltinDeclarationURI {
-		uri = lsproto.DocumentUri(target)
+	if text == "" && target == "/lib/builtins.d.ty" {
+		uri = lsproto.DocumentUri(pythonfrontend.BuiltinDeclarationURI)
 		text = pythonfrontend.BuiltinDeclarationSource()
 	}
 	start, startOK := pythonPositionAt(text, span.Start, encoding)
@@ -393,14 +393,13 @@ func (s *pythonLanguageService) computeDiagnostics(ctx context.Context, params *
 			FullDocumentDiagnosticReport: &lsproto.RelatedFullDocumentDiagnosticReport{Items: []*lsproto.Diagnostic{}},
 		}, nil
 	}
-	program, done, err := s.buildPythonProgram(ctx, sources)
-	if err != nil {
-		return lsproto.RelatedFullDocumentDiagnosticReportOrUnchangedDocumentDiagnosticReport{}, err
+	inputs := make([]pythonfrontend.SourceInput, 0, len(sources))
+	for name, text := range sources {
+		inputs = append(inputs, pythonfrontend.SourceInput{FileName: name, Text: text})
 	}
-	defer done()
 	items := make([]*lsproto.Diagnostic, 0)
 	related := make(map[lsproto.DocumentUri]lsproto.FullDocumentDiagnosticReportOrUnchangedDocumentDiagnosticReport)
-	for _, diagnostic := range program.Diagnostics {
+	for _, diagnostic := range pyprogram.Check(ctx, inputs) {
 		diagnosticFile := filepath.Clean(diagnostic.FileName)
 		source, exists := sources[diagnosticFile]
 		if !exists {
@@ -531,47 +530,41 @@ func (s *pythonLanguageService) computeSignatureHelp(ctx context.Context, params
 	if !ok {
 		return lsproto.SignatureHelpOrNull{}, nil
 	}
-	recovered, query, ok := pythonfrontend.PrepareCallCompletion(source, offset)
+	inputs := func() []pythonfrontend.SourceInput {
+		result := make([]pythonfrontend.SourceInput, 0, len(sources))
+		for name, text := range sources {
+			result = append(result, pythonfrontend.SourceInput{FileName: name, Text: text})
+		}
+		return result
+	}
+	session := pyprogram.Open(ctx, inputs())
+	defer func() { session.Close() }()
+	help, ok := session.SignatureHelp(fileName, offset)
 	if !ok {
-		return lsproto.SignatureHelpOrNull{}, nil
-	}
-	program, done, err := s.buildPythonProgram(ctx, sources)
-	if err != nil {
-		return lsproto.SignatureHelpOrNull{}, err
-	}
-	defer done()
-	help := program.SignatureHelpAt(fileName, query)
-	if len(help.Signatures) == 0 {
+		recovered, _, recoveredOK := pythonfrontend.PrepareCallCompletion(source, offset)
+		if !recoveredOK {
+			return lsproto.SignatureHelpOrNull{}, nil
+		}
 		sources[fileName] = recovered
-		program, done, err = s.buildPythonProgram(ctx, sources)
-		if err != nil {
-			return lsproto.SignatureHelpOrNull{}, err
+		session.Close()
+		session = pyprogram.Open(ctx, inputs())
+		help, ok = session.SignatureHelp(fileName, offset)
+		if !ok {
+			return lsproto.SignatureHelpOrNull{}, nil
 		}
-		defer done()
-		help = program.SignatureHelpAt(fileName, query)
 	}
-	if len(help.Signatures) == 0 {
-		return lsproto.SignatureHelpOrNull{}, nil
+	parameters := make([]*lsproto.ParameterInformation, 0, len(help.Parameters))
+	for _, parameter := range help.Parameters {
+		parameters = append(parameters, &lsproto.ParameterInformation{Label: lsproto.StringOrTuple{String: &parameter}})
 	}
-	signatures := make([]*lsproto.SignatureInformation, 0, len(help.Signatures))
-	for _, signature := range help.Signatures {
-		parameters := make([]*lsproto.ParameterInformation, 0, len(signature.Parameters))
-		for _, parameter := range signature.Parameters {
-			parameters = append(parameters, &lsproto.ParameterInformation{Label: lsproto.StringOrTuple{String: &parameter}})
-		}
-		info := &lsproto.SignatureInformation{Label: signature.Label, Parameters: &parameters}
-		if signature.ActiveParameter >= 0 {
-			active := uint32(signature.ActiveParameter)
-			info.ActiveParameter = &lsproto.UintegerOrNull{Uinteger: &active}
-		}
-		signatures = append(signatures, info)
+	info := &lsproto.SignatureInformation{Label: help.Label, Parameters: &parameters}
+	if help.ActiveParameter >= 0 {
+		active := uint32(help.ActiveParameter)
+		info.ActiveParameter = &lsproto.UintegerOrNull{Uinteger: &active}
 	}
-	activeSignature := uint32(help.ActiveSignature)
-	result := &lsproto.SignatureHelp{Signatures: signatures, ActiveSignature: &activeSignature}
-	if active := help.Signatures[help.ActiveSignature].ActiveParameter; active >= 0 {
-		value := uint32(active)
-		result.ActiveParameter = &lsproto.UintegerOrNull{Uinteger: &value}
-	}
+	signatures := []*lsproto.SignatureInformation{info}
+	activeSignature := uint32(0)
+	result := &lsproto.SignatureHelp{Signatures: signatures, ActiveSignature: &activeSignature, ActiveParameter: info.ActiveParameter}
 	return lsproto.SignatureHelpOrNull{SignatureHelp: result}, nil
 }
 

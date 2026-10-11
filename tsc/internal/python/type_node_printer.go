@@ -8,6 +8,10 @@ import (
 	"github.com/jdrebin/TyThon/tsc/internal/printer"
 )
 
+func PrintPythonTypeNode(node *ast.Node, emit *printer.EmitContext) string {
+	return printPythonTypeNode(node, emit)
+}
+
 // printPythonTypeNode is a syntax printer, not a type formatter. The native
 // node builder has already decided what to expand, retain, or elide, and has
 // introduced mapped/infer binders in their proper scope. Never resolve members
