@@ -92,7 +92,9 @@ assertScope(presence, 1, "!", "keyword.operator.presence.tython");
 assertNotScope(presence, 2, "keep!", "keyword.operator.presence.tython");
 assertNotScope(presence, 3, "!=", "keyword.operator.presence.tython");
 const requiredMapping = tokenize('type Required(T) = { -optional (K): T[K] for K in keyof T }');
-assertScope(requiredMapping, 0, "-optional", "keyword.operator.presence.tython");
+assertScope(requiredMapping, 0, "optional", "storage.modifier.tython");
+assertScope(requiredMapping, 0, "-", "keyword.operator.type.tython");
+assertScope(requiredMapping, 0, ")", "punctuation.parenthesis.end.python");
 
 const optionalModifiers = tokenize('type Patch = { optional name: str, readonly optional "id": int }\ninterface Model:\n    optional label: str\ntype Partial(T) = { optional (K): T[K] for K in keyof T }');
 assertScope(optionalModifiers, 0, "optional", "storage.modifier.tython");
@@ -163,6 +165,48 @@ assertNotScope(defColor, 8, "*", "meta.function.python");
 assertNotScope(defColor, 8, "*", "keyword.operator.arithmetic.python");
 assertNotScope(defColor, 8, "{", "meta.function.python");
 assertNotScope(defColor, 10, "value", "meta.function.python");
+assertScope(defColor, 8, ")", "punctuation.parenthesis.end.python");
+const mappedStar = defColor[8].text.lastIndexOf("*");
+assertExactToken(defColor, 8, mappedStar, "*", "entity.name.type.interface.tython");
+assertExactToken(defColor, 8, mappedStar + 1, ")", "punctuation.parenthesis.end.python");
+
+const starParens = tokenize([
+    "interface Named<T>:",
+    '    (*<"lkokok">): int',
+    "type BoxAttributes = Extract(keyof Box<str>, *)",
+    "type BoxItems = {(K): Box<str>[K] for K in Exclude(keyof Box<str>, *)}",
+].join("\n"));
+const interfaceStar = starParens[1].text.indexOf("*");
+assertExactToken(starParens, 1, interfaceStar - 1, "(", "punctuation.parenthesis.begin.python");
+assertExactToken(starParens, 1, interfaceStar, "*", "entity.name.type.interface.tython");
+assertExactToken(starParens, 1, interfaceStar + 1, "<", "punctuation.definition.typeparameters.begin.tython");
+assertExactToken(starParens, 1, starParens[1].text.indexOf(")"), ")", "punctuation.parenthesis.end.python");
+const extractStar = starParens[2].text.lastIndexOf("*");
+assertExactToken(starParens, 2, extractStar, "*", "entity.name.type.interface.tython");
+assertExactToken(starParens, 2, extractStar + 1, ")", "punctuation.parenthesis.end.python");
+const itemsStar = starParens[3].text.lastIndexOf("*");
+assertExactToken(starParens, 3, itemsStar, "*", "entity.name.type.interface.tython");
+assertExactToken(starParens, 3, itemsStar + 1, ")", "punctuation.parenthesis.end.python");
+
+const dotted = tokenize("type UserNameViaDot = User(str).name\ntype Id = User.id\nx = 1 # keep\ny = 2\nref = user.name\n");
+assertScope(dotted, 0, "name", "entity.name.type.tython");
+assertNotScope(dotted, 0, "name", "variable.other.property.python");
+assertScope(dotted, 1, "id", "entity.name.type.tython");
+assertNotScope(dotted, 1, "id", "variable.other.property.python");
+assertScope(dotted, 2, "#", "comment.line.number-sign.python");
+assertNotScope(dotted, 3, "y", "comment.line.number-sign.python");
+assertScope(dotted, 4, "name", "variable.other.property.python");
+
+const restType = tokenize("type R = *()U\ntype S = *[]U\ntype Pair(T, U) = (T, *()U)\n");
+assertScope(restType, 0, "*", "keyword.operator.type.tython");
+assertNotScope(restType, 0, "*", "keyword.operator.arithmetic.python");
+assertScope(restType, 0, "(", "punctuation.parenthesis.begin.python");
+assertScope(restType, 0, ")", "punctuation.parenthesis.end.python");
+assertScope(restType, 1, "*", "keyword.operator.type.tython");
+assertScope(restType, 1, "[", "punctuation.definition.list.begin.python");
+assertScope(restType, 1, "]", "punctuation.definition.list.end.python");
+assertScope(restType, 2, "*", "keyword.operator.type.tython");
+assertNotScope(restType, 2, "*", "keyword.operator.arithmetic.python");
 
 console.log("tython grammar tests passed.");
 
@@ -194,6 +238,13 @@ function assertScope(lines, lineNumber, fragment, scope) {
 function assertNotScope(lines, lineNumber, fragment, scope) {
     const token = tokenFor(lines, lineNumber, fragment);
     assert(!token.scopes.includes(scope), `${JSON.stringify(fragment)} on line ${lineNumber + 1} unexpectedly has scope ${scope}`);
+}
+
+function assertExactToken(lines, lineNumber, startIndex, text, scope) {
+    const token = lines[lineNumber].tokens.find(candidate => candidate.startIndex === startIndex);
+    assert(token, `no token at ${startIndex} on line ${lineNumber + 1}`);
+    assert.equal(lines[lineNumber].text.slice(token.startIndex, token.endIndex), text);
+    assert(token.scopes.includes(scope), `${JSON.stringify(text)} on line ${lineNumber + 1} has scopes ${token.scopes.join(", ")}; expected ${scope}`);
 }
 
 const languageConfiguration = JSON.parse(await readFile(path.join(extensionDirectory, "language-configuration.json"), "utf8"));

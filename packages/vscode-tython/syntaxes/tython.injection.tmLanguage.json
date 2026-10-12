@@ -7,8 +7,15 @@
             "include": "source.python.typed#comments"
         },
         {
+            "match": "(-)(optional)\\b",
+            "captures": {
+                "1": { "name": "keyword.operator.type.tython" },
+                "2": { "name": "storage.modifier.tython" }
+            }
+        },
+        {
             "name": "keyword.operator.presence.tython",
-            "match": "(-optional)\\b|(!(?!=))"
+            "match": "(!(?!=))"
         },
         {
             "match": "(?<!\\bdef\\s+)(?<![\\w])(__)([A-Za-z][A-Za-z0-9_]*?)(__)(?![\\w])",
@@ -143,6 +150,22 @@
                     "include": "#attribute-key"
                 },
                 {
+                    "match": "(\\*)(\\()(\\))",
+                    "captures": {
+                        "1": { "name": "keyword.operator.type.tython" },
+                        "2": { "name": "punctuation.parenthesis.begin.python" },
+                        "3": { "name": "punctuation.parenthesis.end.python" }
+                    }
+                },
+                {
+                    "match": "(\\*)(\\[)(\\])",
+                    "captures": {
+                        "1": { "name": "keyword.operator.type.tython" },
+                        "2": { "name": "punctuation.definition.list.begin.python" },
+                        "3": { "name": "punctuation.definition.list.end.python" }
+                    }
+                },
+                {
                     "include": "#collection-shorthand"
                 },
                 {
@@ -171,6 +194,13 @@
                 {
                     "name": "punctuation.separator.annotation.result.python",
                     "match": "->"
+                },
+                {
+                    "match": "(\\.)([[:alpha:]_]\\w*)",
+                    "captures": {
+                        "1": { "name": "punctuation.separator.period.python" },
+                        "2": { "name": "entity.name.type.tython" }
+                    }
                 },
                 {
                     "include": "source.python.typed#expression"
@@ -297,7 +327,10 @@
                         "1": { "name": "entity.name.type.interface.tython" },
                         "2": { "name": "punctuation.definition.typeparameters.begin.tython" }
                     },
-                    "end": ">",
+                    "end": "(>)",
+                    "endCaptures": {
+                        "1": { "name": "punctuation.definition.typeparameters.end.tython" }
+                    },
                     "patterns": [{ "include": "#type-expression" }]
                 },
                 {
@@ -309,15 +342,24 @@
         "type-containers": {
             "patterns": [
                 {
-                    "begin": "\\{", "end": "\\}",
+                    "begin": "\\{",
+                    "beginCaptures": { "0": { "name": "punctuation.definition.dict.begin.python" } },
+                    "end": "\\}",
+                    "endCaptures": { "0": { "name": "punctuation.definition.dict.end.python" } },
                     "patterns": [{ "include": "#type-expression" }]
                 },
                 {
-                    "begin": "\\[", "end": "\\]",
+                    "begin": "\\[",
+                    "beginCaptures": { "0": { "name": "punctuation.definition.list.begin.python" } },
+                    "end": "\\]",
+                    "endCaptures": { "0": { "name": "punctuation.definition.list.end.python" } },
                     "patterns": [{ "include": "#type-expression" }]
                 },
                 {
-                    "begin": "\\(", "end": "\\)",
+                    "begin": "\\(",
+                    "beginCaptures": { "0": { "name": "punctuation.parenthesis.begin.python" } },
+                    "end": "\\)",
+                    "endCaptures": { "0": { "name": "punctuation.parenthesis.end.python" } },
                     "patterns": [{ "include": "#type-expression" }]
                 }
             ]

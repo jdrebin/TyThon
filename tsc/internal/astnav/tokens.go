@@ -256,6 +256,12 @@ func getTokenAtPosition(
 						if current.Kind == ast.KindConstructor && token == ast.KindIdentifier {
 							return sourceFile.GetOrCreateToken(token, tokenFullStart, tokenEnd, current, flags)
 						}
+						// `import sample.models as models` stores the dotted path as a
+						// string, so those identifier tokens are not children. Hover the
+						// enclosing import instead of panicking.
+						if token == ast.KindIdentifier && sourceFile.LanguageVariant == core.LanguageVariantPython {
+							return current
+						}
 						panic(fmt.Sprintf("did not expect %s to have %s in its trivia", current.Kind.String(), token.String()))
 					}
 					return sourceFile.GetOrCreateToken(token, tokenFullStart, tokenEnd, current, flags)

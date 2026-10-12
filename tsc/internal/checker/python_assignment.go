@@ -7,8 +7,10 @@ import (
 )
 
 // The declared type of a name introduced by assignment (`x = value`, `a, b = pair`)
-// is the union of the widened types of every value assigned to it in its scope, the
-// analogue of getWidenedTypeForAssignmentDeclaration for JavaScript expandos. An
+// is the widened type of its initializer, the first assignment in the scope. Later
+// assignments are checked against that type; they do not contribute to it. A fresh
+// literal widens (`x = "v1"` is str). A non-fresh literal union does not
+// (`x = registry.version` stays 'v1' | 'v2', and `x = "v3"` is an error). An
 // annotated name is a VariableDeclaration and does not come through here.
 
 // isPythonMatchPattern reports a case pattern that binds names rather than a
@@ -48,21 +50,18 @@ func (c *Checker) pythonPatternCaptureType(name *ast.Node) *Type {
 }
 
 func (c *Checker) getPythonAssignmentDeclarationType(symbol *ast.Symbol) *Type {
-	var types []*Type
 	for _, declaration := range symbol.Declarations {
 		if declaration.Kind != ast.KindBinaryExpression {
 			continue
 		}
 		assignment := declaration.AsBinaryExpression()
+		// Only the initializer. A later `"v2"` must not widen 'v1' | 'v2' to str.
 		value := c.getWidenedLiteralType(c.checkExpressionCached(assignment.Right))
 		if t := c.pythonTargetType(assignment.Left, value, symbol.Name); t != nil {
-			types = append(types, t)
+			return c.getWidenedType(t)
 		}
 	}
-	if len(types) == 0 {
-		return c.errorType
-	}
-	return c.getWidenedType(c.getUnionTypeEx(types, UnionReductionSubtype, nil, nil))
+	return c.errorType
 }
 
 // pythonTargetType returns the type that name receives when sourceType is assigned

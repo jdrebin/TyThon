@@ -176,7 +176,7 @@
         "demo:prepare": "node scripts/prepare-demo.mjs",
         "grammar:test": "node test/grammar.test.mjs && node test/icons.test.mjs",
         "grammar:update": "node scripts/update-python-grammar.mjs",
-        "test": "npm run grammar:test && node test/documentScope.test.mjs && node test/completionFallback.test.mjs && node test/serverLaunch.test.mjs && node test/hoverLatency.test.mjs && node test/compilerPath.test.mjs && npm run formatter:test",
+        "test": "npm run grammar:test && node test/documentScope.test.mjs && node test/completionFallback.test.mjs && node test/serverLaunch.test.mjs && node test/hoverLatency.test.mjs && node test/compilerPath.test.mjs && node --experimental-strip-types --no-warnings test/starLigature.test.ts && npm run formatter:test",
         "watch": "npm run bundle -- --watch"
     },
     "devDependencies": {

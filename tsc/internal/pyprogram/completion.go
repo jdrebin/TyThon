@@ -15,9 +15,10 @@ func (s *Session) AttributeCompletions(fileName string, query python.AttributeCo
 	if receiver == nil {
 		return nil
 	}
+	receiverType, typeMember := s.attributeReceiverType(receiver)
 	seen := map[string]bool{}
 	var entries []python.CompletionEntry
-	for _, property := range s.checker.PropertiesForCompletion(s.checker.GetTypeAtLocation(receiver)) {
+	for _, property := range s.checker.PropertiesForCompletion(receiverType) {
 		name := property.Name
 		if s.checker.IsPythonPrivateAttributeName(name) || !includeCompletionName(name, query.Prefix) {
 			continue
@@ -26,7 +27,7 @@ func (s *Session) AttributeCompletions(fileName string, query python.AttributeCo
 			continue
 		}
 		seen[name] = true
-		entries = append(entries, s.propertyEntry(name, property, query.ReplaceFrom, query.ReplaceTo))
+		entries = append(entries, s.propertyEntry(name, property, query.ReplaceFrom, query.ReplaceTo, typeMember))
 	}
 	sortCompletionLabels(entries)
 	return entries
@@ -195,13 +196,103 @@ func (s *Session) nodeAt(fileName string, offset int) *ast.Node {
 	if node == nil && offset > 0 {
 		node = astnav.GetTouchingToken(file, offset-1)
 	}
-	return node
+	return completionReceiver(node)
 }
 
-func (s *Session) propertyEntry(name string, property *ast.Symbol, from int, to int) python.CompletionEntry {
+// completionReceiver is the object a trailing dot applies to. The cursor offset
+// lands on the last token of that object (`User(str).` lands on `)`), which has
+// no properties of its own.
+func completionReceiver(node *ast.Node) *ast.Node {
+	if node == nil {
+		return nil
+	}
+	current := node
+	for parent := current.Parent; parent != nil && parent.Kind != ast.KindSourceFile; parent = current.Parent {
+		if parent.End() != current.End() {
+			break
+		}
+		switch parent.Kind {
+		case ast.KindTypeCallType, ast.KindTypeReference, ast.KindAttributeAccessType,
+			ast.KindIndexedAccessType, ast.KindParenthesizedType, ast.KindUnionType,
+			ast.KindIntersectionType, ast.KindExpressionWithTypeArguments,
+			ast.KindQualifiedName, ast.KindCallExpression, ast.KindParenthesizedExpression:
+			current = parent
+		default:
+			return current
+		}
+	}
+	return current
+}
+
+// attributeReceiverType is the type a dot applies to. `User.id` parses as a
+// qualified name, so the receiver identifier is not itself a type node and
+// GetTypeAtLocation is an error. The declared type of that name is the
+// attribute surface. A runtime `user.id` stays on GetTypeAtLocation.
+func (s *Session) attributeReceiverType(node *ast.Node) (*checker.Type, bool) {
+	if node == nil {
+		return nil, false
+	}
+	if typeAttributeReceiver(node) {
+		if t := s.typeNameReceiverType(node); t != nil && t != s.checker.GetErrorType() {
+			return t, true
+		}
+		if ast.IsPartOfTypeNode(node) {
+			return s.checker.GetTypeAtLocation(node), true
+		}
+	}
+	return s.checker.GetTypeAtLocation(node), false
+}
+
+func typeAttributeReceiver(node *ast.Node) bool {
+	for current := node; current != nil && current.Kind != ast.KindSourceFile; current = current.Parent {
+		switch current.Kind {
+		case ast.KindTypeReference, ast.KindTypeCallType, ast.KindAttributeAccessType,
+			ast.KindIndexedAccessType, ast.KindQualifiedName, ast.KindTypeAliasDeclaration,
+			ast.KindUnionType, ast.KindIntersectionType, ast.KindParenthesizedType:
+			return true
+		}
+		if ast.IsPartOfTypeNode(current) {
+			return true
+		}
+	}
+	return false
+}
+
+func (s *Session) typeNameReceiverType(node *ast.Node) *checker.Type {
+	switch node.Kind {
+	case ast.KindIdentifier:
+		// The qualified-name resolver stashes a transient alias on this identifier.
+		// The name in scope is the type (`type User = ...`).
+		symbol := s.checker.ResolveName(node.Text(), node, ast.SymbolFlagsType, false)
+		if symbol == nil || symbol.Flags&ast.SymbolFlagsType == 0 {
+			return nil
+		}
+		return s.checker.GetDeclaredTypeOfSymbol(symbol)
+	case ast.KindQualifiedName:
+		qualified := node.AsQualifiedName()
+		left := s.typeNameReceiverType(qualified.Left)
+		if left == nil || qualified.Right == nil {
+			return nil
+		}
+		return s.checker.GetAttributeType(left, s.checker.GetStringLiteralType(qualified.Right.Text()))
+	default:
+		if ast.IsPartOfTypeNode(node) {
+			t := s.checker.GetTypeAtLocation(node)
+			if t == s.checker.GetErrorType() {
+				return nil
+			}
+			return t
+		}
+		return nil
+	}
+}
+
+func (s *Session) propertyEntry(name string, property *ast.Symbol, from int, to int, typeMember bool) python.CompletionEntry {
 	t := s.checker.GetTypeOfSymbol(property)
 	kind := python.CompletionKindProperty
-	if len(s.checker.GetSignaturesOfType(t, checker.SignatureKindCall)) != 0 {
+	if typeMember {
+		kind = python.CompletionKindType
+	} else if len(s.checker.GetSignaturesOfType(t, checker.SignatureKindCall)) != 0 {
 		kind = python.CompletionKindMethod
 	}
 	return python.CompletionEntry{

@@ -15,6 +15,7 @@ import {
 } from "vscode-languageclient/node";
 import { recolorDunderTokens } from "./dunderConceal";
 import { presentDunderCompletion, registerDunderMask } from "./dunderMask";
+import { registerStarLigatureMask } from "./starLigatureMask";
 import { registerHoverFeature } from "./hover";
 import { createServerLaunch } from "./serverLaunch";
 import { PythonTools } from "./pythonTools";
@@ -30,6 +31,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     const output = vscode.window.createOutputChannel("TyThon");
     context.subscriptions.push(output);
     registerDunderMask(context);
+    registerStarLigatureMask(context);
 
     context.subscriptions.push(vscode.commands.registerCommand("pythonTypeScript.openPreview", async () => {
         const selected = await vscode.window.showOpenDialog({ canSelectFiles: false, canSelectFolders: true, canSelectMany: false,

@@ -445,6 +445,133 @@ func TestAdvancedTypesHover(t *testing.T) {
 	}
 }
 
+func TestDotTypeCompletion(t *testing.T) {
+	source := strings.Join([]string{
+		"interface Box<T>:",
+		"    value: T",
+		"    def get(self) -> T",
+		"type User(T) = { name: str }",
+		"type A = User(str).",
+		"type B = Box<str>.",
+		"",
+	}, "\n")
+	for _, test := range []struct{ marker, want string }{
+		{"User(str).", "name"},
+		{"Box<str>.", "value"},
+	} {
+		offset := strings.Index(source, test.marker) + len(test.marker)
+		recovered, query, ok := python.PrepareAttributeCompletion(source, offset)
+		if !ok {
+			t.Fatalf("no attribute query at %s", test.marker)
+		}
+		session := Open(t.Context(), []python.SourceInput{{FileName: "/t.ty", Text: recovered}})
+		entries := session.AttributeCompletions("/t.ty", query)
+		session.Close()
+		found := false
+		labels := make([]string, len(entries))
+		for i, entry := range entries {
+			labels[i] = entry.Label
+			if entry.Label == test.want {
+				found = true
+			}
+		}
+		if !found {
+			t.Fatalf("%s completions %v, want %s", test.marker, labels, test.want)
+		}
+		for _, entry := range entries {
+			if entry.Label == test.want && entry.Kind != python.CompletionKindType {
+				t.Fatalf("%s completion kind %v, want a type", test.marker, entry.Kind)
+			}
+		}
+	}
+}
+
+func TestTypeDotAttribute(t *testing.T) {
+	source := strings.Join([]string{
+		"type User = {id: int, name: str}",
+		"type Id = User.",
+		"user: User",
+		"value = user.id",
+		"",
+	}, "\n")
+	offset := strings.Index(source, "User.") + len("User.")
+	recovered, query, ok := python.PrepareAttributeCompletion(source, offset)
+	if !ok {
+		t.Fatal("no attribute query")
+	}
+	session := Open(t.Context(), []python.SourceInput{{FileName: "/t.ty", Text: recovered}})
+	entries := session.AttributeCompletions("/t.ty", query)
+	session.Close()
+	found := false
+	labels := make([]string, len(entries))
+	for i, entry := range entries {
+		labels[i] = entry.Label
+		if entry.Label == "id" {
+			found = true
+			if entry.Kind != python.CompletionKindType {
+				t.Fatalf("User.id completion kind %v, want a type", entry.Kind)
+			}
+		}
+	}
+	if !found {
+		t.Fatalf("User. completions %v, want id", labels)
+	}
+
+	typed := strings.Replace(source, "type Id = User.", "type Id = User.id", 1)
+	session = Open(t.Context(), []python.SourceInput{{FileName: "/t.ty", Text: typed}})
+	defer session.Close()
+	kindAt := func(marker, name string) (ast.Kind, bool) {
+		t.Helper()
+		at := strings.Index(typed, marker) + strings.Index(typed[strings.Index(typed, marker):], name)
+		for _, token := range session.SemanticIdentifiers("/t.ty") {
+			if token.Range.Start == at && typed[token.Range.Start:token.Range.End] == name {
+				return token.Kind, true
+			}
+		}
+		return 0, false
+	}
+	if kind, ok := kindAt("User.id", "id"); !ok || kind != ast.KindTypeAliasDeclaration {
+		t.Fatalf("User.id kind %v", kind)
+	}
+	if kind, ok := kindAt("user.id", "id"); !ok || kind == ast.KindTypeAliasDeclaration {
+		t.Fatalf("user.id kind %v, want a property", kind)
+	}
+}
+
+func TestHoverImportLine(t *testing.T) {
+	text, err := os.ReadFile(filepath.Join(repoRoot(t), "vscode-extension-demo/advanced_modules.ty"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	source := string(text)
+	lineEnd := strings.IndexByte(source, '\n')
+	session := Open(t.Context(), []python.SourceInput{{FileName: "/advanced_modules.ty", Text: source}})
+	defer session.Close()
+	for offset := 0; offset < lineEnd; offset++ {
+		func() {
+			defer func() {
+				if recovered := recover(); recovered != nil {
+					t.Errorf("panic at %d %q: %v", offset, source[offset:min(offset+12, lineEnd)], recovered)
+				}
+			}()
+			session.Hover("/advanced_modules.ty", offset, nil)
+		}()
+	}
+}
+
+func TestColorAfterComment(t *testing.T) {
+	source := "x = 1 # keep\ncount: int = 1\n"
+	session := Open(t.Context(), []python.SourceInput{{FileName: "/t.ty", Text: source}})
+	defer session.Close()
+	at := strings.Index(source, "count")
+	for _, token := range session.SemanticIdentifiers("/t.ty") {
+		if token.Range.Start == at && token.Kind == ast.KindVariableDeclaration {
+			return
+		}
+	}
+	t.Fatal("count after a comment lost its color")
+}
+
 func TestNativeColorAndHover(t *testing.T) {
 	source := strings.Join([]string{
 		"type Label = str",

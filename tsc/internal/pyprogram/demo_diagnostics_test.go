@@ -33,7 +33,6 @@ var acceptedDemoDiagnostics = []string{
 
 	// @overload is parked, so an unannotated implementation trips noImplicitAny.
 	`vscode-extension-demo/frontier_bytes_overload.ty:13: Parameter 'value' implicitly has an 'any' type.`,
-	`vscode-extension-demo/frontier_bytes_overload.ty:20: Property 'trimLeft' does not exist on type 'string'.`,
 
 	// Omit(User(int), *) strips every attribute, so this assignment is rejected.
 	`vscode-extension-demo/completion.ty:57: Type 'Omit<User<bigint>, *<string>>' is not assignable to type 'User<bigint>'.`,

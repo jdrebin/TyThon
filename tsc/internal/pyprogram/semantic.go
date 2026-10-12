@@ -6,7 +6,6 @@ import (
 	"github.com/jdrebin/TyThon/tsc/internal/ast"
 	"github.com/jdrebin/TyThon/tsc/internal/checker"
 	"github.com/jdrebin/TyThon/tsc/internal/python"
-	"github.com/jdrebin/TyThon/tsc/internal/scanner"
 )
 
 // SemanticIdentifier is one named span classified by the symbol the checker
@@ -60,6 +59,10 @@ func (s *Session) semanticIdentifier(file *ast.SourceFile, node *ast.Node) (Sema
 	}
 	symbol := s.checker.GetSymbolAtLocation(node)
 	if symbol == nil {
+		// `Box<str>.value` still names a type attribute when the member has no symbol.
+		if typeAttributeName(node) {
+			return semanticToken(file, node, name, ast.KindTypeAliasDeclaration, nil, false, false)
+		}
 		return SemanticIdentifier{}, false
 	}
 	symbol = s.checker.SkipAlias(symbol)
@@ -68,6 +71,10 @@ func (s *Session) semanticIdentifier(file *ast.SourceFile, node *ast.Node) (Sema
 	}
 	decl := declarationForUse(symbol, node)
 	if decl == nil {
+		// Attribute lookup can produce a transient property with no source declaration.
+		if typeAttributeName(node) {
+			return semanticToken(file, node, name, ast.KindTypeAliasDeclaration, s.checker.GetTypeAtLocation(node), false, false)
+		}
 		return SemanticIdentifier{}, false
 	}
 	// `str`, `int`, `float`, `bool`, and `object` in type position are the
@@ -77,10 +84,48 @@ func (s *Session) semanticIdentifier(file *ast.SourceFile, node *ast.Node) (Sema
 		return SemanticIdentifier{}, false
 	}
 	kind := semanticDeclarationKind(decl)
+	// `User.id` and `User(str).name` name a type attribute. The declaration is
+	// a property, but the use is a type, so it keeps the type color. A runtime
+	// `user.id` stays a property.
+	if typeAttributeName(node) && valueMemberKind(kind) {
+		kind = ast.KindTypeAliasDeclaration
+	}
 	if kind == ast.KindUnknown {
 		return SemanticIdentifier{}, false
 	}
-	start := scanner.SkipTrivia(file.Text(), node.Pos())
+	return semanticToken(file, node, name, kind, s.checker.GetTypeAtLocation(node),
+		decl != nil && ast.HasSyntacticModifier(decl, ast.ModifierFlagsReadonly),
+		decl != nil && ast.IsAsyncFunction(decl))
+}
+
+// typeAttributeName is the member of a type-position attribute: `User.id`
+// (a qualified name) or `Box<str>.value` (an attribute-access type).
+func typeAttributeName(node *ast.Node) bool {
+	parent := node.Parent
+	if parent == nil {
+		return false
+	}
+	if parent.Kind == ast.KindAttributeAccessType && parent.AsAttributeAccessTypeNode().Member == node {
+		return true
+	}
+	return parent.Kind == ast.KindQualifiedName && parent.AsQualifiedName().Right == node && typePositionUse(node)
+}
+
+func valueMemberKind(kind ast.Kind) bool {
+	switch kind {
+	case ast.KindPropertySignature, ast.KindPropertyDeclaration, ast.KindPropertyAssignment,
+		ast.KindShorthandPropertyAssignment, ast.KindMethodSignature, ast.KindMethodDeclaration,
+		ast.KindGetAccessor, ast.KindSetAccessor:
+		return true
+	default:
+		return false
+	}
+}
+
+func semanticToken(file *ast.SourceFile, node *ast.Node, name string, kind ast.Kind, typ *checker.Type, readonly bool, async bool) (SemanticIdentifier, bool) {
+	// A `#` comment is leading trivia of the next token. SkipTrivia leaves the
+	// `#` in place, so the first name after a comment would miss its color.
+	start := skipPythonDiagnosticTrivia(file.Text(), node.Pos(), node.End())
 	end := node.End()
 	if start < 0 || end <= start || end > len(file.Text()) || file.Text()[start:end] != name {
 		return SemanticIdentifier{}, false
@@ -88,9 +133,9 @@ func (s *Session) semanticIdentifier(file *ast.SourceFile, node *ast.Node) (Sema
 	return SemanticIdentifier{
 		Range:    python.TextRange{Start: start, End: end},
 		Kind:     kind,
-		Type:     s.checker.GetTypeAtLocation(node),
-		Readonly: decl != nil && ast.HasSyntacticModifier(decl, ast.ModifierFlagsReadonly),
-		Async:    decl != nil && ast.IsAsyncFunction(decl),
+		Type:     typ,
+		Readonly: readonly,
+		Async:    async,
 	}, true
 }
 

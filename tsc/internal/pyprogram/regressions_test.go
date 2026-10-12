@@ -81,6 +81,49 @@ func TestNativeLambdaParameter(t *testing.T) {
 	}
 }
 
+func TestAssignmentInitializerType(t *testing.T) {
+	accepted := strings.TrimSpace(`
+type Registry = { version: 'v1' | 'v2' }
+registry: Registry
+attribute_version = registry.version
+attribute_version = 'v2'
+`) + "\n"
+	assertNoDiagnostics(t, accepted)
+	if got := assignmentHover(t, accepted); !strings.Contains(got, "v1") || !strings.Contains(got, "v2") || got == "(variable) attribute_version: str" {
+		t.Fatalf("initializer type %q, want 'v1' | 'v2'", got)
+	}
+
+	rejected := strings.TrimSpace(`
+type Registry = { version: 'v1' | 'v2' }
+registry: Registry
+attribute_version = registry.version
+attribute_version = 'v3'
+`) + "\n"
+	var found bool
+	for _, diagnostic := range Check(t.Context(), []python.SourceInput{{FileName: "/t.ty", Text: rejected}}) {
+		if strings.Contains(diagnostic.Message, "v3") {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatal("assigning 'v3' did not error")
+	}
+	if got := assignmentHover(t, rejected); !strings.Contains(got, "v1") || !strings.Contains(got, "v2") || strings.Contains(got, "v3") {
+		t.Fatalf("type widened through the bad assignment: %q", got)
+	}
+}
+
+func assignmentHover(t *testing.T, source string) string {
+	t.Helper()
+	session := Open(t.Context(), []python.SourceInput{{FileName: "/t.ty", Text: source}})
+	defer session.Close()
+	text, _, ok := session.Hover("/t.ty", strings.Index(source, "attribute_version"), nil)
+	if !ok {
+		t.Fatal("no hover")
+	}
+	return text
+}
+
 func assertNoDiagnostics(t *testing.T, source string) {
 	t.Helper()
 	diagnostics := Check(t.Context(), []python.SourceInput{{FileName: "/t.ty", Text: source}})

@@ -442,7 +442,7 @@
         },
         "member-access-attribute": {
             "comment": "Highlight attribute access in otherwise non-specialized cases.",
-            "name": "meta.attribute.python",
+            "name": "meta.attribute.python variable.other.property.python",
             "match": "(?x)\n  \\b ([[:alpha:]_]\\w*) \\b\n"
         },
         "special-names": {
