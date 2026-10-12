@@ -61,6 +61,7 @@ type VisibleNameCompletionQuery struct {
 	ReplaceTo      int
 	StatementStart bool
 	AfterValue     bool
+	Decorator      bool
 }
 
 type DefinitionCompletionQuery struct {
@@ -240,8 +241,34 @@ func PrepareVisibleNameCompletion(source string, offset int) (string, VisibleNam
 	query := VisibleNameCompletionQuery{
 		Prefix: source[start:offset], ScopeOffset: start, ReplaceFrom: start, ReplaceTo: end,
 		StatementStart: statementStart(source, start), AfterValue: afterValue(source, start),
+		Decorator: strings.TrimSpace(source[strings.LastIndexByte(source[:start], '\n')+1:start]) == "@",
 	}
 	return source[:start] + "__completion__" + source[end:], query, true
+}
+
+// Keep an unfinished decorator attached to a declaration in the recovery tree.
+// This also lets @member. complete before the user has typed the next def.
+func RecoverDecoratorCompletion(source string, offset int) string {
+	lineStart := strings.LastIndexByte(source[:offset], '\n') + 1
+	line := source[lineStart:offset]
+	if !strings.HasPrefix(strings.TrimSpace(line), "@") {
+		return source
+	}
+	end := strings.IndexByte(source[offset:], '\n')
+	if end < 0 {
+		end = len(source)
+	} else {
+		end += offset
+	}
+	indent := line[:len(line)-len(strings.TrimLeft(line, " \t"))]
+	return source[:end] + "\n" + indent + "def __completion_target__():\n" + indent + "    pass\n" + source[end:]
+}
+
+func SyntaxCompletions(query VisibleNameCompletionQuery) []CompletionEntry {
+	if query.Decorator {
+		return nil
+	}
+	return syntaxCompletions(query)
 }
 
 func statementStart(source string, start int) bool {
@@ -573,6 +600,13 @@ func PrepareTypeCompletion(source string, offset int) (TypeCompletionQuery, bool
 		return TypeCompletionQuery{}, false
 	}
 	trimmed := strings.TrimSpace(before)
+	// An annotated assignment switches back to value completion after '='.
+	// Defaults in a function signature do too. A type alias stays a type.
+	if !strings.HasPrefix(trimmed, "type ") {
+		if equal := strings.LastIndexByte(before, '='); equal >= 0 && equal > strings.LastIndexByte(before, ':') {
+			return TypeCompletionQuery{}, false
+		}
+	}
 	isType := false
 	if arrow := strings.LastIndex(before, "->"); arrow >= 0 {
 		isType = true

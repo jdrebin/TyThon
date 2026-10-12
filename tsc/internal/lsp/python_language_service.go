@@ -204,6 +204,13 @@ func (s *pythonLanguageService) computeCompletion(ctx context.Context, params *l
 			}
 		}
 	}
+	recoveryOffset := min(offset, len(recovered))
+	if attributeOK {
+		recoveryOffset = attributeQuery.ReplaceFrom
+	} else if visibleOK {
+		recoveryOffset = visibleQuery.ScopeOffset
+	}
+	recovered = pythonfrontend.RecoverDecoratorCompletion(recovered, recoveryOffset)
 	sources[fileName] = recovered
 	inputs := make([]pythonfrontend.SourceInput, 0, len(sources))
 	for name, text := range sources {
@@ -222,11 +229,16 @@ func (s *pythonLanguageService) computeCompletion(ctx context.Context, params *l
 	case stringOK:
 		entries = session.StringCompletions(fileName, stringQuery)
 	default:
+		if definitionOK {
+			query, _ := pythonfrontend.PrepareDefinitionCompletion(source, offset)
+			entries = append(entries, pythonfrontend.DefinitionCompletions(query)...)
+		}
 		if callOK {
 			entries = append(entries, session.KeywordArgumentCompletions(fileName, callQuery)...)
 		}
 		if visibleOK {
 			entries = append(entries, session.VisibleNameCompletions(fileName, visibleQuery)...)
+			entries = append(entries, pythonfrontend.SyntaxCompletions(visibleQuery)...)
 		}
 	}
 	items := make([]*lsproto.CompletionItem, 0, len(entries))
@@ -271,7 +283,7 @@ func (s *pythonLanguageService) computeCompletion(ctx context.Context, params *l
 		} else if len(entry.Label) >= 2 && entry.Label[:2] == "__" && !definitionOK {
 			// Keep Python's common object dunders discoverable without allowing
 			// them to outrank ordinary members in clients that re-sort results.
-			sortText = "12"
+			sortText = "14"
 		} else if definitionOK && entry.Label == "__init__" {
 			sortText = "10"
 		}

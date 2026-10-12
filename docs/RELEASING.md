@@ -65,9 +65,35 @@ also be built against an explicitly selected, previously verified local VSIX:
 npm run release:package -- --vsix /absolute/path/to/verified.vsix
 ```
 
+Release
+
 This requires its `.sha256` and `.build-info.json` sidecars. It deliberately
 uses that artifact's compiler/library/version, even if checkout code has since
 changed. Normal releases should omit this option to rebuild everything.
+
+## Publishing
+
+to vscode marketplace
+
+```sh
+npx @vscode/vsce publish --packagePath built/release/*/*.vsix
+```
+
+to open-vsx
+
+```sh
+ovsx publish -i built/release/*/*.vsix
+```
+
+to pypi
+
+```sh
+python3 -m venv --without-pip /tmp/twine
+python3 -m pip --python /tmp/twine/bin/python install pip twine
+export TWINE_USERNAME=__token__
+export TWINE_PASSWORD='pypi-...'
+/tmp/twine/bin/twine upload built/release/*/*.whl
+```
 
 ## Checks before promotion
 

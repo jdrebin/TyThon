@@ -103,6 +103,7 @@ def show(user: User(str)):
 	assert.Equal(t, initResult.ServerInfo.Name, "TyThon")
 	assert.Assert(t, initResult.Capabilities.CompletionProvider != nil)
 	assert.Assert(t, slices.Contains(*initResult.Capabilities.CompletionProvider.TriggerCharacters, "["))
+	assert.Assert(t, slices.Contains(*initResult.Capabilities.CompletionProvider.TriggerCharacters, "@"))
 	assert.Assert(t, slices.Contains(*initResult.Capabilities.CompletionProvider.TriggerCharacters, `"`))
 	lsptestutil.SendNotification(t, client, lsproto.InitializedInfo, &lsproto.InitializedParams{})
 	<-client.Server.InitComplete()

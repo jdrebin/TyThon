@@ -47,24 +47,56 @@ func (s *Session) VisibleNameCompletions(fileName string, query python.VisibleNa
 		return nil
 	}
 	var entries []python.CompletionEntry
+	expected := s.checker.GetContextualType(location, checker.ContextFlagsNone)
 	for _, symbol := range s.checker.GetSymbolsInScope(location, ast.SymbolFlagsValue) {
 		name := symbol.Name
-		if name == "" || name == "__completion__" || strings.HasPrefix(name, ast.InternalSymbolNamePrefix) || !hasPrefix(name, query.Prefix) {
+		if name == "" || strings.HasPrefix(name, "__completion") || strings.HasPrefix(name, ast.InternalSymbolNamePrefix) || !hasPrefix(name, query.Prefix) {
 			continue
 		}
-		t := s.checker.GetTypeOfSymbol(symbol)
+		t := s.checker.GetPythonCompletionType(symbol, location)
 		kind := python.CompletionKindVariable
 		if symbol.Flags&ast.SymbolFlagsClass != 0 {
 			kind = python.CompletionKindClass
 		} else if len(s.checker.GetSignaturesOfType(t, checker.SignatureKindCall)) != 0 {
 			kind = python.CompletionKindFunction
 		}
-		entries = append(entries, python.CompletionEntry{
+		entry := python.CompletionEntry{
 			Label: name, Detail: s.typeText(t), Kind: kind, InsertText: name,
-			ReplaceFrom: query.ReplaceFrom, ReplaceTo: query.ReplaceTo, Distance: 100,
-		})
+			ReplaceFrom: query.ReplaceFrom, ReplaceTo: query.ReplaceTo, Distance: completionScopeDistance(symbol, location),
+		}
+		if query.Decorator {
+			// Factories, constructors and callable instances are all legitimate.
+			entry.Incompatible = t.Flags()&checker.TypeFlagsAny == 0 &&
+				len(s.checker.GetSignaturesOfType(t, checker.SignatureKindCall)) == 0 &&
+				len(s.checker.GetSignaturesOfType(t, checker.SignatureKindConstruct)) == 0
+		} else if expected != nil {
+			entry.Incompatible = !s.checker.IsTypeAssignableTo(t, expected)
+		}
+		if entry.Incompatible {
+			entry.Description = "not assignable"
+			if query.Decorator {
+				entry.Description = "not callable"
+			}
+		}
+		entries = append(entries, entry)
 	}
 	return entries
+}
+
+func completionScopeDistance(symbol *ast.Symbol, location *ast.Node) int {
+	distance := 0
+	for scope := location; scope != nil; scope = scope.Parent {
+		if locals := scope.Locals(); locals != nil {
+			if locals[symbol.Name] == symbol {
+				return distance
+			}
+			distance++
+		}
+		if ast.IsClassLike(scope) && scope.Symbol() != nil && scope.Symbol().Members[symbol.Name] == symbol {
+			return distance
+		}
+	}
+	return 100
 }
 
 func (s *Session) TypeCompletions(fileName string, query python.TypeCompletionQuery) []python.CompletionEntry {

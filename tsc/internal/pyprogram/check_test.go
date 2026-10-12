@@ -774,7 +774,7 @@ func TestNativeQualifiedTypeAndExcept(t *testing.T) {
 }
 
 func TestNativeSurfaceSetAndBases(t *testing.T) {
-	_, user, parseErrors := checkNative("/t.ty", "interface Vector:\n    __add__: (other: Vector) -> Vector\nleft: Vector\nright: Vector\ncombined: Vector = left + right\nnumber = 1\ntext: str = number.__str__()\nclass NumericValue:\n    scale!: int\nclass TextValue:\n    value!: str\nclass ResolvedValue(TextValue, NumericValue):\n    marker: bool\nresolved: ResolvedValue\nscale: int = resolved.scale\ndef unique(values: []str) -> set<int>:\n    return {len(value) for value in values}\nsnapshot = {\"version\": \"v1\"}\nkeys = snapshot.keys()\n")
+	_, user, parseErrors := checkNative("/t.ty", "interface Vector:\n    __add__: (other: Vector) -> Vector\nleft: Vector\nright: Vector\ncombined: Vector = left + right\nnumber = 1\ntext: str = number.__str__()\nclass NumericValue:\n    scale!: int\nclass TextValue:\n    value!: str\nclass ResolvedValue(TextValue, NumericValue):\n    marker!: bool\nresolved: ResolvedValue\nscale: int = resolved.scale\ndef unique(values: []str) -> set<int>:\n    return {len(value) for value in values}\nsnapshot = {\"version\": \"v1\"}\nkeys = snapshot.keys()\n")
 	if parseErrors != 0 {
 		t.Fatal("parse errors")
 	}

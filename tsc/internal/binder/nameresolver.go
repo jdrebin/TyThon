@@ -30,6 +30,7 @@ func (r *NameResolver) Resolve(location *ast.Node, name string, meaning ast.Symb
 	var associatedDeclarationForContainingInitializerOrBindingName *ast.Node
 	var withinDeferredContext bool
 	var grandparent *ast.Node
+	var decoratedDeclaration *ast.Node
 	originalLocation := location // needed for did-you-mean error reporting, which gathers candidates starting from the original location
 	nameIsConst := name == "const"
 loop:
@@ -176,6 +177,19 @@ loop:
 				}
 			}
 		case ast.KindClassDeclaration, ast.KindClassExpression, ast.KindInterfaceDeclaration:
+			// A decorator on a class member executes in the class body. Earlier
+			// class bindings are visible here, unlike inside a method body.
+			classBodyDeclaration := decoratedDeclaration
+			if lastLocation != nil && (ast.IsPropertyDeclaration(lastLocation) || ast.IsExpressionStatement(lastLocation)) {
+				classBodyDeclaration = lastLocation
+			}
+			if classBodyDeclaration != nil && classBodyDeclaration.Parent == location {
+				member := r.lookup(r.getSymbolOfDeclaration(location).Members, name, meaning&ast.SymbolFlagsValue)
+				if member != nil && member.ValueDeclaration != nil && member.ValueDeclaration.Pos() < classBodyDeclaration.Pos() {
+					result = member
+					break loop
+				}
+			}
 			result = r.lookup(r.getSymbolOfDeclaration(location).Members, name, meaning&ast.SymbolFlagsType)
 			if result != nil {
 				if !isTypeParameterSymbolDeclaredInContainer(result, location) {
@@ -251,31 +265,10 @@ loop:
 				}
 			}
 		case ast.KindDecorator:
-			// Decorators are resolved at the class declaration. Resolving at the parameter
-			// or member would result in looking up locals in the method.
-			//
-			//   function y() {}
-			//   class C {
-			//       method(@y x, y) {} // <-- decorator y should be resolved at the class declaration, not the parameter.
-			//   }
-			//
-			if location.Parent != nil && location.Parent.Kind == ast.KindParameter {
-				location = location.Parent
-			}
-			//   function y() {}
-			//   class C {
-			//       @y method(x, y) {} // <-- decorator y should be resolved at the class declaration, not the method.
-			//   }
-			//
-			// class Decorators are resolved outside of the class to avoid referencing type parameters of that class.
-			//
-			//   type T = number;
-			//   declare function y(x: T): any;
-			//   @param(1 as T) // <-- T should resolve to the type alias outside of class C
-			//   class C<T> {}
-			if location.Parent != nil && (ast.IsClassElement(location.Parent) || location.Parent.Kind == ast.KindClassDeclaration) {
-				location = location.Parent
-			}
+			// Decorator expressions run in the enclosing scope, outside the
+			// decorated function's parameters, locals, and type parameters.
+			decoratedDeclaration = location.Parent
+			location = location.Parent
 		case ast.KindParameter:
 			parameterDeclaration := location.AsParameterDeclaration()
 			if lastLocation != nil && (lastLocation == parameterDeclaration.Initializer ||

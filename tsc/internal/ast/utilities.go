@@ -1075,7 +1075,6 @@ func CanHaveSymbol(node *Node) bool {
 func CanHaveIllegalDecorators(node *Node) bool {
 	switch node.Kind {
 	case KindPropertyAssignment, KindShorthandPropertyAssignment,
-		KindConstructor,
 		KindIndexSignature, KindClassStaticBlockDeclaration,
 		KindMissingDeclaration, KindVariableStatement,
 		KindInterfaceDeclaration, KindTypeAliasDeclaration,
@@ -1135,7 +1134,9 @@ func CanHaveModifiers(node *Node) bool {
 
 func CanHaveDecorators(node *Node) bool {
 	switch node.Kind {
-	case KindParameter,
+	case KindFunctionDeclaration,
+		KindConstructor,
+		KindParameter,
 		KindPropertyDeclaration,
 		KindMethodDeclaration,
 		KindGetAccessor,
@@ -3850,6 +3851,21 @@ func HasDecorators(node *Node) bool {
 	return HasSyntacticModifier(node, ModifierFlagsDecorator)
 }
 
+// IsOverloadDecorator recognizes the Python declaration marker. The parser
+// consumes a stub body under this marker as an overload signature.
+func IsOverloadDecorator(node *Node) bool {
+	if !IsDecorator(node) {
+		return false
+	}
+	expr := node.Expression()
+	return IsIdentifier(expr) && expr.Text() == "overload" ||
+		IsPropertyAccessExpression(expr) && expr.Name().Text() == "overload"
+}
+
+func IsOverloadSignatureDecorator(node *Node) bool {
+	return IsOverloadDecorator(node) && IsFunctionLike(node.Parent) && node.Parent.Body() == nil
+}
+
 type hasFileNameImpl struct {
 	fileName string
 	path     tspath.Path
@@ -4341,7 +4357,7 @@ func NodeCanBeDecorated(useLegacyDecorators bool, node *Node, parent *Node, gran
 	case KindClassDeclaration:
 		// class declarations are valid targets
 		return true
-	case KindFunctionDeclaration:
+	case KindFunctionDeclaration, KindConstructor:
 		// tython: def can be decorated.
 		return true
 	case KindClassExpression:

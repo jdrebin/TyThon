@@ -741,10 +741,12 @@ with `class A(B, C as ProjectedC): ...`; the assertion erases, so runtime inheri
 still uses `C`. Library authors must make the declared contract match reality.
 
 Python-specific operations—iteration, operators, async, generators and context
-managers—use protocol adaptation around the shared checker. Recognized built-in
-decorators such as `@property` have dedicated handling. Arbitrary third-party
-decorators do **not** automatically transform a declaration's static type; describe
-their resulting contract explicitly. Metaclass/descriptor modeling is not complete.
+managers—use protocol adaptation around the shared checker. Decorators use ordinary
+call checking: each decorator accepts the previous value and its return type
+becomes the decorated name's type. Stacks apply from bottom to top. Library-declared
+`property`, `classmethod`, and `staticmethod` use descriptor access. Direct member
+reads, writes, and deletes check the descriptor protocol; structural views and
+type projections use the getter type. General metaclass modeling remains incomplete.
 
 ### 10. Assertions, readonly and imports
 
@@ -797,7 +799,7 @@ runtime behaviors the frontend connects to the shared type checker.
 | `async for`, `async with` | `for await ... of`; no exact `async with` equivalent | Async iteration and context-manager protocols |
 | `yield from source` | `yield* source` | Generator delegation, subject to Python's runtime rules |
 | `Generator<Yield, Send, Return>` | `Generator<Yield, Return, Next>` | **Different parameter order** for send/next and final return |
-| `@property`, `@staticmethod`, `@classmethod` | Getters / `static` are related; class methods have no exact counterpart | Recognized built-in descriptor/binding behavior |
+| `@property`, `@staticmethod`, `@classmethod` | Getters / `static` are related; class methods have no exact counterpart | Library-declared descriptors with native receiver binding and separate property read/write types |
 
 For example, entering a context manager changes which value you work with:
 
@@ -909,7 +911,7 @@ demonstrate type transformations already checked by tython itself.
 | Inheritance | Base-constructor signatures and instance attributes inferred inside a base `__init__` do not yet propagate reliably to subclasses. The inheritance example above exercises declared methods. |
 | Editor | Hover still has custom rendering paths. Navigation is partial; complete reference/rename/refactor parity is not promised. |
 | Formatting | Format Document runs the pinned Black shipped in the VSIX with your Python 3.10+. It does not use the Black package in that environment. Unsupported syntax is rejected without edits. Range formatting is not exposed. |
-| Runtime | Erasure is not validation. No inferred arbitrary decorator transformations, general monkey-patch tracking, or runtime enforcement of readonly/presence assertions. |
+| Runtime | Erasure is not validation. Decorator results follow callable signatures. General monkey-patch tracking, and runtime enforcement of readonly/presence assertions are incomplete. |
 | Distribution | Marketplace VSIXes and `tython-lang` wheels cover Linux x64, Linux arm64, macOS arm64, macOS x64, and Windows x64. Linux memory containment is required by default and is not silently disabled on startup failure. |
 
 Shared TypeScript semantics are the design rule, **not a claim that every editor

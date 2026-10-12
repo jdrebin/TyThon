@@ -1,6 +1,7 @@
 package pyprogram
 
 import (
+	"slices"
 	"strings"
 
 	"github.com/jdrebin/TyThon/tsc/internal/ast"
@@ -27,6 +28,13 @@ func formatHover(c *checker.Checker, node *ast.Node, verbosity *checker.Verbosit
 	decl := declarationForUse(symbol, node)
 	if typePositionUse(node) && intrinsicTypeAlias(decl) {
 		return symbol.Name
+	}
+	// A decorated declaration can publish any value, including a non-callable
+	// value or an entirely different class. Display that value's actual type.
+	if decl != nil && !typePositionUse(node) && slices.ContainsFunc(decl.ModifierNodes(), func(modifier *ast.Node) bool {
+		return ast.IsDecorator(modifier) && !ast.IsOverloadSignatureDecorator(modifier)
+	}) {
+		return symbol.Name + ": " + hoverTypeText(c, node, verbosity)
 	}
 	switch semanticDeclarationKind(decl) {
 	case ast.KindClassDeclaration, ast.KindClassExpression:
@@ -230,6 +238,9 @@ func hoverTypeText(c *checker.Checker, node *ast.Node, verbosity *checker.Verbos
 func typeForHover(c *checker.Checker, node *ast.Node) *checker.Type {
 	if ast.IsIdentifier(node) && node.Parent != nil {
 		parent := node.Parent
+		if ast.IsQualifiedName(parent) && parent.AsQualifiedName().Right == node && parent.Parent != nil && parent.Parent.Kind == ast.KindTypeReference {
+			return c.GetTypeAtLocation(parent.Parent)
+		}
 		if parent.Kind == ast.KindTypeReference || (parent.Kind == ast.KindExpressionWithTypeArguments && ast.IsPartOfTypeNode(parent)) {
 			if t := c.GetTypeAtLocation(parent); t != nil {
 				return t

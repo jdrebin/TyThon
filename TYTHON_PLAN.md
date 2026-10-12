@@ -854,13 +854,12 @@ through the constructor receiver in `__init__`, but not afterward. A getter-only
 
 ## Decorators, descriptors, and dynamic attributes
 
-External decorator bodies and call signatures are ignored in phase one. A
-decorator does not silently transform a declaration's static type. Users and
-library declarations must state the transformed contract explicitly.
-
-Selected built-ins such as `@property`, `@classmethod`, and `@staticmethod`
-may be recognized because their semantics are part of Python itself. Simple
-property getter/setter types may be inferred from their declarations.
+Decorators use ordinary call checking and publish the resulting value type;
+see [Decorator input and output](#decorator-input-and-output). `property`,
+`classmethod`, and `staticmethod` are library-declared descriptor objects. Member
+access invokes their protocols, as it does for user-defined descriptors. The
+native receiver adapter supplies the callable surface of `BoundMethod<F>` and
+types the receivers of built-in static and class methods.
 
 `__getattr__` and `__setattr__` are not used to invent a public structural
 surface. Arbitrary attributes must be declared explicitly:
@@ -910,9 +909,8 @@ Built-in protocols live in bundled `.d.ty` declarations. `object` fallback is
 applied at runtime/editor boundaries rather than injected into every finite
 `keyof` result.
 
-Third-party decorators are ignored unless the phase 2 decorator contract below
-is implemented. A decorator does not change a name's type until that contract
-exists.
+Third-party decorators follow their callable contracts. Their declared return
+types determine the decorated values; the checker does not execute library code.
 
 ## Editor behavior
 
@@ -1241,7 +1239,6 @@ verification does not substitute for an interactive extension-host smoke test.
 - exact static semantics for more exotic hashable key types;
 - exact tuple/list slice-result calculation;
 - spread syntax inside type shapes such as `{ **Record(str, int) }`;
-- an explicit decorator input/output contract (see phase 2);
 - deeper metaclass and descriptor modeling;
 - richer standard-library and third-party declaration coverage.
 
@@ -1297,9 +1294,32 @@ name see the output, not the original function or class. Stacked decorators
 apply inside-out, matching Python: the bottom decorator runs first, and each
 output is the next input.
 
-`@property`, `@classmethod`, and `@staticmethod` stay built-in special cases.
-This contract is the general rule for user and library decorators. Until it
-exists, an unrecognized decorator still does not change the declared type.
+Decorator expressions are checked in the enclosing scope, in source order;
+their results are applied bottom-up. Factories, callable instances, and class
+constructors use the same call resolver as explicit calls. The output may be
+any value, including `None` or a non-callable object. The original declaration
+retains its own signature for body checking. Decoration changes the published
+value, not a class's declared instance type. The existing `@overload` signature
+marker remains declaration syntax rather than a runtime value transformation.
+Python emission preserves the original decorators and their evaluation order.
+
+The checker keeps the descriptor object on the member, resolving reads, writes,
+and deletes through its protocol. Ordinary
+structural comparison and type-level attribute access use the read type, as in
+TypeScript. Mapped members use the projected type and applicable modifiers;
+they do not carry the original setter contract. Aliases retaining the original
+containing type retain descriptor-aware access. A standalone descriptor object
+keeps its own type and is not implicitly assignable to its getter result.
+
+During class construction, a subsequent descriptor binding may replace an
+inferred descriptor type without being assignable to the previous one. Its
+expression is checked against the previous binding; explicit annotations still
+constrain the result. Earlier aliases retain their types. This permits a
+library-declared `.setter` or `.deleter` to return a new descriptor with new
+capabilities. It is not a union of successive types and does not apply to an
+assignment through an instance. Decorated method definitions support this
+sequential rebinding (`@name.setter`, `@name.deleter`, and `@name.getter`).
+General assignment-based descriptor builders remain a follow-up.
 
 ### `defer`: bind a blank type from one target
 

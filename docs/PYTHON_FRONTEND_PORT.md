@@ -49,9 +49,10 @@ These are closed. Relitigate only if a later construct proves the foundation is 
   `pyprogram` is the parallel host (`primitives.d.ty` then `builtins.d.ty`, then user
   files), analogous to TS starting from `lib.d.ts`. Do not merge to `main` as the
   product frontend until that path is the one that actually checks files.
-- Future items (decorators as input/output call signatures, files as classes,
-  class bodies as both code and definition, ordered keys) are context only. Do not
-  implement or prepare for them now. None of them required a different bottom.
+- General decorator input/output calls use the shared call resolver.
+  Descriptor access uses `__get__`, `__set__`, and `__delete__`; decorated
+  descriptor definitions can refine the preceding class-body binding.
+  Files as classes and ordered keys remain future context.
 
 **Concept map (TypeScript idea → tython spelling)**
 
@@ -67,7 +68,7 @@ These are closed. Relitigate only if a later construct proves the foundation is 
 | `var` function-scoped, rebinding allowed | Python assignment and `for` targets (array binding patterns) |
 | `else if` | `elif` as an `IfStatement` in the else slot |
 | no block scope for `var` | no block scope at all (`Block`/`For*`/`Catch`/`CaseBlock` are not containers) |
-| definite assignment in `constructor` | `__init__` assertions; the TS constructor check is skipped until that is ported |
+| definite assignment in `constructor` | required attributes checked against the native `__init__` return-flow graph |
 | overload signatures vs implementation | `@overload` stub bodies are omitted like `declare function f();` |
 | `?` meaning `T \| undefined` | `optional` is presence only; the value type is unchanged |
 | `null` / `undefined` | `None` is an explicit value; implicit return is `None`, not `undefined` |
@@ -339,7 +340,7 @@ rules keep the TS concept:
 | `this.x =` in a constructor | `self.x =` on the receiver |
 | `T[K]` / `keyof T` as JS property keys | item/attribute key algebra (`GetPythonIndexedAccessType`, `GetItemKeyType`) |
 | `*args` must be an array | `**kwargs` is a mapping, not an array |
-| definite assignment in `constructor` | `__init__` assertions (TS constructor check skipped) |
+| definite assignment in `constructor` | native return-flow check using the Python receiver parameter |
 
 Progress meter: `go test ./internal/pyprogram -run TestNativeCheckerProgress` (always
 under `ulimit -v` and `timeout`). Last measured: 32 of 32 corpus files parse, 25 check
@@ -356,7 +357,8 @@ position, `except E as e` (instance type, assigned), contextual dict literals,
 bare `self` on a type-literal method, `is` / `is not` narrowing, `for`/`else`,
 and `match` (literal cases, class patterns `User(name=nam)`, mapping patterns)
 are in. Methods are not copied onto the class; `@classmethod` /
-`@staticmethod` / `@property` are still deferred. `async def f() -> T` is `Awaitable<T>` at the
+`@staticmethod`, `@classmethod`, and `@property` now use descriptor access (below).
+`async def f() -> T` is `Awaitable<T>` at the
 call and `T` in the body. An async generator's annotation is the iterator
 (`AsyncIterator<Y>`), and with no TS `AsyncGenerator` global that is the type
 produced. Defaulted parameters may be omitted without becoming
@@ -367,8 +369,7 @@ not TS `Generator<Y, R, N>` — do not coerce. `trimLeft` on `str` in the bytes
 overload demo is an intentional error. Dotted imports resolve to a sibling
 `.d.ty` (`catalog`, `sample_package.models`); an ambient declaration file is a
 module and its top-level names are the exports. `pathlib` is the embedded
-`lib/pathlib.d.ty`. `@overload` is not a priority. Class-side decorators stay
-deferred. What remains on the meter is those deferred gaps plus the intentional
+`lib/pathlib.d.ty`. What remains on the meter is the other deferred gaps plus the intentional
 error fixtures (`diagnostic_gallery.ty`, `type_error.ty`, `value_hierarchy.ty`).
 
 Those remaining clusters are language-specific overhauls of the same TS concepts
@@ -378,9 +379,53 @@ them look solved.
 
 ## Future context (not in scope, recorded only)
 
-General decorators as call-signature folds, descriptor-based member types, files as classes,
-and class bodies as both code and definition are phase 2 or later. None of them signals a
-different foundation; they sit on the same binder and checker.
+Files as classes and the remaining class-body execution model are follow-up
+work. They sit on the same binder and checker. General decorator calls and
+descriptor-based member access are implemented as described below.
 
 Open language questions that are not this port's job are listed under Decisions
 ("Not decided"). The differential harness still defines "current" for those.
+
+Required field initialization now queries the native constructor return-flow
+graph, including branches, early returns, loops, and `finally`. Class defaults
+and descriptors supply attributes without instance assignments; annotations do
+not overwrite inherited defaults. Optional fields, definite-assignment
+assertions, and declaration-only classes remain exempt. Synthesized initializer
+assertion signatures and cooperative base-initializer call effects still need
+to move from the compatibility frontend to the native checker.
+
+## General decorator calls
+
+Decorators now use the ordinary call resolver with one synthetic argument: the
+original declaration value, or the result of the next inner decorator. The
+native source tree and Python output remain unchanged. The declaration keeps its
+original callable/class type for body checking; a separate lazy cache publishes
+the decorated value to references, imports, and editor queries. Recursive
+inference is guarded by the checker's existing type-resolution stack.
+
+Decorator expressions resolve outside the declaration's parameters and locals;
+method decorator expressions can see earlier class-body bindings. The existing
+`@overload` signature marker is not a runtime fold. `property`, `classmethod`,
+and `staticmethod` have library-declared contracts. Class-dictionary members
+retain their descriptor objects; direct access invokes their protocols, while
+structural comparison and type-level projections use the getter type. Descriptor
+method definitions such as `@name.setter` resolve the previous binding and
+publish the newly decorated result without an ordinary reassignment check.
+
+Bare class-body references, declaration hover, and completion retain the raw
+class-local value. Ordinary assignments to an existing class binding are checked
+against that value, so replacing a descriptor with its getter's value is an
+error. These rules also apply to user-defined descriptors.
+
+The existing receiver adapters still own method binding and special-method
+invocation. `BoundMethod<F>` supplies a bound callable without reconstructing
+its signature, retaining generics, keyword names, defaults, and parameter kinds.
+Binding newly returned function objects, invoking decorated special methods
+through protocols, and general assignment-based descriptor builders remain
+follow-ups.
+
+Native completion now registers `@` as a trigger and recovers an unfinished
+decorator with a temporary declaration. Callable values rank ahead of noncallable
+ones there. Visible-name ranking uses lexical distance and contextual
+assignability, including the existing flow graph for narrowed locals. Statement
+keywords and definition snippets use the shared syntax completion providers.

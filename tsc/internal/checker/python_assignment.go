@@ -108,11 +108,10 @@ func (c *Checker) pythonTargetType(target *ast.Node, sourceType *Type, name stri
 	return nil
 }
 
-// pythonClassAttributeOnClassValue is a class-body data attribute. Methods are
-// not class attributes; classmethod and staticmethod are decorator folds.
+// Class dictionaries expose methods as well as data; descriptor access decides
+// whether a read through the class binds the receiver or keeps the value raw.
 func pythonClassAttributeOnClassValue(symbol *ast.Symbol) bool {
-	return symbol.Flags&ast.SymbolFlagsProperty != 0 &&
-		symbol.Flags&(ast.SymbolFlagsMethod|ast.SymbolFlagsGetAccessor|ast.SymbolFlagsSetAccessor) == 0
+	return symbol.Flags&(ast.SymbolFlagsProperty|ast.SymbolFlagsMethod) != 0
 }
 
 func (c *Checker) pythonIteratedType(sourceType *Type, errorNode *ast.Node) *Type {

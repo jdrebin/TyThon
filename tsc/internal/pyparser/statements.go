@@ -90,6 +90,17 @@ func (p *Parser) isStartOfStatement() bool {
 }
 
 func (p *Parser) parseStatement() *ast.Node {
+	// Class-field modifiers are also valid in executable classes. An optional
+	// annotation declares presence metadata; it does not initialize the field.
+	if p.inClassBody && p.isMemberModifier() && p.lookAhead(func(p *Parser) bool {
+		p.parseMemberModifiers()
+		return p.isAttributeName()
+	}) {
+		pos := p.nodePos()
+		modifiers := p.parseMemberModifiers()
+		name := p.parseIdentifierName()
+		return p.parseAnnotatedAssignment(pos, name, modifiers, nil)
+	}
 	switch p.token {
 	case ast.KindAtToken:
 		return p.parseDecoratedStatement()
@@ -465,7 +476,7 @@ func (p *Parser) parseDecoratedStatement() *ast.Node {
 		return p.parseDeclareStatement(pos, decorators)
 	}
 	modifiers := p.newModifierList(core.NewTextRange(pos, p.nodePos()), decorators)
-	p.nextDefIsOverload = slices.ContainsFunc(decorators, isOverloadDecorator)
+	p.nextDefIsOverload = slices.ContainsFunc(decorators, ast.IsOverloadDecorator)
 	switch p.token {
 	case ast.KindFunctionKeyword:
 		return p.parseFunctionDeclaration(pos, modifiers)
@@ -777,17 +788,4 @@ func isStubBody(statements *ast.NodeList) bool {
 
 func isIdentifierNamed(node *ast.Node, text string) bool {
 	return node != nil && node.Kind == ast.KindIdentifier && node.AsIdentifier().Text == text
-}
-
-// isOverloadDecorator: `@overload` or `@typing.overload`. A def under it whose body
-// is `...` is an overload signature: a TypeScript overload has no body.
-func isOverloadDecorator(decorator *ast.Node) bool {
-	expression := decorator.Expression()
-	switch expression.Kind {
-	case ast.KindIdentifier:
-		return expression.Text() == "overload"
-	case ast.KindPropertyAccessExpression:
-		return expression.Name().Text() == "overload"
-	}
-	return false
 }

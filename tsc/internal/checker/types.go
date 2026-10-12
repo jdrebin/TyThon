@@ -423,6 +423,9 @@ type SignatureLinks struct {
 	resolvedSignature  *Signature // Cached signature of signature node or call expression
 	effectsSignature   *Signature // Signature with possible control flow effects
 	decoratorSignature *Signature // Signature for decorator as if invoked by the runtime
+	decoratedType      *Type      // Published value of a Python declaration after decoration
+	decoratorCall      *ast.Node  // Implicit one-argument Python call, with source locations
+	decorating         bool       // Call resolution can reset the general type-resolution stack
 }
 
 type TypeFlags uint32

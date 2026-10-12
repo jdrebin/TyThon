@@ -11,21 +11,14 @@ import (
 )
 
 // acceptedDemoDiagnostics are the diagnostics the demo trees are allowed to
-// produce. Parked decorators, @overload, and Generator argument order are
+// produce. Remaining frontend gaps and Generator argument order are
 // listed here, along with intentional error fixtures. TestNativeDemoDiagnostics
 // fails on any other diagnostic from those trees, and when one of these
 // disappears.
 var acceptedDemoDiagnostics = []string{
-	// @property / @classmethod / @staticmethod are parked.
-	`vscode-extension-demo/advanced_classes.ty:19: Cannot find name 'property'.`,
-	`vscode-extension-demo/advanced_classes.ty:20: Duplicate function implementation.`,
-	`vscode-extension-demo/advanced_classes.ty:23: Cannot find name 'label'.`,
-	`vscode-extension-demo/advanced_classes.ty:24: Duplicate function implementation.`,
-	`vscode-extension-demo/advanced_classes.ty:27: Cannot find name 'classmethod'.`,
-	`vscode-extension-demo/advanced_classes.ty:31: Cannot find name 'staticmethod'.`,
-	`vscode-extension-demo/advanced_classes.ty:59: Property 'create' does not exist on type 'typeof User'.`,
-	`vscode-extension-demo/advanced_classes.ty:64: Property 'valid_name' does not exist on type 'typeof User'.`,
-
+	// Required fields without initializers or constructor assignments.
+	`vscode-extension-demo/advanced_classes.ty:9: Attribute 'created_at' has no initializer and is not definitely assigned in __init__.`,
+	`vscode-extension-demo/advanced_classes.ty:56: Attribute 'marker' has no initializer and is not definitely assigned in __init__.`,
 	// Generator<Y, S, R> is still checked as TypeScript's Generator<Y, R, N>.
 	`vscode-extension-demo/advanced_async_and_generators.ty:32: Type 'boolean' is not assignable to type 'string'.`,
 	`vscode-extension-demo/advanced_async_and_generators.ty:34: Type 'boolean' is not assignable to type 'string'.`,

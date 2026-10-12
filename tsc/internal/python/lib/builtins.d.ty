@@ -236,6 +236,33 @@ declare def isinstance(value: any, class_or_tuple: any) -> bool: ...
 declare def issubclass(value: any, class_or_tuple: any) -> bool: ...
 declare def callable(value: any) -> bool: ...
 
+# Descriptors keep their own types in the class body. Attribute access invokes
+# __get__; direct writes and deletes check the corresponding protocol method.
+interface Property<G, S = never, D = never>:
+    def __get__<I>(self, instance: I, owner: any = ...) -> Property<G, S, D> if I extends None else G
+    def __set__(self, instance: object, value: S) -> None
+    def __delete__(self, instance: D) -> None
+    def getter<R>(self, fn: (instance: any, /) -> R) -> Property<R, S, D>
+    def setter<W>(self, fn: (instance: any, value: W, /) -> None) -> Property<G, W, D>
+    def deleter(self, fn: (instance: any, /) -> None) -> Property<G, S, object>
+
+declare def property<G, S = never, D = never>(fget: (instance: any, /) -> G, fset: ((instance: any, value: S, /) -> None) | None = ..., fdel: ((instance: D, /) -> None) | None = ..., doc: str | None = ...) -> Property<G, S, D>: ...
+
+interface StaticMethod<F>:
+    def __get__(self, instance: any, owner: any = ...) -> F
+
+declare def staticmethod<F>(fn: F) -> StaticMethod<F>: ...
+
+# The native callable adapter removes just the receiver, retaining generics,
+# overloads, parameter names, defaults and Python parameter categories.
+interface BoundMethod<F>:
+    __func__: F
+
+interface ClassMethod<F>:
+    def __get__(self, instance: any, owner: any = ...) -> BoundMethod<F>
+
+declare def classmethod<F>(fn: F) -> ClassMethod<F>: ...
+
 declare def len(value: any) -> int: ...
 declare def hash(value: any) -> int: ...
 declare def id(value: any) -> int: ...

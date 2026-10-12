@@ -20,6 +20,26 @@ func (c *Checker) GetSymbolsInScope(location *ast.Node, meaning ast.SymbolFlags)
 	return c.getSymbolsInScope(location, meaning)
 }
 
+// Query the existing flow graph at the cursor using a hypothetical reference.
+// Completion must not lose a local's narrowing just because the cursor holds
+// the recovery identifier instead of that local's actual spelling.
+func (c *Checker) GetPythonCompletionType(symbol *ast.Symbol, location *ast.Node) *Type {
+	if raw := c.pythonClassBodyValue(symbol, location); raw != nil {
+		return raw
+	}
+	symbol = c.getExportSymbolOfValueSymbolIfExported(symbol)
+	t := c.getTypeOfSymbol(symbol)
+	if symbol.Flags&ast.SymbolFlagsVariable == 0 || getFlowNodeOfNode(location) == nil {
+		return t
+	}
+	reference := c.factory.NewIdentifier(symbol.Name)
+	reference.Loc = location.Loc
+	reference.Parent = location.Parent
+	reference.FlowNodeData().FlowNode = getFlowNodeOfNode(location)
+	c.symbolNodeLinks.Get(reference).resolvedSymbol = symbol
+	return c.getFlowTypeOfReference(reference, t)
+}
+
 func (c *Checker) getSymbolsInScope(location *ast.Node, meaning ast.SymbolFlags) []*ast.Symbol {
 	if location.Flags&ast.NodeFlagsInWithStatement != 0 {
 		// We cannot answer semantic questions within a with block, do not proceed any further
@@ -66,6 +86,7 @@ func (c *Checker) getSymbolsInScope(location *ast.Node, meaning ast.SymbolFlags)
 
 	populateSymbols := func() {
 		var lastLocation *ast.Node
+		var decoratedDeclaration *ast.Node
 		for location != nil {
 			if ast.IsModuleDeclaration(location) &&
 				location.AsModuleDeclaration().Attributes != nil &&
@@ -81,6 +102,9 @@ func (c *Checker) getSymbolsInScope(location *ast.Node, meaning ast.SymbolFlags)
 			}
 
 			switch location.Kind {
+			case ast.KindDecorator:
+				decoratedDeclaration = location.Parent
+				location = location.Parent
 			case ast.KindSourceFile:
 				if !ast.IsExternalModule(location.AsSourceFile()) {
 					break
@@ -99,6 +123,17 @@ func (c *Checker) getSymbolsInScope(location *ast.Node, meaning ast.SymbolFlags)
 				// type parameter inside class expression similar to how we handle it in classDeclaration and interface Declaration.
 				fallthrough
 			case ast.KindClassDeclaration, ast.KindInterfaceDeclaration:
+				classBodyDeclaration := decoratedDeclaration
+				if lastLocation != nil && (ast.IsPropertyDeclaration(lastLocation) || ast.IsExpressionStatement(lastLocation)) {
+					classBodyDeclaration = lastLocation
+				}
+				if classBodyDeclaration != nil && classBodyDeclaration.Parent == location {
+					for _, member := range c.getSymbolOfDeclaration(location).Members {
+						if member.ValueDeclaration != nil && member.ValueDeclaration.Pos() < classBodyDeclaration.Pos() {
+							copySymbol(member, meaning&ast.SymbolFlagsValue)
+						}
+					}
+				}
 				// If we didn't come from static member of class or interface,
 				// add the type parameters into the symbol table
 				// (type parameters of classDeclaration/classExpression and interface are in member property of the symbol.

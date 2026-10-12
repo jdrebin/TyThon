@@ -708,7 +708,7 @@ func (s *Server) handleInitialize(ctx context.Context, params *lsproto.Initializ
 	if s.startWatchdog != nil && params.ProcessId.Integer != nil {
 		s.startWatchdog(int(*params.ProcessId.Integer))
 	}
-	pythonCompletionTriggers := []string{".", "[", `"`, "'", "_"}
+	pythonCompletionTriggers := []string{".", "[", `"`, "'", "_", "@"}
 	pythonSignatureTriggers := []string{"(", ","}
 	pythonSignatureRetriggers := []string{","}
 	return &lsproto.InitializeResult{

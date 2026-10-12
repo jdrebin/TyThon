@@ -219,7 +219,10 @@ func (c *Checker) pythonBoundMethodAccessType(leftType *Type, prop *ast.Symbol, 
 	if prop == nil || prop.Flags&ast.SymbolFlagsMethod == 0 || propType == nil {
 		return propType
 	}
-	if c.isPythonClassValueType(leftType) || !c.pythonSignatureHasReceiver(propType) {
+	if c.isPythonClassValueType(leftType) {
+		return c.pythonDecoratorInputType(propType)
+	}
+	if !c.pythonSignatureHasReceiver(propType) {
 		return propType
 	}
 	return c.BoundPythonCallable(propType)

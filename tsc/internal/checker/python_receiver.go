@@ -18,7 +18,7 @@ func (c *Checker) pythonReceiverType(declaration *ast.Node) *Type {
 	if len(parameters) == 0 || parameters[0] != declaration {
 		return nil
 	}
-	if ast.HasStaticModifier(method) {
+	if ast.HasStaticModifier(method) || c.pythonBuiltinMethodDecorator(method, "staticmethod") {
 		return nil
 	}
 	owner := method.Parent
@@ -26,6 +26,9 @@ func (c *Checker) pythonReceiverType(declaration *ast.Node) *Type {
 		return nil
 	}
 	if ast.IsClassLike(owner) || owner.Kind == ast.KindInterfaceDeclaration {
+		if c.pythonBuiltinMethodDecorator(method, "classmethod") {
+			return c.getUndecoratedTypeOfFuncClassEnumModule(c.getSymbolOfDeclaration(owner))
+		}
 		return c.getDeclaredTypeOfSymbol(c.getSymbolOfDeclaration(owner))
 	}
 	// A bare first parameter in a type literal is the receiver (`def __init__(self)`).
@@ -62,7 +65,7 @@ func (c *Checker) isPythonReceiverParameter(param *ast.Node) bool {
 		return false
 	}
 	parameters := method.Parameters()
-	if len(parameters) == 0 || parameters[0] != param || ast.HasStaticModifier(method) {
+	if len(parameters) == 0 || parameters[0] != param || ast.HasStaticModifier(method) || c.pythonBuiltinMethodDecorator(method, "staticmethod") {
 		return false
 	}
 	owner := method.Parent

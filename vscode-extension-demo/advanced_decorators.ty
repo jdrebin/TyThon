@@ -1,0 +1,433 @@
+# Decorators use ordinary call checking: the decorated name has the result type.
+# Hover over the names and results below to inspect their inferred types.
+# Type @ on a new line to see decorators; @name. offers descriptor methods.
+
+
+# 1. Generic identity preserves an ordinary function's signature.
+def identity<T>(value: T) -> T:
+    return value
+
+
+@identity
+def double(value: int) -> int:
+    return value * 2
+
+
+doubled: int = double(21)
+# double("21")  # Error: the original int parameter is still enforced.
+
+
+# 2. The result can itself remain generic.
+@identity
+def echo<T>(value: T) -> T:
+    return value
+
+
+echo_number: int = echo(42)
+echo_text: str = echo("hello")
+
+
+# 3. Default values and keyword-only parameters survive identity decoration.
+@identity
+def greet(name: str = "world", *, excited: bool = False) -> str:
+    if excited:
+        return "Hello, " + name + "!"
+    return "Hello, " + name
+
+
+default_greeting: str = greet()
+excited_greeting: str = greet("Ada", excited=True)
+# greet("Ada", True)  # Error: excited is keyword-only.
+
+
+# 4. A decorator can replace the callable signature completely.
+def replace_signature(fn: (value: int) -> int) -> (value: str) -> str:
+    def wrapped(value: str) -> str:
+        return value + "!"
+
+    return wrapped
+
+
+@replace_signature
+def transformed(value: int) -> int:
+    return value + 1
+
+
+transformed_text: str = transformed("hello")
+# transformed(1)  # Error: callers now see the str parameter.
+
+
+# 5. A decorator can call the original and preserve its signature.
+def increment_result(fn: (value: int) -> int) -> (value: int) -> int:
+    def wrapped(value: int) -> int:
+        return fn(value) + 1
+
+    return wrapped
+
+
+@increment_result
+def square(value: int) -> int:
+    return value * value
+
+
+squared_plus_one: int = square(4)
+
+
+# 6. A decorated function may become a non-callable value.
+def label(fn: () -> int) -> str:
+    return "registered"
+
+
+@label
+def labeled_function() -> int:
+    return 42
+
+
+function_label: str = labeled_function
+# labeled_function()  # Error: the decorated name is a str.
+# wrong_label: int = labeled_function  # Error: str is not assignable to int.
+
+
+# 7. Factories are ordinary expressions returning decorators.
+def named_label(name: str):
+    def decorate(fn: () -> int) -> str:
+        return name
+
+    return decorate
+
+
+@named_label("answer")
+def factory_labeled() -> int:
+    return 42
+
+
+factory_label: str = factory_labeled
+
+
+# 8. Stacks apply bottom-up, with each output feeding the next input.
+def label_to_number(value: str) -> int:
+    return 99
+
+
+@label_to_number
+@named_label("inner")
+def stacked() -> int:
+    return 42
+
+
+stacked_number: int = stacked
+
+
+# 9. Several identity decorators still preserve generic inference.
+@identity
+@identity
+@identity
+def stacked_echo<T>(value: T) -> T:
+    return value
+
+
+stacked_echo_number: int = stacked_echo(7)
+stacked_echo_text: str = stacked_echo("seven")
+
+
+# 10. Callable instances can be decorators.
+class LabelDecorator:
+    def __call__(self, fn: () -> int) -> str:
+        return "callable instance"
+
+
+label_decorator = LabelDecorator()
+
+
+@label_decorator
+def instance_decorated() -> int:
+    return 42
+
+
+instance_label: str = instance_decorated
+
+
+# 11. Constructors can be decorators; the result is the constructed object.
+class WrappedFunction:
+    def __init__(self, fn: () -> int):
+        pass
+
+    def label(self) -> str:
+        return "wrapped object"
+
+
+@WrappedFunction
+def object_decorated() -> int:
+    return 42
+
+
+wrapper_label: str = object_decorated.label()
+
+
+# 12. Class decorators can preserve the constructor and its instance members.
+@identity
+class Counter:
+    def __init__(self, value: int):
+        self.value = value
+
+    def read(self) -> int:
+        return self.value
+
+
+counter = Counter(3)
+counter_value: int = counter.read()
+
+
+# 13. A class decorator can also replace the public value with data.
+def replace_with_name<T>(value: T) -> str:
+    return "replacement"
+
+
+@replace_with_name
+class ReplacedClass:
+    def __init__(self, value: int):
+        self.value = value
+
+    def read(self) -> int:
+        return self.value
+
+
+class_name: str = ReplacedClass
+# ReplacedClass(3)  # Error: the decorated class name is now a str.
+
+
+# 14. An async function is passed as a callable returning an Awaitable.
+def async_label(fn: () -> Awaitable<int>) -> str:
+    return "async function"
+
+
+@async_label
+async def fetch_number() -> int:
+    return 42
+
+
+async_function_label: str = fetch_number
+
+
+# 15. None is a valid result; there is no implicit fallback to the original.
+def register(fn: () -> int) -> None:
+    pass
+
+
+@register
+def registered_function() -> int:
+    return 42
+
+
+registration_result: None = registered_function
+
+
+# 16. Decorator expressions resolve outside the decorated function's scope.
+@identity
+def shadowed_parameter(identity: int) -> int:
+    return identity
+
+
+shadowed_result: int = shadowed_parameter(42)
+
+
+# 17. Annotated recursive functions work with identity decoration.
+@identity
+def countdown(value: int) -> int:
+    if value:
+        return countdown(value - 1)
+    return 0
+
+
+countdown_result: int = countdown(3)
+
+
+# 18. Identity preserves an existing method's receiver and constructor shape.
+class IdentityMethods:
+    @identity
+    def __init__(self, value: int):
+        self.value = value
+
+    @identity
+    def add(self, amount: int) -> int:
+        return self.value + amount
+
+
+method_result: int = IdentityMethods(10).add(5)
+
+
+# 19. A method decorator receives the unbound function, including self.
+def method_label(fn: (self: any, value: int) -> int) -> str:
+    return "method replaced with data"
+
+
+class DataMethod:
+    @method_label
+    def calculate(self, value: int) -> int:
+        return value * 2
+
+
+method_data: str = DataMethod().calculate
+# DataMethod().calculate(2)  # Error: the member is now a str.
+
+
+# 20. Decorator expressions can use earlier bindings in a class body.
+class LocalDecorator:
+    decorate = method_label
+
+    @decorate
+    def calculate(self, value: int) -> int:
+        return value
+
+
+local_method_data: str = LocalDecorator().calculate
+
+
+# 21. Overload selection uses the original function's signature.
+# As in advanced_calls.ty, @overload marks declaration-only signatures.
+@overload
+def describe(fn: () -> int) -> str: ...
+
+
+@overload
+def describe(fn: () -> str) -> str: ...
+
+
+def describe(fn: any) -> str:
+    return "described"
+
+
+@describe
+def described_number() -> int:
+    return 1
+
+
+@describe
+def described_text() -> str:
+    return "one"
+
+
+number_description: str = described_number
+text_description: str = described_text
+
+
+# 22. Decorator aliases use the same call checking.
+aliased_label = label
+
+
+@aliased_label
+def alias_decorated() -> int:
+    return 42
+
+
+alias_result: str = alias_decorated
+
+
+# 23. Properties keep separate read and write types on direct access.
+class Profile:
+    def __init__(self, name: str):
+        self._name = name
+
+    @property
+    def name(self) -> str:
+        return self._name
+
+    @name.setter
+    def name(self, value: int) -> None:
+        self._name = str(value)
+
+    @name.deleter
+    def name(self) -> None:
+        self._name = ""
+
+    @property
+    def display(self) -> str:
+        return self._name.upper()
+
+    @classmethod
+    def create(cls, name: str) -> Profile:
+        return cls(name)
+
+    @staticmethod
+    def valid_name(name: str, *, allow_empty: bool = False) -> bool:
+        return allow_empty or bool(name)
+
+
+profile = Profile.create(name="Ada")
+profile.name = 123
+profile_name: str = profile.name
+profile_display: str = profile.display
+valid_profile_name: bool = Profile.valid_name("Ada", allow_empty=False)
+valid_instance_name: bool = profile.valid_name("Grace")
+del profile.name
+# profile.name = "Ada"  # Error: this setter takes int.
+# profile.display = "Ada"  # Error: this property has no setter.
+# del profile.display  # Error: this property has no deleter.
+
+
+# 24. Class access retains the descriptor; a type projection uses its getter.
+name_descriptor = Profile.name
+type ProfileName = Profile.name
+projected_name: ProfileName = "hello"
+
+
+# 25. As with TS accessors, structural views use only the read type.
+def rename_through_view(value: { name: str }):
+    value.name = "new name"
+
+
+# This is allowed by the structural checker, although the runtime still calls
+# Profile's int-taking setter. Retaining the exact type preserves that check.
+rename_through_view(profile)
+
+
+# 26. User-defined descriptors use the same protocol as property.
+class StringField:
+    def __get__(self, instance: object, owner: any) -> str:
+        return "field value"
+
+    def __set__(self, instance: object, value: int) -> None:
+        pass
+
+
+class Record:
+    field = StringField()
+
+
+record = Record()
+record.field = 42
+field_text: str = record.field
+
+
+# Additional error cases: uncomment one block at a time to inspect diagnostics.
+
+# A decorator expression must be callable.
+# not_callable = 42
+# @not_callable
+# def invalid_decorator() -> int:
+#     return 1
+
+# The callable must accept the decorated value as its single supplied argument.
+# def requires_text(value: str) -> str:
+#     return value
+# @requires_text
+# def invalid_input() -> int:
+#     return 1
+
+# Required extra arguments are not supplied automatically.
+# def requires_extra(fn: () -> int, extra: int) -> str:
+#     return "invalid"
+# @requires_extra
+# def missing_argument() -> int:
+#     return 1
+
+# The original body is checked against its own return annotation.
+# @label
+# def invalid_body() -> int:
+#     return "still an error"
+
+# Each stage of a decorator stack must accept the preceding stage's result.
+# @label
+# @named_label("already a str")
+# def invalid_stack() -> int:
+#     return 1

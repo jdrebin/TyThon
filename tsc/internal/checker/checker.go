@@ -65,6 +65,7 @@ const (
 	TypeSystemPropertyNameWriteType
 	TypeSystemPropertyNameInitializerIsUndefined
 	TypeSystemPropertyNameAliasTarget
+	TypeSystemPropertyNameDecoratedType
 )
 
 type TypeResolution struct {
@@ -2889,6 +2890,7 @@ func (c *Checker) checkClassStaticBlockDeclaration(node *ast.Node) {
 }
 
 func (c *Checker) checkConstructorDeclaration(node *ast.Node) {
+	c.checkDecorators(node)
 	// Grammar check on signature of constructor and modifier of the constructor is done in checkSignatureDeclaration function.
 	c.checkSignatureDeclaration(node)
 	// Grammar check for checking only related to constructorDeclaration
@@ -3463,6 +3465,9 @@ func (c *Checker) checkFunctionOrConstructorSymbol(symbol *ast.Symbol) {
 }
 
 func (c *Checker) checkFunctionOrConstructorSymbolWorker(symbol *ast.Symbol) {
+	if c.pythonDescriptorRebinding(symbol) {
+		return
+	}
 	flagsToCheck := ast.ModifierFlagsExport | ast.ModifierFlagsAmbient | ast.ModifierFlagsPrivate | ast.ModifierFlagsProtected | ast.ModifierFlagsAbstract
 	someNodeFlags := ast.ModifierFlagsNone
 	allNodeFlags := flagsToCheck
@@ -4299,7 +4304,7 @@ func (c *Checker) checkClassLikeDeclaration(node *ast.Node) {
 	classType := c.getDeclaredTypeOfSymbol(symbol)
 	classTypeData := classType.AsInterfaceType()
 	typeWithThis := c.getTypeWithThisArgument(classType, nil, false)
-	staticType := c.getTypeOfSymbol(symbol)
+	staticType := c.getUndecoratedTypeOfFuncClassEnumModule(symbol)
 	c.checkTypeParameterListsIdentical(symbol)
 	c.checkFunctionOrConstructorSymbol(symbol)
 	c.checkObjectTypeForDuplicateDeclarations(node, true /*checkPrivateNames*/)
@@ -4671,7 +4676,8 @@ basePropertyCheck:
 						diagnostics.X_0_is_defined_as_an_accessor_in_class_1_but_is_overridden_here_in_2_as_an_instance_property,
 						diagnostics.X_0_is_defined_as_a_property_in_class_1_but_is_overridden_here_in_2_as_an_accessor)
 					c.error(core.OrElse(ast.GetNameOfDeclaration(derived.ValueDeclaration), derived.ValueDeclaration), errorMessage, c.symbolToString(base), c.TypeToString(baseType), c.TypeToString(t))
-				} else if c.compilerOptions.GetUseDefineForClassFields() {
+				} else if c.compilerOptions.GetUseDefineForClassFields() && derived.ValueDeclaration != nil && ast.GetSourceFileOfNode(derived.ValueDeclaration).LanguageVariant != core.LanguageVariantPython {
+					// Python annotations are erased and do not overwrite base attributes.
 					uninitialized := core.Find(derived.Declarations, func(d *ast.Node) bool {
 						return ast.IsPropertyDeclaration(d) && d.Initializer() == nil
 					})
@@ -4789,7 +4795,7 @@ func (c *Checker) getMemberOverrideModifierStatus(node *ast.Node, member *ast.No
 
 	t := c.getDeclaredTypeOfSymbol(classSymbol)
 	typeWithThis := c.getTypeWithThisArgument(t, nil, false)
-	staticType := c.getTypeOfSymbol(classSymbol)
+	staticType := c.getUndecoratedTypeOfFuncClassEnumModule(classSymbol)
 
 	var baseWithThis *Type
 	if ast.GetClassExtendsHeritageElement(node) != nil {
@@ -5026,8 +5032,7 @@ func (c *Checker) checkTypeForDuplicateIndexSignatures(node *ast.Node) {
 }
 
 func (c *Checker) checkPropertyInitialization(node *ast.Node) {
-	// Instance initialization is `__init__`'s assertion, not a TypeScript constructor.
-	_ = node
+	c.checkPythonPropertyInitialization(node)
 }
 
 func (c *Checker) isPropertyWithoutInitializer(node *ast.Node) bool {
@@ -5052,11 +5057,21 @@ func (c *Checker) isPropertyInitializedInStaticBlocks(propName *ast.Node, propTy
 }
 
 func (c *Checker) isPropertyInitializedInConstructor(propName *ast.Node, propType *Type, constructor *ast.Node) bool {
+	receiver := c.factory.NewKeywordExpression(ast.KindThisKeyword)
+	if ast.GetSourceFileOfNode(constructor).LanguageVariant == core.LanguageVariantPython {
+		parameters := constructor.Parameters()
+		if len(parameters) == 0 || !ast.IsIdentifier(parameters[0].Name()) {
+			return false
+		}
+		receiver = c.factory.NewIdentifier(parameters[0].Name().Text())
+		receiver.Parent = constructor
+		c.symbolNodeLinks.Get(receiver).resolvedSymbol = c.getSymbolOfDeclaration(parameters[0])
+	}
 	var reference *ast.Node
 	if ast.IsComputedPropertyName(propName) {
-		reference = c.factory.NewElementAccessExpression(c.factory.NewKeywordExpression(ast.KindThisKeyword), nil, propName.Expression(), ast.NodeFlagsNone)
+		reference = c.factory.NewElementAccessExpression(receiver, nil, propName.Expression(), ast.NodeFlagsNone)
 	} else {
-		reference = c.factory.NewPropertyAccessExpression(c.factory.NewKeywordExpression(ast.KindThisKeyword), nil, propName, ast.NodeFlagsNone)
+		reference = c.factory.NewPropertyAccessExpression(receiver, nil, propName, ast.NodeFlagsNone)
 	}
 	reference.Expression().Parent = reference
 	reference.Parent = constructor
@@ -6070,7 +6085,12 @@ func (c *Checker) checkVariableLikeDeclaration(node *ast.Node) {
 	if ast.IsBigIntLiteral(name) {
 		c.error(name, diagnostics.A_bigint_literal_cannot_be_used_as_a_property_name)
 	}
-	t := c.convertAutoToAny(c.getTypeOfSymbol(symbol))
+	t := c.convertAutoToAny(c.getRawTypeOfSymbol(symbol))
+	if ast.IsPropertyDeclaration(node) {
+		if previous := c.pythonClassBodyValue(symbol, node); previous != nil {
+			t = previous
+		}
+	}
 	if node == symbol.ValueDeclaration {
 		// Node is the primary declaration of the symbol, just validate the initializer
 		// Don't validate for-in initializer as it is already an error
@@ -6200,76 +6220,22 @@ func (c *Checker) checkVarDeclaredNamesNotShadowed(node *ast.Node) {
 }
 
 func (c *Checker) checkDecorators(node *ast.Node) {
-	// skip this check for nodes that cannot have decorators. These should have already had an error reported by
-	// checkGrammarModifiers.
-	if !ast.CanHaveDecorators(node) || !ast.HasDecorators(node) || !ast.NodeCanBeDecorated(c.legacyDecorators, node, node.Parent, node.Parent.Parent) {
+	if !ast.HasDecorators(node) || !isPythonDecoratedDeclaration(node) {
 		return
 	}
-	firstDecorator := core.Find(node.ModifierNodes(), ast.IsDecorator)
-	if firstDecorator == nil {
-		return
+	symbol := c.getSymbolOfDeclaration(node)
+	original := c.getUndecoratedTypeOfFuncClassEnumModule(symbol)
+	if ast.IsMethodDeclaration(node) {
+		original = c.NewObjectTypeFromCallSignatures([]*Signature{c.getSignatureFromDeclaration(node)})
 	}
-	if c.legacyDecorators {
-		c.checkExternalEmitHelpers(firstDecorator, ExternalEmitHelpersDecorate)
-		if ast.IsParameterDeclaration(node) {
-			c.checkExternalEmitHelpers(firstDecorator, ExternalEmitHelpersParam)
-		}
-	} else if c.languageVersion < LanguageFeatureMinimumTarget.ClassAndClassElementDecorators {
-		c.checkExternalEmitHelpers(firstDecorator, ExternalEmitHelpersESDecorateAndRunInitializers)
-		if ast.IsClassDeclaration(node) {
-			if node.Name() == nil || c.getFirstTransformableStaticClassElement(node) != nil {
-				c.checkExternalEmitHelpers(firstDecorator, ExternalEmitHelpersSetFunctionName)
-			}
-		} else if !ast.IsClassExpression(node) {
-			name := node.Name()
-			if ast.IsPrivateIdentifier(name) && (ast.IsMethodDeclaration(node) || ast.IsAccessor(node) || ast.IsAutoAccessorPropertyDeclaration(node)) {
-				c.checkExternalEmitHelpers(firstDecorator, ExternalEmitHelpersSetFunctionName)
-			}
-			if ast.IsComputedPropertyName(name) {
-				c.checkExternalEmitHelpers(firstDecorator, ExternalEmitHelpersPropKey)
-			}
-		}
+	if ast.IsConstructorDeclaration(node) {
+		// Python decorates the __init__ function, whose return is None, rather
+		// than the class construction signature, whose return is an instance.
+		original = c.NewObjectTypeFromCallSignatures([]*Signature{
+			c.SignatureWithReturnType(c.getSignatureFromDeclaration(node), c.nullType),
+		})
 	}
-	c.markLinkedReferences(node, ReferenceHintDecorator, nil, nil)
-	for _, modifier := range node.ModifierNodes() {
-		if ast.IsDecorator(modifier) {
-			c.checkDecorator(modifier)
-		}
-	}
-}
-
-func (c *Checker) checkDecorator(node *ast.Node) {
-	c.checkGrammarDecorator(node.AsDecorator())
-	signature := c.getResolvedSignature(node, nil, CheckModeNormal)
-	c.checkDeprecatedSignature(signature, node)
-	returnType := c.getReturnTypeOfSignature(signature)
-	if returnType.flags&TypeFlagsAny != 0 {
-		return
-	}
-	// if we fail to get a signature and return type here, we will have already reported a grammar error in `checkDecorators`.
-	decoratorSignature := c.getDecoratorCallSignature(node)
-	if decoratorSignature == nil || decoratorSignature.resolvedReturnType == nil {
-		return
-	}
-	var headMessage *diagnostics.Message
-	expectedReturnType := decoratorSignature.resolvedReturnType
-	switch node.Parent.Kind {
-	case ast.KindClassDeclaration, ast.KindClassExpression:
-		headMessage = diagnostics.Decorator_function_return_type_0_is_not_assignable_to_type_1
-	case ast.KindPropertyDeclaration:
-		if !c.legacyDecorators {
-			headMessage = diagnostics.Decorator_function_return_type_0_is_not_assignable_to_type_1
-			break
-		}
-		fallthrough
-	case ast.KindParameter:
-		headMessage = diagnostics.Decorator_function_return_type_is_0_but_is_expected_to_be_void_or_any
-	case ast.KindMethodDeclaration, ast.KindGetAccessor, ast.KindSetAccessor:
-		headMessage = diagnostics.Decorator_function_return_type_0_is_not_assignable_to_type_1
-	default:
-		panic("Unhandled case in checkDecorator")
-	}
-	c.checkTypeAssignableTo(returnType, expectedReturnType, node.Expression(), headMessage)
+	c.getPythonDecoratedType(node, original)
 }
 
 func (c *Checker) checkIteratedTypeOrElementType(use IterationUse, inputType *Type, sentType *Type, errorNode *ast.Node) *Type {
@@ -8930,36 +8896,11 @@ func (c *Checker) resolveTaggedTemplateExpression(node *ast.Node, candidatesOutA
 }
 
 func (c *Checker) resolveDecorator(node *ast.Node, candidatesOutArray *[]*Signature, checkMode CheckMode) *Signature {
-	if !ast.CanHaveDecorators(node.Parent) {
-		return c.resolveErrorCall(node)
+	c.checkDecorators(node.Parent)
+	if call := c.signatureLinks.Get(node).decoratorCall; call != nil {
+		return c.getResolvedSignature(call, candidatesOutArray, checkMode)
 	}
-	funcType := c.checkExpression(node.Expression())
-	apparentType := c.getApparentType(funcType)
-	if c.isErrorType(apparentType) {
-		return c.resolveErrorCall(node)
-	}
-	callSignatures := c.getSignaturesOfType(apparentType, SignatureKindCall)
-	numConstructSignatures := len(c.getSignaturesOfType(apparentType, SignatureKindConstruct))
-	if c.isUntypedFunctionCall(funcType, apparentType, len(callSignatures), numConstructSignatures) {
-		return c.resolveUntypedCall(node)
-	}
-	if c.isPotentiallyUncalledDecorator(node, callSignatures) && !ast.IsParenthesizedExpression(node.Expression()) {
-		nodeStr := scanner.GetTextOfNode(node.Expression())
-		c.error(node, diagnostics.X_0_accepts_too_few_arguments_to_be_used_as_a_decorator_here_Did_you_mean_to_call_it_first_and_write_0, nodeStr)
-		return c.resolveErrorCall(node)
-	}
-	headMessage := c.getDiagnosticHeadMessageForDecoratorResolution(node)
-	if len(callSignatures) == 0 {
-		diag := ast.NewDiagnosticChain(c.invocationErrorDetails(node.Expression(), apparentType, SignatureKindCall), headMessage)
-		diag = c.addDiagnostic(diag)
-		c.invocationErrorRecovery(apparentType, SignatureKindCall, diag)
-		return c.resolveErrorCall(node)
-	}
-	decoratorSignature := c.getDecoratorCallSignature(node)
-	if decoratorSignature == nil {
-		return c.resolveErrorCall(node)
-	}
-	return c.resolveCall(node, callSignatures, candidatesOutArray, checkMode, SignatureFlagsNone, headMessage)
+	return c.unknownSignature
 }
 
 // Sometimes, we have a decorator that could accept zero arguments,
@@ -9348,7 +9289,7 @@ func (c *Checker) hasCorrectArity(node *ast.Node, args []*ast.Node, signature *S
 			argCount = len(args)
 		}
 		// If we are missing the close parenthesis, the call is incomplete.
-		callIsIncomplete = node.ArgumentList().End() == node.End()
+		callIsIncomplete = node.ArgumentList().End() == node.End() && !isPythonDecoratorCall(node)
 		// If a spread argument is present, check that it corresponds to a rest parameter or at least that it's in the valid range.
 		spreadArgIndex := c.getSpreadArgumentIndex(args)
 		if spreadArgIndex >= 0 {
@@ -10166,9 +10107,11 @@ func (c *Checker) resolveErrorCall(node *ast.Node) *Signature {
  * but is a subtype of the Function interface, the call is an untyped function call.
  */
 func (c *Checker) isUntypedFunctionCall(funcType *Type, apparentFuncType *Type, numCallSignatures int, numConstructSignatures int) bool {
-	// We exclude union types because we may have a union of function types that happen to have no common signatures.
+	// A missing JavaScript Function global resolves to {}. That fallback must
+	// not make every Python non-null value callable.
+	// Exclude unions that have no common call signature.
 	return IsTypeAny(funcType) || IsTypeAny(apparentFuncType) && funcType.flags&TypeFlagsTypeParameter != 0 ||
-		numCallSignatures == 0 && numConstructSignatures == 0 && apparentFuncType.flags&TypeFlagsUnion == 0 &&
+		c.globalFunctionType != c.emptyObjectType && numCallSignatures == 0 && numConstructSignatures == 0 && apparentFuncType.flags&TypeFlagsUnion == 0 &&
 			c.getReducedType(apparentFuncType).flags&TypeFlagsNever == 0 && c.isTypeAssignableTo(funcType, c.globalFunctionType)
 }
 
@@ -11055,6 +10998,12 @@ func (c *Checker) checkDeleteExpression(node *ast.Node) *Type {
 	}
 	symbol := c.getExportSymbolOfValueSymbolIfExported(c.getResolvedSymbolOrNil(expr))
 	if symbol != nil {
+		if ast.IsPropertyAccessExpression(expr) && pythonDescriptorOwner(symbol) != nil {
+			raw := c.getRawTypeOfSymbol(symbol)
+			if !c.isPythonClassValueType(c.checkExpression(expr.Expression())) && (c.pythonDescriptorMethod(raw, "__set__") != nil || c.pythonDescriptorMethod(raw, "__delete__") != nil) {
+				return c.booleanType
+			}
+		}
 		if c.isReadonlySymbol(symbol) {
 			c.error(expr, diagnostics.The_operand_of_a_delete_operator_cannot_be_a_read_only_property)
 		} else {
@@ -11305,6 +11254,9 @@ func (c *Checker) checkIdentifier(node *ast.Node, checkMode CheckMode) *Type {
 		c.markLinkedReferences(node, ReferenceHintIdentifier, nil /*propSymbol*/, nil /*parentType*/)
 	}
 	localOrExportSymbol := c.getExportSymbolOfValueSymbolIfExported(symbol)
+	if value := c.pythonClassBodyValue(localOrExportSymbol, node); value != nil {
+		return value
+	}
 	targetSymbol := c.resolveAliasWithDeprecationCheck(localOrExportSymbol, node)
 	if len(targetSymbol.Declarations) != 0 && c.isDeprecatedSymbol(targetSymbol) && c.isUncalledFunctionReference(node, targetSymbol) {
 		c.addDeprecatedSuggestion(node, targetSymbol.Declarations, node.Text())
@@ -11632,6 +11584,9 @@ func (c *Checker) checkPropertyAccessExpressionOrQualifiedName(node *ast.Node, l
 		c.markPropertyAsReferenced(prop, node, c.isSelfTypeAccess(left, parentSymbol))
 		c.symbolNodeLinks.Get(node).resolvedSymbol = prop
 		c.checkPropertyAccessibility(node, left.Kind == ast.KindSuperKeyword, ast.IsWriteAccess(node), apparentType, prop)
+		if descriptorType, ok := c.pythonDescriptorAccess(node, apparentType, prop, writeOnly || ast.IsWriteOnlyAccess(node)); ok {
+			return descriptorType
+		}
 		if c.isAssignmentToReadonlyEntity(node, prop, assignmentKind) {
 			c.error(right, diagnostics.Cannot_assign_to_0_because_it_is_a_read_only_property, right.Text())
 			return c.errorType
@@ -13000,7 +12955,9 @@ func (c *Checker) checkReferenceAssignment(target *ast.Node, sourceType *Type, c
 		diagnostics.The_target_of_an_object_rest_assignment_may_not_be_an_optional_property_access,
 		diagnostics.The_left_hand_side_of_an_assignment_expression_may_not_be_an_optional_property_access)
 	if c.checkReferenceExpression(target, message, optionalMessage) {
-		c.checkTypeAssignableToAndOptionallyElaborate(sourceType, targetType, target, target, nil, nil)
+		if !c.checkPythonDescriptorAssignment(target, sourceType) {
+			c.checkTypeAssignableToAndOptionallyElaborate(sourceType, targetType, target, target, nil, nil)
+		}
 	}
 	return sourceType
 }
@@ -13057,6 +13014,9 @@ func (c *Checker) checkAssignmentOperator(left *ast.Node, operator ast.Kind, rig
 			leftType = c.checkPropertyAccessExpression(left, CheckModeNormal, true /*writeOnly*/)
 		}
 		if c.checkReferenceExpression(left, diagnostics.The_left_hand_side_of_an_assignment_expression_must_be_a_variable_or_a_property_access, diagnostics.The_left_hand_side_of_an_assignment_expression_may_not_be_an_optional_property_access) {
+			if c.checkPythonDescriptorAssignment(left, rightType) {
+				return
+			}
 			var headMessage *diagnostics.Message
 			if c.exactOptionalPropertyTypes && ast.IsPropertyAccessExpression(left) && c.maybeTypeOfKind(rightType, TypeFlagsUndefined) {
 				target := c.getTypeOfPropertyOfType(c.getTypeOfExpression(left.Expression()), left.Name().Text())
@@ -16907,6 +16867,10 @@ func (c *Checker) GetTypeOfSymbolAtLocation(symbol *ast.Symbol, location *ast.No
 }
 
 func (c *Checker) getTypeOfSymbol(symbol *ast.Symbol) *Type {
+	return c.pythonDescriptorValueType(symbol, c.getRawTypeOfSymbol(symbol))
+}
+
+func (c *Checker) getRawTypeOfSymbol(symbol *ast.Symbol) *Type {
 	if symbol.CheckFlags&ast.CheckFlagsDeferredType != 0 {
 		return c.getTypeOfSymbolWithDeferredType(symbol)
 	}
@@ -16944,7 +16908,7 @@ func (c *Checker) getNonMissingTypeOfSymbol(symbol *ast.Symbol) *Type {
 func (c *Checker) getTypeOfInstantiatedSymbol(symbol *ast.Symbol) *Type {
 	links := c.valueSymbolLinks.Get(symbol)
 	if links.resolvedType == nil {
-		links.resolvedType = c.instantiateType(c.getTypeOfSymbol(links.target), links.mapper)
+		links.resolvedType = c.instantiateType(c.getRawTypeOfSymbol(links.target), links.mapper)
 	}
 	return links.resolvedType
 }
@@ -17332,6 +17296,17 @@ func (c *Checker) getWidenedLiteralTypeForInitializer(declaration *ast.Node, t *
 }
 
 func (c *Checker) getTypeOfFuncClassEnumModule(symbol *ast.Symbol) *Type {
+	if symbol.Flags&ast.SymbolFlagsMethod != 0 && len(symbol.Declarations) > 1 && c.pythonDescriptorRebinding(symbol) {
+		return c.pythonDeclarationValue(symbol.Declarations[len(symbol.Declarations)-1])
+	}
+	raw := c.getUndecoratedTypeOfFuncClassEnumModule(symbol)
+	if declaration := symbol.ValueDeclaration; declaration != nil && ast.HasDecorators(declaration) && isPythonDecoratedDeclaration(declaration) {
+		return c.getPythonDecoratedType(declaration, raw)
+	}
+	return raw
+}
+
+func (c *Checker) getUndecoratedTypeOfFuncClassEnumModule(symbol *ast.Symbol) *Type {
 	links := c.valueSymbolLinks.Get(symbol)
 	if links.resolvedType == nil {
 		links.resolvedType = c.getTypeOfFuncClassEnumModuleWorker(symbol)
@@ -19287,6 +19262,8 @@ func (c *Checker) typeResolutionHasProperty(r *TypeResolution) bool {
 		return c.nodeLinks.Get(r.target.(*ast.Node)).flags&NodeCheckFlagsInitializerIsUndefinedComputed != 0
 	case TypeSystemPropertyNameWriteType:
 		return c.valueSymbolLinks.Get(r.target.(*ast.Symbol)).writeType != nil
+	case TypeSystemPropertyNameDecoratedType:
+		return c.signatureLinks.Get(r.target.(*ast.Node)).decoratedType != nil
 	case TypeSystemPropertyNameAliasTarget:
 		return c.aliasSymbolLinks.Get(r.target.(*ast.Symbol)).aliasTarget != nil
 	}
@@ -19618,6 +19595,9 @@ func (c *Checker) resolveObjectTypeMembers(t *Type, source *Type, typeParameters
 		callSignatures = c.instantiateSignatures(resolved.declaredCallSignatures, mapper)
 		constructSignatures = c.instantiateSignatures(resolved.declaredConstructSignatures, mapper)
 		indexInfos = c.instantiateIndexInfos(resolved.declaredIndexInfos, mapper, source.AsStructuredType().separateAttributeAndItem)
+	}
+	if source.symbol != nil && source.symbol == c.globals["BoundMethod"] && len(typeArguments) > 0 {
+		callSignatures = c.getSignaturesOfType(c.BoundPythonCallable(typeArguments[0]), SignatureKindCall)
 	}
 	baseTypes := c.getBaseTypes(source)
 	if len(baseTypes) != 0 {
@@ -30638,10 +30618,9 @@ func (c *Checker) getContextualTypeForArgumentAtIndex(callTarget *ast.Node, argI
 }
 
 func (c *Checker) getContextualTypeForDecorator(decorator *ast.Node) *Type {
-	signature := c.getDecoratorCallSignature(decorator)
-	if signature != nil {
-		return c.getOrCreateTypeFromSignature(signature)
-	}
+	// Python imposes no contextual return contract on a decorator. Its
+	// ordinary call determines the published type, which may be unrelated to
+	// the original declaration's type.
 	return nil
 }
 
@@ -32785,6 +32764,9 @@ func (c *Checker) isThisPropertyAndThisTyped(node *ast.Node) bool {
 }
 
 func (c *Checker) getTypeOfNode(node *ast.Node) *Type {
+	if value := c.pythonClassDeclarationType(node); value != nil {
+		return value
+	}
 	if ast.IsSourceFile(node) && !ast.IsExternalOrCommonJSModule(node.AsSourceFile()) {
 		return c.errorType
 	}
