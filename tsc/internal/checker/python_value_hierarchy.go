@@ -143,6 +143,23 @@ func (c *Checker) PythonPrimitiveBase(t *Type) *Type {
 	return nil
 }
 
+// pythonClassPrimitiveBase is the primitive a class inherits (`class Label(str)`).
+func (c *Checker) pythonClassPrimitiveBase(t *Type) *Type {
+	if t == nil || t.flags&TypeFlagsObject == 0 || t.objectFlags&ObjectFlagsClass == 0 {
+		return nil
+	}
+	target := t
+	if t.objectFlags&ObjectFlagsReference != 0 && t.Target() != nil {
+		target = t.Target()
+	}
+	for _, base := range c.getBaseTypes(target) {
+		if primitive := c.PythonPrimitiveBase(base); primitive != nil {
+			return primitive
+		}
+	}
+	return nil
+}
+
 func (c *Checker) PythonPrimitiveBaseSurface(t *Type) *Type {
 	return c.pythonValueApparentType(t, c.getApparentType(t))
 }

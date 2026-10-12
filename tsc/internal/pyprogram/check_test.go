@@ -302,6 +302,255 @@ func TestNativeHover(t *testing.T) {
 	if !ok || !strings.Contains(value, "str") || strings.Contains(value, "=>") {
 		t.Fatalf("value hover: %q", value)
 	}
+	if !strings.Contains(value, "(variable)") {
+		t.Fatalf("value hover: %q", value)
+	}
+}
+
+func TestHoverOptionalMembers(t *testing.T) {
+	text, err := os.ReadFile(filepath.Join(repoRoot(t), "vscode-extension-demo/optional_members.ty"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	source := string(text)
+	session := Open(t.Context(), []python.SourceInput{{FileName: "/optional_members.ty", Text: source}})
+	defer session.Close()
+	for offset := 0; offset < len(source); offset++ {
+		func() {
+			defer func() {
+				if recovered := recover(); recovered != nil {
+					line := 1 + strings.Count(source[:offset], "\n")
+					t.Errorf("panic at %d line %d %q: %v", offset, line, source[offset:min(offset+24, len(source))], recovered)
+				}
+			}()
+			session.Hover("/optional_members.ty", offset, nil)
+		}()
+	}
+	hover := func(marker, name string) string {
+		t.Helper()
+		start := strings.Index(source, marker)
+		offset := start + strings.Index(source[start:], name)
+		text, _, ok := session.Hover("/optional_members.ty", offset, nil)
+		if !ok {
+			t.Fatalf("no hover at %s", name)
+		}
+		return text
+	}
+	if got := hover("type CopiedProfile", "CopiedProfile"); !strings.Contains(got, "Copy(Profile)") {
+		t.Fatalf("CopiedProfile hover %q", got)
+	}
+	if got := hover("type RequiredProfile", "RequiredProfile"); !strings.Contains(got, "Required(Profile)") {
+		t.Fatalf("RequiredProfile hover %q", got)
+	}
+}
+
+func TestAttributeDotType(t *testing.T) {
+	source := strings.Join([]string{
+		"interface Box<T>:",
+		"    optional value: T",
+		"    def get(self) -> T",
+		"type User(T) = {",
+		"    name: str,",
+		"    def inspect<U>(value: U) -> U,",
+		"}",
+		"type BoxContents = Box<str>.value",
+		"type UserNameViaDot = User(str).name",
+		"type Missing = Box<str>.missing",
+		"",
+	}, "\n")
+	file := "/attr.ty"
+	diagnostics := Check(t.Context(), []python.SourceInput{{FileName: file, Text: source}})
+	for _, diagnostic := range diagnostics {
+		if strings.Contains(diagnostic.Message, "typeof import") {
+			t.Errorf("diagnostic mentions the file module: %s", diagnostic.Message)
+		}
+		lineStart := 0
+		if diagnostic.Range.Start > 0 && diagnostic.Range.Start <= len(source) {
+			lineStart = strings.LastIndex(source[:diagnostic.Range.Start], "\n") + 1
+		}
+		lineEnd := len(source)
+		if diagnostic.Range.Start < len(source) {
+			if next := strings.Index(source[diagnostic.Range.Start:], "\n"); next >= 0 {
+				lineEnd = diagnostic.Range.Start + next
+			}
+		}
+		line := source[lineStart:lineEnd]
+		if strings.Contains(line, "BoxContents") || strings.Contains(line, "UserNameViaDot") {
+			t.Errorf("dot type diagnostic: %s", diagnostic.Message)
+		}
+	}
+	var missing bool
+	for _, diagnostic := range diagnostics {
+		if strings.Contains(diagnostic.Message, "missing") {
+			missing = true
+		}
+	}
+	if !missing {
+		t.Fatalf("missing attribute was accepted: %#v", diagnostics)
+	}
+	session := Open(t.Context(), []python.SourceInput{{FileName: file, Text: source}})
+	defer session.Close()
+	for _, marker := range []string{"Box<str>.value", "User(str).name"} {
+		offset := strings.Index(source, marker) + strings.LastIndex(marker, ".") + 1
+		text, _, ok := session.Hover(file, offset, nil)
+		if !ok || strings.Contains(text, "typeof import") || !strings.Contains(text, "str") {
+			t.Fatalf("%s hover %q", marker, text)
+		}
+	}
+	for _, token := range session.SemanticIdentifiers(file) {
+		if source[token.Range.Start:token.Range.End] == "self" {
+			t.Fatalf("self should keep the grammar color, got a semantic token at %d", token.Range.Start)
+		}
+	}
+}
+
+func TestAdvancedTypesHover(t *testing.T) {
+	text, err := os.ReadFile(filepath.Join(repoRoot(t), "vscode-extension-demo/advanced_types.ty"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	source := string(text)
+	file := "/advanced_types.ty"
+	session := Open(t.Context(), []python.SourceInput{{FileName: file, Text: source}})
+	defer session.Close()
+	for offset := 0; offset < len(source); offset++ {
+		func() {
+			defer func() {
+				if recovered := recover(); recovered != nil {
+					line := 1 + strings.Count(source[:offset], "\n")
+					t.Errorf("panic at %d line %d %q: %v", offset, line, source[offset:min(offset+24, len(source))], recovered)
+				}
+			}()
+			got, _, _ := session.Hover(file, offset, nil)
+			if strings.Contains(got, "typeof import") {
+				line := 1 + strings.Count(source[:offset], "\n")
+				t.Errorf("line %d hover %q", line, got)
+			}
+		}()
+	}
+	member := func(marker string) string {
+		t.Helper()
+		offset := strings.Index(source, marker) + strings.LastIndex(marker, ".") + 1
+		text, _, ok := session.Hover(file, offset, nil)
+		if !ok {
+			t.Fatalf("no hover at %s", marker)
+		}
+		return text
+	}
+	if got := member("User(str).name"); !strings.Contains(got, "str") {
+		t.Fatalf("User(str).name hover %q", got)
+	}
+	if got := member("Box<str>.value"); !strings.Contains(got, "str") {
+		t.Fatalf("Box<str>.value hover %q", got)
+	}
+}
+
+func TestNativeColorAndHover(t *testing.T) {
+	source := strings.Join([]string{
+		"type Label = str",
+		"type User(T) = { id: T, name: str }",
+		"interface Named:",
+		"    name: str",
+		"class Box(Named):",
+		"    def __init__(self, value: int):",
+		"        self.value = value",
+		"    def show(self) -> str:",
+		"        return str(self.value)",
+		"def identity<T>(value: T) -> T:",
+		"    return value",
+		"count: int = 1",
+		"flag: bool = True",
+		"text = str(count)",
+		"boxed = Box(count)",
+		"shown = boxed.show()",
+		"again = identity(text)",
+		"items = {\"id\": count, \"name\": text}",
+		"raw: bytes = b\"hi\"",
+		"obj: object = text",
+		"",
+	}, "\n")
+	session := Open(t.Context(), []python.SourceInput{{FileName: "/t.ty", Text: source}})
+	defer session.Close()
+
+	identifiers := session.SemanticIdentifiers("/t.ty")
+	offsetOf := func(marker, name string) int {
+		t.Helper()
+		start := strings.Index(source, marker)
+		if start < 0 {
+			t.Fatalf("missing %s", marker)
+		}
+		return start + strings.Index(source[start:], name)
+	}
+	kindAt := func(marker, name string) (ast.Kind, bool) {
+		t.Helper()
+		at := offsetOf(marker, name)
+		for _, token := range identifiers {
+			if token.Range.Start == at && source[token.Range.Start:token.Range.End] == name {
+				return token.Kind, true
+			}
+		}
+		return 0, false
+	}
+	for _, name := range []struct{ marker, name string }{
+		{"type Label = ", "str"},
+		{"count: ", "int"},
+		{"flag: ", "bool"},
+		{"-> ", "str"},
+		{"obj: ", "object"},
+	} {
+		if _, ok := kindAt(name.marker, name.name); ok {
+			t.Errorf("%s in %s should keep the builtin type color", name.name, name.marker)
+		}
+	}
+	for _, test := range []struct {
+		marker, name string
+		kind         ast.Kind
+	}{
+		{"text = ", "str", ast.KindFunctionDeclaration},
+		{"raw: ", "bytes", ast.KindClassDeclaration},
+		{"class Box(", "Named", ast.KindInterfaceDeclaration},
+		{"def ", "__init__", ast.KindMethodDeclaration},
+		{"self.", "value", ast.KindPropertyDeclaration},
+		{"\"id\": ", "count", ast.KindVariableDeclaration},
+		{"boxed = ", "Box", ast.KindClassDeclaration},
+	} {
+		kind, ok := kindAt(test.marker, test.name)
+		if !ok || kind != test.kind {
+			t.Errorf("%s in %s kind %v, want %v", test.name, test.marker, kind, test.kind)
+		}
+	}
+
+	hoverAt := func(marker, name string) string {
+		t.Helper()
+		text, _, ok := session.Hover("/t.ty", offsetOf(marker, name), nil)
+		if !ok {
+			t.Fatalf("no hover at %s", name)
+		}
+		return text
+	}
+	for _, test := range []struct{ marker, name, want string }{
+		{"type Label = ", "str", "str"},
+		{"count: ", "int", "int"},
+		{"flag: ", "bool", "bool"},
+		{"obj: ", "object", "object"},
+		{"raw: ", "bytes", "class bytes"},
+		{"type ", "Label", "type Label = str"},
+		{"type ", "User", "type User(T) = { id: T, name: str }"},
+		{"class Box(", "Named", "interface Named"},
+		{"class ", "Box", "class Box"},
+		{"def ", "__init__", "def __init__(value: int) -> None"},
+		{"def ", "show", "def show() -> str"},
+		{"boxed.", "show", "show: () -> str"},
+		{"again = ", "identity", "def identity(value: str) -> str"},
+		{"text = ", "str", "def str(value: any) -> str"},
+		{"count: ", "count", "(variable) count: int"},
+		{"\"id\": ", "count", "(variable) count: int"},
+		{"type User(", "T", "(type parameter) T"},
+	} {
+		if got := hoverAt(test.marker, test.name); !strings.Contains(got, test.want) {
+			t.Errorf("%s hover %q, want %q", test.name, got, test.want)
+		}
+	}
 }
 
 func TestNativeProjectImports(t *testing.T) {

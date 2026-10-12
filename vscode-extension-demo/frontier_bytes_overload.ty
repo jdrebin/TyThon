@@ -17,7 +17,7 @@ def normalize(value):
 normalized_bytes = normalize(b"Ada")
 
 name = (
-    lambda s: str, f="", *args: []int: s.trimLeft()
+    lambda s: str, f="", *args: []int: s.lower()
 )  # Error: bytes is not assignable to str
 
 name(f="er", s='hello')

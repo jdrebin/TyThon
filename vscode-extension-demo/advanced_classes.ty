@@ -56,7 +56,7 @@ class ResolvedValue(TextValue, NumericValue):
     marker: bool
 
 
-user = User.create("Ada")
+user: User = User.create("Ada")
 bound_display = user.display
 displayed = bound_display()
 object_text = user.__repr__()

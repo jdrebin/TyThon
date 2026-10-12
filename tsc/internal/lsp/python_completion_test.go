@@ -221,7 +221,7 @@ profile: Profile
 	})
 	assert.Assert(t, hoverOK && hoverMessage.AsResponse().Error == nil, "hover failed")
 	assert.Assert(t, hoverResponse.Hover != nil && hoverResponse.Hover.Contents.MarkupContent != nil)
-	assert.Equal(t, hoverResponse.Hover.Contents.MarkupContent.Value, "identity: <T>(value: T) -> T")
+	assert.Equal(t, hoverResponse.Hover.Contents.MarkupContent.Value, "def identity<T>(value: T) -> T")
 	assert.DeepEqual(t, *hoverResponse.Hover.Range, lsproto.Range{
 		Start: lsproto.Position{Line: 2, Character: 4}, End: lsproto.Position{Line: 2, Character: 12},
 	})
@@ -229,14 +229,14 @@ profile: Profile
 		TextDocument: lsproto.TextDocumentIdentifier{Uri: uri}, Position: lsproto.Position{Line: 17, Character: 2},
 	})
 	assert.Assert(t, hoverOK && hoverMessage.AsResponse().Error == nil && hoverResponse.Hover != nil, "compact named-type hover failed")
-	assert.Equal(t, hoverResponse.Hover.Contents.MarkupContent.Value, "profile: Profile")
+	assert.Equal(t, hoverResponse.Hover.Contents.MarkupContent.Value, "(variable) profile: Profile")
 	assert.Assert(t, hoverResponse.Hover.CanIncreaseVerbosity, "named interface hover should be expandable")
 	levelOne := int32(1)
 	hoverMessage, hoverResponse, hoverOK = lsptestutil.SendRequest(t, client, lsproto.TextDocumentHoverInfo, &lsproto.HoverParams{
 		TextDocument: lsproto.TextDocumentIdentifier{Uri: uri}, Position: lsproto.Position{Line: 17, Character: 2}, VerbosityLevel: &levelOne,
 	})
 	assert.Assert(t, hoverOK && hoverMessage.AsResponse().Error == nil && hoverResponse.Hover != nil, "expanded named-type hover failed")
-	assert.Equal(t, hoverResponse.Hover.Contents.MarkupContent.Value, "profile: { name: str }")
+	assert.Equal(t, hoverResponse.Hover.Contents.MarkupContent.Value, "(variable) profile: { name: str }")
 	diagnosticMessage, diagnosticResponse, diagnosticOK := lsptestutil.SendRequest(t, client, lsproto.TextDocumentDiagnosticInfo, &lsproto.DocumentDiagnosticParams{
 		TextDocument: lsproto.TextDocumentIdentifier{Uri: uri},
 	})

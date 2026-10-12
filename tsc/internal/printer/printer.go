@@ -1915,6 +1915,23 @@ func (p *Printer) emitTypeReference(node *ast.TypeReferenceNode) {
 	p.exitNode(node.AsNode(), state)
 }
 
+func (p *Printer) emitTypeCallType(node *ast.TypeCallTypeNode) {
+	state := p.enterNode(node.AsNode())
+	p.emitTypeNodeOutsideExtends(node.Callee)
+	p.writePunctuation("(")
+	if node.Arguments != nil {
+		for index, argument := range node.Arguments.Nodes {
+			if index > 0 {
+				p.writePunctuation(",")
+				p.writeSpace()
+			}
+			p.emitTypeNodeOutsideExtends(argument)
+		}
+	}
+	p.writePunctuation(")")
+	p.exitNode(node.AsNode(), state)
+}
+
 // Emits the return type of a FunctionTypeNode or ConstructorTypeNode, including the arrow (`=>`)
 func (p *Printer) emitReturnType(node *ast.TypeNode) {
 	if node == nil {
@@ -2127,6 +2144,14 @@ func (p *Printer) emitTypeOperator(node *ast.TypeOperatorNode) {
 	p.emitToken(node.Operator, node.Pos(), WriteKindKeyword, node.AsNode())
 	p.writeSpace()
 	p.emitTypeNode(node.Type, core.IfElse(node.Operator == ast.KindReadonlyKeyword, ast.TypePrecedencePostfix, ast.TypePrecedenceTypeOperator))
+	p.exitNode(node.AsNode(), state)
+}
+
+func (p *Printer) emitAttributeAccessType(node *ast.AttributeAccessTypeNode) {
+	state := p.enterNode(node.AsNode())
+	p.emitPostfixTypeOperand(node.ObjectType, node.AsNode())
+	p.writePunctuation(".")
+	p.emitIdentifierNameNode(node.Member)
 	p.exitNode(node.AsNode(), state)
 }
 
@@ -2354,6 +2379,8 @@ func (p *Printer) emitTypeNode(node *ast.TypeNode, precedence ast.TypePrecedence
 		p.emitTypeOperator(node.AsTypeOperatorNode())
 	case ast.KindIndexedAccessType:
 		p.emitIndexedAccessType(node.AsIndexedAccessTypeNode())
+	case ast.KindAttributeAccessType:
+		p.emitAttributeAccessType(node.AsAttributeAccessTypeNode())
 	case ast.KindMappedType:
 		p.emitMappedType(node.AsMappedTypeNode())
 	case ast.KindLiteralType:
@@ -2373,6 +2400,8 @@ func (p *Printer) emitTypeNode(node *ast.TypeNode, precedence ast.TypePrecedence
 	case ast.KindExpressionWithTypeArguments:
 		// !!! Should this actually be considered a type?
 		p.emitExpressionWithTypeArguments(node.AsExpressionWithTypeArguments())
+	case ast.KindTypeCallType:
+		p.emitTypeCallType(node.AsTypeCallTypeNode())
 
 	case ast.KindJSDocAllType:
 		p.emitJSDocAllType(node)

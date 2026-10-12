@@ -2376,6 +2376,14 @@ func (c *Checker) checkSourceElementWorker(node *ast.Node) {
 		c.checkNamedTupleMember(node)
 	case ast.KindIndexedAccessType:
 		c.checkIndexedAccessType(node)
+	case ast.KindAttributeAccessType:
+		// The object may be `User(str)`, a type call. Checking that callee on its
+		// own reports a missing type-argument list; the call is resolved with the
+		// attribute.
+		if objectType := node.AsAttributeAccessTypeNode().ObjectType; objectType != nil && objectType.Kind != ast.KindTypeCallType {
+			c.checkSourceElement(objectType)
+		}
+		c.getTypeFromAttributeAccessTypeNode(node)
 	case ast.KindMappedType:
 		c.checkMappedType(node)
 	case ast.KindFunctionDeclaration:
@@ -4317,6 +4325,9 @@ func (c *Checker) checkClassLikeDeclaration(node *ast.Node) {
 					c.issueMemberSpecificError(node, typeWithThis, baseWithThis, diagnostics.Class_0_incorrectly_extends_base_class_1)
 				}
 				c.checkKindsOfPropertyMemberOverrides(classType, baseType)
+			} else if c.PythonPrimitiveBase(baseType) != nil {
+				// A primitive base is the instance identity (`class Label(str)` is a
+				// str). It has no static constructor side to check.
 			} else {
 				c.checkJSDocAugmentsTagMatchesExtends(node, baseTypeNode, baseType)
 				baseConstructorType := c.getBaseConstructorTypeOfClass(classType)
@@ -5863,7 +5874,7 @@ func (c *Checker) checkExternalModuleExports(node *ast.Node) {
 			}
 			if exportedDeclarationsCount > 1 && !core.Every(symbol.Declarations, func(node *ast.Node) bool {
 				return ast.GetAssignmentDeclarationKind(node) == ast.JSDeclarationKindExportsProperty
-			}) {
+			}) && !pythonAssignmentRebinding(symbol) {
 				for _, declaration := range symbol.Declarations {
 					if isNotOverload(declaration) {
 						c.error(declaration, diagnostics.Cannot_redeclare_exported_variable_0, id)
@@ -5895,6 +5906,30 @@ func (c *Checker) hasShadowedNamespace(symbol *ast.Symbol) bool {
 
 func isNotOverload(node *ast.Node) bool {
 	return !ast.IsFunctionDeclaration(node) && !ast.IsMethodDeclaration(node) || node.Body() != nil
+}
+
+// pythonAssignmentRebinding reports a Python name bound by more than one
+// assignment. Rebinding is not a second export; a later `name = value` adds a
+// declaration to the same symbol.
+func pythonAssignmentRebinding(symbol *ast.Symbol) bool {
+	if symbol.ValueDeclaration == nil {
+		return false
+	}
+	file := ast.GetSourceFileOfNode(symbol.ValueDeclaration)
+	if file == nil || file.LanguageVariant != core.LanguageVariantPython {
+		return false
+	}
+	sawAssignment := false
+	for _, declaration := range symbol.Declarations {
+		if !isNotOverload(declaration) || ast.IsAccessor(declaration) || ast.IsInterfaceDeclaration(declaration) {
+			continue
+		}
+		if !ast.IsBinaryExpression(declaration) {
+			return false
+		}
+		sawAssignment = true
+	}
+	return sawAssignment
 }
 
 func (c *Checker) checkMissingDeclaration(node *ast.Node) {
@@ -17380,7 +17415,7 @@ func (c *Checker) getBaseConstructorTypeOfClass(t *Type) *Type {
 		}
 		return data.resolvedBaseConstructorType
 	}
-	if baseConstructorType.flags&TypeFlagsAny == 0 && baseConstructorType != c.nullWideningType && !c.isConstructorType(baseConstructorType) {
+	if baseConstructorType.flags&TypeFlagsAny == 0 && baseConstructorType != c.nullWideningType && !c.isConstructorType(baseConstructorType) && !c.pythonCallableBase(baseTypeNode, baseConstructorType) {
 		err := c.error(baseTypeNode.Expression(), diagnostics.Type_0_is_not_a_constructor_function_type, c.TypeToString(baseConstructorType))
 		if baseConstructorType.flags&TypeFlagsTypeParameter != 0 {
 			constraint := c.getConstraintFromTypeParameter(baseConstructorType)
@@ -17408,6 +17443,17 @@ func (c *Checker) getBaseConstructorTypeOfClass(t *Type) *Type {
 
 func (c *Checker) isFunctionType(t *Type) bool {
 	return t.flags&TypeFlagsObject != 0 && len(c.getSignaturesOfType(t, SignatureKindCall)) > 0
+}
+
+// pythonCallableBase is a Python base that is called, not constructed.
+// `class Label(str)` uses the `str(...)` overloads; their return type is the
+// instance type.
+func (c *Checker) pythonCallableBase(baseTypeNode *ast.Node, baseConstructorType *Type) bool {
+	if baseTypeNode == nil || !c.isFunctionType(baseConstructorType) {
+		return false
+	}
+	file := ast.GetSourceFileOfNode(baseTypeNode)
+	return file != nil && file.LanguageVariant == core.LanguageVariantPython
 }
 
 func (c *Checker) isConstructorType(t *Type) bool {
@@ -18701,6 +18747,12 @@ func (c *Checker) reportImplicitAny(declaration *ast.Node, t *Type, wideningKind
 			diagnostics.Member_0_implicitly_has_an_1_type,
 			diagnostics.Member_0_implicitly_has_an_1_type_but_a_better_type_may_be_inferred_from_usage)
 	case ast.KindParameter:
+		// Python lambda parameters are not contextually required to be annotated.
+		if declaration.Parent != nil && declaration.Parent.Kind == ast.KindArrowFunction {
+			if file := ast.GetSourceFileOfNode(declaration); file != nil && file.LanguageVariant == core.LanguageVariantPython {
+				return
+			}
+		}
 		param := declaration.AsParameterDeclaration()
 		if ast.IsIdentifier(param.Name()) {
 			name := param.Name().AsIdentifier()
@@ -19714,6 +19766,11 @@ func (c *Checker) resolveBaseTypesOfClass(t *Type) {
 		// with a matching number of type parameters and use the return type of the first instantiated signature. Elsewhere
 		// we check that all instantiated signatures return the same type.
 		constructors := c.getInstantiatedConstructorsForTypeArguments(baseConstructorType, baseTypeNode.TypeArguments(), baseTypeNode)
+		if len(constructors) == 0 && c.pythonCallableBase(baseTypeNode, baseConstructorType) {
+			// Python calls a base (`str()`, `User()`). The call return type is
+			// the instance type; there is no `new` signature.
+			constructors = c.getSignaturesOfType(baseConstructorType, SignatureKindCall)
+		}
 		if len(constructors) == 0 {
 			c.error(baseTypeNode.Expression(), diagnostics.No_base_constructor_has_the_specified_number_of_type_arguments)
 			return
@@ -20026,6 +20083,7 @@ func (c *Checker) isValidBaseType(t *Type) bool {
 	// TODO: Given that we allow type parameters here now, is this `!isGenericMappedType(type)` check really needed?
 	// There's no reason a `T` should be allowed while a `Readonly<T>` should not.
 	return t.flags&(TypeFlagsObject|TypeFlagsNonPrimitive|TypeFlagsAny) != 0 && !c.isGenericMappedType(t) ||
+		c.PythonPrimitiveBase(t) != nil ||
 		t.flags&TypeFlagsIntersection != 0 && core.Every(t.Types(), c.isValidBaseType)
 }
 
@@ -23597,6 +23655,9 @@ func (c *Checker) getTypeFromTypeNodeWorker(node *ast.Node) *Type {
 		// `User(str)` is a type-argument list. Parentheses are the spelling;
 		// resolution is the type-reference path.
 		return c.getTypeFromTypeReference(node)
+	case ast.KindAttributeAccessType:
+		// `Box<str>.value` is attribute lookup, the same key as `Box<str>[*<"value">]`.
+		return c.getTypeFromAttributeAccessTypeNode(node)
 	default:
 		return c.errorType
 	}
@@ -23650,6 +23711,27 @@ func (c *Checker) getTypeFromTypeLiteralOrFunctionOrConstructorTypeNode(node *as
 			}
 			links.resolvedType = t
 		}
+	}
+	return links.resolvedType
+}
+
+func (c *Checker) getTypeFromAttributeAccessTypeNode(node *ast.Node) *Type {
+	links := c.typeNodeLinks.Get(node)
+	if links.resolvedType == nil {
+		access := node.AsAttributeAccessTypeNode()
+		objectType := c.getTypeFromTypeNode(access.ObjectType)
+		name := ""
+		if access.Member != nil {
+			name = access.Member.Text()
+		}
+		resolved := c.GetPythonIndexedAccessType(objectType, c.NewPythonAttributeKeyType(c.getStringLiteralType(name)))
+		if resolved == nil {
+			resolved = c.errorType
+			if name != "" && objectType.flags&TypeFlagsAny == 0 && !c.isErrorType(objectType) {
+				c.error(access.Member, diagnostics.Property_0_does_not_exist_on_type_1, name, c.TypeToString(objectType))
+			}
+		}
+		links.resolvedType = resolved
 	}
 	return links.resolvedType
 }
@@ -28554,8 +28636,13 @@ func isRestParameter(param *ast.Node) bool {
 }
 
 func getNameFromIndexInfo(info *IndexInfo) string {
-	if info.declaration != nil {
-		return scanner.DeclarationNameToString(info.declaration.Parameters()[0].Name())
+	if info.declaration != nil && len(info.declaration.Parameters()) != 0 {
+		name := info.declaration.Parameters()[0].Name()
+		// A tython item key `(K)` has no parameter name. Print it as the
+		// anonymous index `x`, not the missing-name placeholder.
+		if name != nil && name.Pos() != name.End() && name.Text() != "" {
+			return scanner.DeclarationNameToString(name)
+		}
 	}
 	return "x"
 }
@@ -31951,7 +32038,12 @@ func (c *Checker) removeNullableByIntersection(t *Type, targetFacts TypeFacts, o
 		return t
 	}
 	// By default we intersect with a union of {} and the opposite nullable.
+	// None is the only Python absence. Excluding it must not leave `undefined`
+	// in the type the way `!== null` leaves `undefined` in TypeScript.
 	emptyAndOtherUnion := c.getUnionType([]*Type{c.pythonNonNullableBase(), otherType})
+	if c.pythonValueHierarchy != nil {
+		emptyAndOtherUnion = c.pythonNonNullableBase()
+	}
 	// For each constituent type that can compare equal to the target nullable, intersect with the above union
 	// if the type doesn't already include the opposite nullable and the constituent can compare equal to the
 	// opposite nullable; otherwise, just intersect with {}.
@@ -32585,8 +32677,13 @@ func (c *Checker) getSymbolOfNameOrPropertyAccessExpression(name *ast.Node) *ast
 			meaning = core.IfElse(ast.IsPartOfTypeNode(name), ast.SymbolFlagsType, ast.SymbolFlagsValue)
 
 			// In a class 'extends' clause we are also looking for a value.
+			// A Python base can be a class, an interface, or a primitive alias,
+			// so the type meaning is part of the same lookup.
 			if ast.IsExpressionWithTypeArgumentsInClassExtendsClause(name.Parent) {
 				meaning = meaning | ast.SymbolFlagsValue
+				if file := ast.GetSourceFileOfNode(name); file != nil && file.LanguageVariant == core.LanguageVariantPython {
+					meaning |= ast.SymbolFlagsType
+				}
 			}
 		} else {
 			meaning = ast.SymbolFlagsNamespace
@@ -32839,12 +32936,28 @@ func (c *Checker) getThisTypeArgument(t *Type) *Type {
 	return nil
 }
 
+// pythonIndexKeysOverlap reports whether two index keys share a namespace and
+// the source key is assignable to the target key. Attribute keys (`*`) and
+// item keys (`bytes`, `"id"`, `str`) never constrain each other.
+func (c *Checker) pythonIndexKeysOverlap(key *Type, indexKey *Type) bool {
+	_, keyAttribute := c.GetPythonAttributeNameType(key)
+	_, indexAttribute := c.GetPythonAttributeNameType(indexKey)
+	if keyAttribute != indexAttribute {
+		return false
+	}
+	return c.isTypeAssignableTo(key, indexKey)
+}
+
 func (c *Checker) getApplicableIndexInfos(t *Type, keyType *Type) []*IndexInfo {
 	infos := c.getIndexInfosOfType(t)
 	if t.flags&TypeFlagsObject != 0 && t.AsStructuredType().separateAttributeAndItem {
 		// Python item domains do not use JavaScript's number-to-string key
-		// coercion. Domain inclusion itself is still native assignability.
-		return core.Filter(infos, func(info *IndexInfo) bool { return c.isTypeAssignableTo(keyType, info.keyType) })
+		// coercion, and an item key is not applicable to an attribute key.
+		// `*` is a weak interface, so a class such as `bytes` is otherwise
+		// structurally assignable to it.
+		return core.Filter(infos, func(info *IndexInfo) bool {
+			return c.pythonIndexKeysOverlap(keyType, info.keyType)
+		})
 	}
 	return core.Filter(infos, func(info *IndexInfo) bool { return c.isApplicableIndexType(keyType, info.keyType) })
 }

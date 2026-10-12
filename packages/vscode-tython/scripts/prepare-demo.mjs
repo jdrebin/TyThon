@@ -29,6 +29,12 @@ else {
 console.log("Preparing the pinned bundled formatter (the first run downloads it)...");
 await run(process.execPath, [path.join(extensionDirectory, "scripts/prepare-formatter.mjs")], extensionDirectory);
 
+const localTypeScript = path.join(repositoryDirectory, "node_modules", "typescript", "bin", "tsc");
+if (await modifiedTime(localTypeScript) === undefined) {
+    console.log("Installing workspace dependencies...");
+    await run(npm, ["install"], repositoryDirectory);
+}
+
 console.log("[2/2] Building the VS Code extension...");
 await run(npm, ["run", "build"], extensionDirectory);
 

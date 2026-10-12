@@ -1,5 +1,3 @@
-# Type functions use (), while generic declarations and specializations use <>.
-
 type Maybe(T) = T | None
 type Many(T) = []T
 type WithFallback(T extends object, U = None) = T | U
@@ -24,20 +22,16 @@ type User(T) = {
     def __init__(self) -> None,
     def __eq__(other: int) -> None,
 }
-
-
-# Computed map keys preserve whether K is an attribute key or an item key.
 type PublicAttributes(T) = {(K): T[K] for K in Extract(keyof T, *)}
 
 type GetterSurface = {(*<f"get_{str}">): int}
 type ItemShape(T) = {(K): T[K] for K in Exclude(keyof T, *)}
-
+type O = Exclude({}, *)
 type UserKeys = keyof User(str)
 type UserAttributeNames = Extract(keyof User(str), *)
 type UserName = User(str)[*<"name">]
 type UserNameViaDot = User(str).name
 type BoxContents = Box<str>.value
-# Go to Definition on * opens its actual bundled interface declaration.
 type NameKey = *<"name">
 type UserItems = ItemShape(User(str))
 type PublicUser = PublicAttributes(User(str))
@@ -60,3 +54,5 @@ optional_value: Maybe(str) = boxed_value
 many_values: Many(int) = [1, 2, 3]
 getter_surface: GetterSurface
 getter_result = getter_surface.get_name
+
+df = {id: 3434}

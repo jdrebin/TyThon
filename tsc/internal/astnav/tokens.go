@@ -250,6 +250,12 @@ func getTokenAtPosition(
 						if ast.IsJSDocKind(current.Kind) {
 							return current
 						}
+						// `def __init__` is a constructor, and the constructor node has
+						// no name child. The identifier sits in the span between `def`
+						// and `(`.
+						if current.Kind == ast.KindConstructor && token == ast.KindIdentifier {
+							return sourceFile.GetOrCreateToken(token, tokenFullStart, tokenEnd, current, flags)
+						}
 						panic(fmt.Sprintf("did not expect %s to have %s in its trivia", current.Kind.String(), token.String()))
 					}
 					return sourceFile.GetOrCreateToken(token, tokenFullStart, tokenEnd, current, flags)

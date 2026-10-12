@@ -139,6 +139,31 @@ assertScope(dunders, 1, "radd", "keyword.control.flow.python");
 assertNotScope(dunders, 2, "__add__", "keyword.control.flow.python");
 assertNotScope(dunders, 3, "__init__", "keyword.control.flow.python");
 
+const defColor = tokenize([
+    "interface Box<T>:",
+    "    def get(self) -> T",
+    "    def __eq__(bool) -> str",
+    "def unwrap<T>(box: Box<T>):",
+    "    return box.get()",
+    "type User(T) = {",
+    "    def inspect<U>(value: U) -> U,",
+    "}",
+    "type PublicAttributes(T) = {(K): T[K] for K in Extract(keyof T, *)}",
+    "def get(self) -> T # note",
+    "value: int = 1",
+].join("\n"));
+for (const line of [1, 2, 3, 6, 9]) {
+    assertScope(defColor, line, "def", "storage.type.function.python");
+    assertNotScope(defColor, line, "def", "keyword.control.flow.python");
+}
+assertScope(defColor, 1, "self", "variable.language.self.python");
+assertNotScope(defColor, 1, "self", "variable.parameter.function.language.python");
+assertScope(defColor, 8, "*", "entity.name.type.interface.tython");
+assertNotScope(defColor, 8, "*", "meta.function.python");
+assertNotScope(defColor, 8, "*", "keyword.operator.arithmetic.python");
+assertNotScope(defColor, 8, "{", "meta.function.python");
+assertNotScope(defColor, 10, "value", "meta.function.python");
+
 console.log("tython grammar tests passed.");
 
 function tokenize(text) {

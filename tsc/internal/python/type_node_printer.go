@@ -77,6 +77,9 @@ func printPythonTypeNode(node *ast.Node, emit *printer.EmitContext) string {
 		case ast.KindIndexedAccessType:
 			access := node.AsIndexedAccessTypeNode()
 			return atomic(access.ObjectType) + "[" + render(access.IndexType) + "]"
+		case ast.KindAttributeAccessType:
+			access := node.AsAttributeAccessTypeNode()
+			return atomic(access.ObjectType) + "." + render(access.Member)
 		case ast.KindUnionType:
 			return join(node.AsUnionTypeNode().Types.Nodes, " | ")
 		case ast.KindIntersectionType:
@@ -88,6 +91,14 @@ func printPythonTypeNode(node *ast.Node, emit *printer.EmitContext) string {
 				return name + "<" + join(reference.TypeArguments.Nodes, ", ") + ">"
 			}
 			return name
+		case ast.KindTypeCallType:
+			// `Copy(Profile)` is a type-argument list spelled with parentheses.
+			call := node.AsTypeCallTypeNode()
+			args := ""
+			if call.Arguments != nil {
+				args = join(call.Arguments.Nodes, ", ")
+			}
+			return atomic(call.Callee) + "(" + args + ")"
 		case ast.KindInferType:
 			parameter := node.AsInferTypeNode().TypeParameter.AsTypeParameterDeclaration()
 			text := "infer " + render(parameter.Name())

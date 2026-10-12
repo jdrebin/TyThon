@@ -1350,6 +1350,14 @@
                     "include": "#illegal-object-name"
                 },
                 {
+                    "name": "variable.language.self.python",
+                    "match": "\\bself\\b"
+                },
+                {
+                    "name": "variable.language.cls.python",
+                    "match": "\\bcls\\b"
+                },
+                {
                     "include": "#parameter-special"
                 },
                 {
@@ -1438,7 +1446,7 @@
         },
         "return-annotation": {
             "begin": "(->)",
-            "end": "(?=:)",
+            "end": "(?=:|#|$)",
             "beginCaptures": {
                 "1": {
                     "name": "punctuation.separator.annotation.result.python"
@@ -1791,10 +1799,10 @@
             "match": "(?x)\n  \\b (?<!\\.) (?:\n    (self) | (cls)\n  )\\b\n",
             "captures": {
                 "1": {
-                    "name": "variable.language.special.self.python"
+                    "name": "variable.language.self.python"
                 },
                 "2": {
-                    "name": "variable.language.special.cls.python"
+                    "name": "variable.language.cls.python"
                 }
             }
         },

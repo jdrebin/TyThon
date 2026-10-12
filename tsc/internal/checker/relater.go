@@ -997,6 +997,11 @@ func (c *Checker) getUnmatchedPropertiesWorker(source *Type, target *Type, requi
 		if requireOptionalProperties || targetProp.Flags&ast.SymbolFlagsOptional == 0 && targetProp.CheckFlags&ast.CheckFlagsPartial == 0 {
 			sourceProp := c.getPropertyOfType(source, targetProp.Name)
 			if sourceProp == nil {
+				// A dict literal keeps its item shape. MappingProtocol methods
+				// are the same projection property access already uses.
+				sourceProp = c.pythonMappingMethod(source, targetProp.Name)
+			}
+			if sourceProp == nil {
 				if propsOut == nil {
 					return targetProp
 				}
@@ -2658,8 +2663,15 @@ func (r *Relater) isRelatedToEx(originalSource *Type, originalTarget *Type, recu
 		return TernaryTrue
 	}
 	// Before normalization: if `source` is type an object type, and `target` is primitive,
-	// skip all the checks we don't need and just return `isSimpleTypeRelatedTo` result
+	// skip all the checks we don't need and just return `isSimpleTypeRelatedTo` result.
+	// A Python class whose base is that primitive (`class Label(str)`) is the exception:
+	// the class object is the primitive.
 	if originalSource.flags&TypeFlagsObject != 0 && originalTarget.flags&TypeFlagsPrimitive != 0 {
+		if r.relation != r.c.identityRelation {
+			if primitive := r.c.pythonClassPrimitiveBase(originalSource); primitive != nil && r.isRelatedTo(primitive, originalTarget, RecursionFlagsSource, reportErrors) != TernaryFalse {
+				return TernaryTrue
+			}
+		}
 		if r.relation == r.c.comparableRelation && originalTarget.flags&TypeFlagsNever == 0 && r.c.isSimpleTypeRelatedTo(originalTarget, originalSource, r.relation, nil) ||
 			r.c.isSimpleTypeRelatedTo(originalSource, originalTarget, r.relation, core.IfElse(reportErrors, r.reportError, nil)) {
 			return TernaryTrue
@@ -4443,6 +4455,9 @@ func (r *Relater) propertiesRelatedTo(source *Type, target *Type, reportErrors b
 		name := targetProp.Name
 		if targetProp.Flags&ast.SymbolFlagsPrototype == 0 && (!numericNamesOnly || isNumericLiteralName(name) || name == "length") && (!optionalsOnly || targetProp.Flags&ast.SymbolFlagsOptional != 0) {
 			sourceProp := r.c.getPropertyOfType(source, name)
+			if sourceProp == nil {
+				sourceProp = r.c.pythonMappingMethod(source, name)
+			}
 			if sourceProp != nil && sourceProp != targetProp {
 				related := r.propertyRelatedTo(source, target, sourceProp, targetProp, r.c.getNonMissingTypeOfSymbol, reportErrors, intersectionState, r.relation == r.c.comparableRelation)
 				if related == TernaryFalse {

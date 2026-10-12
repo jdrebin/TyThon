@@ -82,25 +82,22 @@ func (s *Session) Diagnostics() []python.ProgramDiagnostic {
 	return diagnostics
 }
 
-// Hover is TypeScript quick info: the node at the offset, then GetTypeAtLocation
-// and TypeToString. The symbol name, when there is one, is SymbolToString.
+// Hover is the symbol at the offset, classified the same way as a semantic
+// token, then spelled the way the declaration is written (`class`, `def`,
+// `(variable)`, …). Types still come from the checker.
 func (s *Session) Hover(fileName string, offset int, verbosity *checker.VerbosityContext) (string, python.TextRange, bool) {
 	file := s.program.GetSourceFile(fileName)
 	if file == nil {
 		return "", python.TextRange{}, false
 	}
 	node := astnav.GetTouchingToken(file, offset)
-	if node == nil {
+	if node == nil || node.Parent == nil {
 		return "", python.TextRange{}, false
 	}
 	node = hoverNode(node)
-	t := s.checker.GetTypeAtLocation(node)
-	if t == nil {
+	text := formatHover(s.checker, node, verbosity)
+	if text == "" {
 		return "", python.TextRange{}, false
-	}
-	text := s.checker.TypeToStringForFrontend(t, verbosity, python.PrintPythonTypeNode)
-	if symbol := s.checker.GetSymbolAtLocation(node); symbol != nil && symbol.Name != "" && !strings.HasPrefix(symbol.Name, "\"") && !strings.HasPrefix(symbol.Name, ast.InternalSymbolNamePrefix) {
-		text = s.checker.SymbolToString(symbol) + ": " + text
 	}
 	start := scanner.SkipTrivia(file.Text(), node.Pos())
 	return text, python.TextRange{Start: start, End: node.End()}, true
@@ -117,7 +114,11 @@ func (s *Session) Definition(fileName string, offset int) (string, python.TextRa
 	if node == nil {
 		return "", python.TextRange{}, false
 	}
-	symbol := s.checker.GetSymbolAtLocation(hoverNode(node))
+	node = hoverNode(node)
+	if node == nil {
+		return "", python.TextRange{}, false
+	}
+	symbol := s.checker.GetSymbolAtLocation(node)
 	if symbol == nil {
 		return "", python.TextRange{}, false
 	}
@@ -185,15 +186,23 @@ func declarationName(decl *ast.Node) *ast.Node {
 // hoverNode stays on a name, expression, or type node. A keyword token walks
 // up to the declaration that owns it.
 func hoverNode(node *ast.Node) *ast.Node {
+	if node == nil || node.Parent == nil {
+		return node
+	}
+	// `def __init__` has no name child. The recovered identifier stays the hover
+	// target so the constructor is not presented as the class.
+	if ast.IsIdentifier(node) && node.Parent.Kind == ast.KindConstructor {
+		return node
+	}
 	if ast.IsDeclarationNameOrImportPropertyName(node) || ast.IsExpressionNode(node) || ast.IsPartOfTypeNode(node) {
 		return node
 	}
-	for current := node.Parent; current != nil; current = current.Parent {
+	for current := node.Parent; current != nil && current.Kind != ast.KindSourceFile; current = current.Parent {
 		if ast.IsDeclaration(current) || ast.IsExpressionNode(current) {
 			return current
 		}
 	}
-	return node
+	return nil
 }
 
 // CallSignature is one resolved signature at a call, in source spelling.
@@ -310,14 +319,43 @@ func activeCallParameter(call *ast.Node, offset int, signature *checker.Signatur
 }
 
 func programDiagnostic(file *ast.SourceFile, diagnostic *ast.Diagnostic, kind python.ProgramDiagnosticKind) python.ProgramDiagnostic {
+	start := diagnostic.Pos()
 	end := diagnostic.End()
-	if end < diagnostic.Pos() {
-		end = diagnostic.Pos()
+	if end < start {
+		end = start
+	}
+	// Pos includes leading trivia, so the first statement in a file otherwise
+	// squiggles the comment above it. Python comments are `#` lines; SkipTrivia
+	// only knows JavaScript comments.
+	if text := file.Text(); start >= 0 && start <= len(text) {
+		start = skipPythonDiagnosticTrivia(text, start, end)
 	}
 	return python.ProgramDiagnostic{
 		Kind:     kind,
 		FileName: file.FileName(),
-		Range:    python.TextRange{Start: diagnostic.Pos(), End: end},
+		Range:    python.TextRange{Start: start, End: end},
 		Message:  diagnostic.String(),
+	}
+}
+
+func skipPythonDiagnosticTrivia(text string, start, end int) int {
+	for {
+		next := scanner.SkipTrivia(text, start)
+		if next > end || next >= len(text) || text[next] != '#' {
+			if next > end {
+				return start
+			}
+			return next
+		}
+		for next < len(text) && text[next] != '\n' {
+			next++
+		}
+		if next < len(text) && text[next] == '\n' {
+			next++
+		}
+		if next > end {
+			return start
+		}
+		start = next
 	}
 }

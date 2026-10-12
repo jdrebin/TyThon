@@ -10,7 +10,7 @@ def normalize(value: str) -> str: ...
 def normalize(value: bytes) -> bytes: ...
 
 
-def normalize(value):
+def normalize(value: str | bytes):
     return value
 
 
@@ -28,6 +28,7 @@ def configure<T, U extends {}>(
     **metadata: U,
 ) -> T:
     return value
+
 
 def transform<T, U>(value: T, callback: (value: T) -> U) -> U:
     return callback(value)

@@ -673,7 +673,7 @@ func GetTypeNodePrecedence(n *TypeNode) TypePrecedence {
 			return TypePrecedenceFunction
 		}
 		return TypePrecedenceTypeOperator
-	case KindIndexedAccessType, KindArrayType, KindOptionalType:
+	case KindIndexedAccessType, KindAttributeAccessType, KindArrayType, KindOptionalType:
 		return TypePrecedencePostfix
 	case KindTypeQuery:
 		// TypeQueryNode is actually a NonArrayType, but we treat it as TypeOperatorNode
@@ -698,6 +698,7 @@ func GetTypeNodePrecedence(n *TypeNode) TypePrecedence {
 		KindLiteralType,
 		KindTypePredicate,
 		KindTypeReference,
+		KindTypeCallType,
 		KindTypeLiteral,
 		KindTupleType,
 		KindRestType,

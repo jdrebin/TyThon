@@ -326,11 +326,11 @@
             "patterns": [
                 {
                     "name": "meta.type.list.tython punctuation.definition.type.list.tython",
-                    "match": "\\[\\](?=\\s*(?:[[:alpha:]_(]|$))"
+                    "match": "(?<![[:word:]])\\[\\](?=\\s*(?:[[:alpha:]_<]|$))"
                 },
                 {
                     "name": "meta.type.tuple.tython punctuation.definition.type.tuple.tython",
-                    "match": "\\(\\)(?=\\s*(?:[[:alpha:]_(]|$))"
+                    "match": "(?<![[:word:]])\\(\\)(?=\\s*(?:[[:alpha:]_<]|$))"
                 }
             ]
         }

@@ -2082,6 +2082,13 @@ func IsInExpressionContext(node *Node) bool {
 		return parent.Expression() == node && !IsPartOfTypeNode(parent)
 	case KindShorthandPropertyAssignment:
 		return parent.AsShorthandPropertyAssignment().ObjectAssignmentInitializer == node
+	case KindDictEntry:
+		entry := parent.AsDictEntry()
+		return node == entry.Key || node == entry.Value
+	case KindKeywordArgument:
+		return parent.AsKeywordArgument().Expression == node
+	case KindTupleExpression, KindSetExpression:
+		return true
 	default:
 		return IsExpressionNode(parent)
 	}
