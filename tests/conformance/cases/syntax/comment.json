@@ -1,0 +1,23 @@
+{
+  "description": "Type keywords in comments do not enter type syntax.",
+  "tags": [
+    "syntax"
+  ],
+  "source": [
+    "# type User = int"
+  ],
+  "syntax": [
+    {
+      "at": {
+        "line": 0,
+        "text": "type User"
+      },
+      "include": [
+        "comment.line.number-sign.python"
+      ],
+      "exclude": [
+        "storage.type.type.tython"
+      ]
+    }
+  ]
+}

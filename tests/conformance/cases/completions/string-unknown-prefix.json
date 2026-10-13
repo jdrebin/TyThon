@@ -1,0 +1,18 @@
+{
+  "description": "Contextual string completion follows the unknown-prefix context.",
+  "tags": [
+    "completions"
+  ],
+  "source": [
+    "type Mode = \"read\" | \"write\"",
+    "declare def configure(mode: Mode) -> None"
+  ],
+  "diagnostics": [],
+  "completions": [
+    {
+      "kind": "string",
+      "expression": "configure(\"xyz¦\")",
+      "exact": []
+    }
+  ]
+}

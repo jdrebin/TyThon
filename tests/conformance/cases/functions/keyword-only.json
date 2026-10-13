@@ -1,0 +1,12 @@
+{
+  "description": "Keyword-only parameters accept named invocation.",
+  "tags": [
+    "functions"
+  ],
+  "source": [
+    "def greet(*, name: str) -> str:",
+    "    return name",
+    "result: str = greet(name=\"Ada\")"
+  ],
+  "diagnostics": []
+}

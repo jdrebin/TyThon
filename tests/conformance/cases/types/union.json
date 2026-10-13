@@ -1,0 +1,20 @@
+{
+  "description": "Union annotations accept each declared constituent.",
+  "tags": [
+    "types"
+  ],
+  "source": [
+    "value: str | int = \"ok\"",
+    "value = 1"
+  ],
+  "diagnostics": [],
+  "hover": [
+    {
+      "at": {
+        "line": 0,
+        "text": "value"
+      },
+      "text": "(variable) value: str | int"
+    }
+  ]
+}

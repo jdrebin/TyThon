@@ -1,0 +1,17 @@
+{
+  "description": "Return annotations reject a value of the wrong type.",
+  "tags": [
+    "functions"
+  ],
+  "source": [
+    "def number() -> int:",
+    "    return \"wrong\""
+  ],
+  "diagnostics": [
+    {
+      "line": 1,
+      "kind": "type",
+      "messageContains": "not assignable"
+    }
+  ]
+}

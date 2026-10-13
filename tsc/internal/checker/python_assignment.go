@@ -16,13 +16,24 @@ import (
 // isPythonMatchPattern reports a case pattern that binds names rather than a
 // value compared with the subject (`User(name=nam)`, `{"score": score}`).
 func isPythonMatchPattern(pattern *ast.Node) bool {
-	return pattern != nil && (pattern.Kind == ast.KindCallExpression || pattern.Kind == ast.KindDictExpression)
+	return pattern != nil && (pattern.Kind == ast.KindCallExpression || pattern.Kind == ast.KindDictExpression || pattern.Kind == ast.KindTupleExpression || pattern.Kind == ast.KindArrayLiteralExpression)
 }
 
 // pythonPatternCaptureType is the type a match capture receives: the attribute
 // type of a class pattern, or the item type of a mapping pattern.
 func (c *Checker) pythonPatternCaptureType(name *ast.Node) *Type {
 	switch name.Parent.Kind {
+	case ast.KindTupleExpression, ast.KindArrayLiteralExpression:
+		clause := ast.FindAncestor(name, ast.IsCaseClause)
+		if clause != nil {
+			subject := c.checkExpression(clause.Parent.Parent.Expression())
+			if name.Parent != clause.Expression() {
+				subject = c.pythonPatternCaptureType(name.Parent)
+			}
+			if result := c.pythonTargetType(name.Parent, subject, name.Text()); result != nil {
+				return result
+			}
+		}
 	case ast.KindKeywordArgument:
 		call := name.Parent.Parent
 		keyword := name.Parent.AsKeywordArgument().Keyword

@@ -1,0 +1,13 @@
+{
+  "description": "Instances with __call__ expose their declared call signature.",
+  "tags": [
+    "classes"
+  ],
+  "source": [
+    "class Identity:",
+    "    def __call__(self, value: int) -> int:",
+    "        return value",
+    "result: int = Identity()(12)"
+  ],
+  "diagnostics": []
+}

@@ -1,0 +1,16 @@
+{
+  "description": "Formatting preserves and consistently spaces call-signature syntax.",
+  "tags": [
+    "formatting"
+  ],
+  "source": [
+    "interface User:",
+    " def(param:int)->int"
+  ],
+  "formatting": {
+    "output": [
+      "interface User:",
+      "    def(param: int) -> int"
+    ]
+  }
+}

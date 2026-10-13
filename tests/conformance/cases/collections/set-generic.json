@@ -1,0 +1,10 @@
+{
+  "description": "Collection annotation set<int> accepts the corresponding runtime value.",
+  "tags": [
+    "collections"
+  ],
+  "source": [
+    "value: set<int> = {1, 2}"
+  ],
+  "diagnostics": []
+}

@@ -1,0 +1,17 @@
+{
+  "description": "Unresolved names produce one diagnostic at the identifier.",
+  "tags": [
+    "diagnostics"
+  ],
+  "source": [
+    "value = missing_name"
+  ],
+  "diagnostics": [
+    {
+      "line": 0,
+      "text": "missing_name",
+      "kind": "type",
+      "messageContains": "Cannot find name"
+    }
+  ]
+}

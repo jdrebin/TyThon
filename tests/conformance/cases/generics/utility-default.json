@@ -1,0 +1,11 @@
+{
+  "description": "Type utility defaults fill omitted trailing arguments.",
+  "tags": [
+    "generics"
+  ],
+  "source": [
+    "type Pair(T, U = str) = (T, U)",
+    "value: Pair(int) = (1, \"Ada\")"
+  ],
+  "diagnostics": []
+}

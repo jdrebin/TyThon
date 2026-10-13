@@ -1,0 +1,13 @@
+{
+  "description": "Reflected operators provide a compatible right-hand operand implementation.",
+  "tags": [
+    "protocols"
+  ],
+  "source": [
+    "class Right:",
+    "    def __radd__(self, value: int) -> str:",
+    "        return \"Ada\"",
+    "result: str = 1 + Right()"
+  ],
+  "diagnostics": []
+}

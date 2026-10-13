@@ -1,0 +1,11 @@
+{
+  "description": "Assertions preserve compatible literal shape values.",
+  "tags": [
+    "operators"
+  ],
+  "source": [
+    "value = {\"id\": 23} as {\"id\": 23}",
+    "exact: 23 = value[\"id\"]"
+  ],
+  "diagnostics": []
+}

@@ -1,0 +1,32 @@
+{
+  "description": "Generic interface members specialize their element types.",
+  "tags": [
+    "interfaces"
+  ],
+  "source": [
+    "interface Box<T>:",
+    "    value: T",
+    "box: Box<str>",
+    "result = box.value"
+  ],
+  "diagnostics": [],
+  "hover": [
+    {
+      "at": {
+        "line": 3,
+        "text": "result"
+      },
+      "text": "(variable) result: str"
+    }
+  ],
+  "completions": [
+    {
+      "expression": "box.",
+      "kind": "attribute",
+      "include": [
+        "value"
+      ],
+      "exclude": []
+    }
+  ]
+}

@@ -672,6 +672,25 @@ func (c *Checker) pythonSequenceKindsDiffer(source, target *Type) bool {
 	return sourceNative != nil && targetNative != nil && sourceKind != targetKind
 }
 
+func isPythonComparisonOperator(kind ast.Kind) bool {
+	switch kind {
+	case ast.KindLessThanToken, ast.KindLessThanEqualsToken, ast.KindGreaterThanToken, ast.KindGreaterThanEqualsToken,
+		ast.KindEqualsEqualsToken, ast.KindExclamationEqualsToken, ast.KindEqualsEqualsEqualsToken, ast.KindExclamationEqualsEqualsToken, ast.KindIsKeyword, ast.KindInKeyword:
+		return true
+	}
+	return false
+}
+
+func pythonComparisonOperand(node *ast.Node) *ast.Node {
+	if ast.IsPrefixUnaryExpression(node) && node.AsPrefixUnaryExpression().Operator == ast.KindExclamationToken {
+		node = node.AsPrefixUnaryExpression().Operand
+	}
+	if ast.IsBinaryExpression(node) && isPythonComparisonOperator(node.AsBinaryExpression().OperatorToken.Kind) {
+		return node.AsBinaryExpression().Right
+	}
+	return nil
+}
+
 func (c *Checker) inPythonSourceFile(node *ast.Node) bool {
 	file := ast.GetSourceFileOfNode(node)
 	// pyparser marks the language variant and does not set ScriptKind.
@@ -718,6 +737,11 @@ func (c *Checker) pythonSequenceInstance(t *Type) *Type {
 // the value. Sequence instances already carry their protocol; this remains the
 // lookup for a mapping literal and for a sequence that was not wrapped.
 func (c *Checker) pythonProjectedProperty(t *Type, name string) *ast.Symbol {
+	if name == "__init__" {
+		if property := c.pythonInitializerProperty(t); property != nil {
+			return property
+		}
+	}
 	if prop := c.pythonMappingMethod(t, name); prop != nil {
 		return prop
 	}

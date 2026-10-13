@@ -1,0 +1,28 @@
+{
+  "description": "A declared bytes binding retains its distinct type.",
+  "tags": [
+    "primitives"
+  ],
+  "source": [
+    "value: bytes"
+  ],
+  "diagnostics": [],
+  "hover": [
+    {
+      "at": {
+        "line": 0,
+        "text": "value"
+      },
+      "text": "(variable) value: bytes"
+    }
+  ],
+  "semantic": [
+    {
+      "at": {
+        "line": 0,
+        "text": "value"
+      },
+      "kind": "VariableDeclaration"
+    }
+  ]
+}

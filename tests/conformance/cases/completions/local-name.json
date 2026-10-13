@@ -1,0 +1,7 @@
+{
+  "description": "Local name completion filters by the typed prefix.",
+  "tags": ["completions", "scope"],
+  "source": ["username = 'Ada'", "count = 1"],
+  "diagnostics": [],
+  "completions": [{"kind": "name", "expression": "user", "include": ["username"], "exclude": ["count"]}]
+}

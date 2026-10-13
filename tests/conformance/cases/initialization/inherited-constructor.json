@@ -1,0 +1,15 @@
+{
+  "description": "Inherited constructors retain initialization guarantees.",
+  "tags": [
+    "initialization"
+  ],
+  "source": [
+    "class Base:",
+    "    id: str",
+    "    def __init__(self):",
+    "        self.id = \"Ada\"",
+    "class Derived(Base):",
+    "    pass"
+  ],
+  "diagnostics": []
+}

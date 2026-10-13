@@ -1,0 +1,14 @@
+{
+  "description": "Generic keyword packs retain named item types.",
+  "tags": [
+    "functions"
+  ],
+  "source": [
+    "def pack<T extends {}>(**kwargs: T) -> T:",
+    "    return kwargs",
+    "value = pack(name=\"Ada\", count=12)",
+    "name: str = value[\"name\"]",
+    "number: int = value[\"count\"]"
+  ],
+  "diagnostics": []
+}

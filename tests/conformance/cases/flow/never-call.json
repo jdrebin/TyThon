@@ -1,0 +1,14 @@
+{
+  "description": "Calls returning never terminate the current flow path.",
+  "tags": [
+    "flow"
+  ],
+  "source": [
+    "declare def fail() -> never",
+    "def read(value: str | None) -> str:",
+    "    if value is None:",
+    "        fail()",
+    "    return value"
+  ],
+  "diagnostics": []
+}

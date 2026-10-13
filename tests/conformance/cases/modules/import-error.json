@@ -1,0 +1,22 @@
+{
+  "description": "An imported function validates its argument types.",
+  "tags": [
+    "modules"
+  ],
+  "source": [
+    "from helpers import greet",
+    "result = greet(1)"
+  ],
+  "files": {
+    "helpers.d.ty": [
+      "declare def greet(name: str) -> str"
+    ]
+  },
+  "diagnostics": [
+    {
+      "line": 1,
+      "kind": "type",
+      "messageContains": "not assignable"
+    }
+  ]
+}

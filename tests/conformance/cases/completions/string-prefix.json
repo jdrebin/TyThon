@@ -1,0 +1,20 @@
+{
+  "description": "Contextual string completion follows the prefix context.",
+  "tags": [
+    "completions"
+  ],
+  "source": [
+    "type Mode = \"read\" | \"write\"",
+    "declare def configure(mode: Mode) -> None"
+  ],
+  "diagnostics": [],
+  "completions": [
+    {
+      "kind": "string",
+      "expression": "value: Mode = \"r¦ubbish\"",
+      "exact": [
+        "read"
+      ]
+    }
+  ]
+}

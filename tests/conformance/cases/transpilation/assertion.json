@@ -1,0 +1,14 @@
+{
+  "description": "Erasure preserves runtime tokens and source layout for assertion.",
+  "tags": [
+    "transpilation"
+  ],
+  "source": [
+    "value = 1 as int"
+  ],
+  "transpile": {
+    "output": [
+      "value = 1       "
+    ]
+  }
+}

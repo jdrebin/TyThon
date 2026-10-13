@@ -2761,7 +2761,7 @@ func (c *Checker) checkParameter(node *ast.Node) {
 	}
 	// Only check rest parameter type if it's not a binding pattern. Since binding patterns are
 	// not allowed in a rest parameter, we already have an error from checkGrammarParameterList.
-	if hasDotDotDotToken(node) && node.AsParameterDeclaration().DotDotDotToken.Kind != ast.KindAsteriskAsteriskToken &&
+	if !c.inPythonSourceFile(node) && hasDotDotDotToken(node) && node.AsParameterDeclaration().DotDotDotToken.Kind != ast.KindAsteriskAsteriskToken &&
 		!ast.IsBindingPattern(node.Name()) && !c.isArrayLikeType(c.getReducedType(c.getTypeOfSymbol(node.Symbol()))) {
 		c.error(node, diagnostics.A_rest_parameter_must_be_of_an_array_type)
 	}
@@ -3127,7 +3127,7 @@ func (c *Checker) getTypePredicateParent(node *ast.Node) *ast.SignatureDeclarati
 	parent := node.Parent
 	switch parent.Kind {
 	case ast.KindArrowFunction, ast.KindCallSignature, ast.KindFunctionDeclaration, ast.KindFunctionExpression, ast.KindFunctionType,
-		ast.KindMethodDeclaration, ast.KindMethodSignature:
+		ast.KindMethodDeclaration, ast.KindMethodSignature, ast.KindConstructor:
 		if node == parent.Type() {
 			return parent
 		}
@@ -4118,6 +4118,12 @@ func (c *Checker) checkReturnStatement(node *ast.Node) {
 				c.error(node, diagnostics.Setters_cannot_return_a_value)
 			}
 		} else if ast.IsConstructorDeclaration(container) {
+			if c.inPythonSourceFile(container) {
+				if exprNode != nil {
+					c.checkTypeAssignableToAndOptionallyElaborate(exprType, c.nullType, node, exprNode, nil, nil)
+				}
+				return
+			}
 			if exprNode != nil && !c.checkTypeAssignableToAndOptionallyElaborate(exprType, returnType, node, exprNode, nil, nil) {
 				c.error(node, diagnostics.Return_type_of_constructor_signature_must_be_assignable_to_the_instance_type_of_the_class)
 			}
@@ -5405,7 +5411,7 @@ func (c *Checker) checkImportDeclaration(node *ast.ImportDeclarationNode) {
 	} else {
 		diagnostic = diagnostics.An_import_declaration_can_only_be_used_at_the_top_level_of_a_namespace_or_module
 	}
-	if c.checkGrammarModuleElementContext(node, diagnostic) {
+	if !c.inPythonSourceFile(node) && c.checkGrammarModuleElementContext(node, diagnostic) {
 		// If we hit an import declaration in an illegal context, just bail out to avoid cascading errors.
 		c.checkExternalModuleNameInGlobalScope(node)
 		return
@@ -5477,7 +5483,7 @@ func (c *Checker) checkExternalImportOrExportDeclaration(node *ast.Node) bool {
 		return false
 	}
 	inAmbientExternalModule := ast.IsModuleBlock(node.Parent) && ast.IsAmbientModule(node.Parent.Parent)
-	if !ast.IsSourceFile(node.Parent) && !inAmbientExternalModule {
+	if !c.inPythonSourceFile(node) && !ast.IsSourceFile(node.Parent) && !inAmbientExternalModule {
 		c.error(moduleName, core.IfElse(ast.IsExportDeclaration(node), diagnostics.Export_declarations_are_not_permitted_in_a_namespace, diagnostics.Import_declarations_in_a_namespace_cannot_reference_a_module))
 		return false
 	}
@@ -6375,6 +6381,10 @@ func (c *Checker) getIterationTypeOfGeneratorFunctionReturnType(typeKind Iterati
 }
 
 func (c *Checker) getIterationTypesOfGeneratorFunctionReturnType(t *Type, isAsyncGenerator bool) IterationTypes {
+	if c.pythonValueHierarchy != nil && c.isReferenceToType(t, c.getGlobalType("Generator", 3, false)) {
+		args := c.getTypeArguments(t)
+		return IterationTypes{args[0], args[2], args[1]}
+	}
 	if IsTypeAny(t) {
 		return IterationTypes{c.anyType, c.anyType, c.anyType}
 	}
@@ -7895,6 +7905,9 @@ func (c *Checker) checkExpressionWorker(node *ast.Node, checkMode CheckMode) *Ty
 	case ast.KindNullKeyword:
 		return c.nullWideningType
 	case ast.KindStringLiteral, ast.KindNoSubstitutionTemplateLiteral:
+		if node.Kind == ast.KindStringLiteral && node.AsStringLiteral().TokenFlags&ast.TokenFlagsPythonBytes != 0 {
+			return c.pythonLibraryType("bytes", 0)
+		}
 		if c.isSkipDirectInferenceNode(node) {
 			return c.blockedStringType
 		}
@@ -8333,6 +8346,16 @@ func (c *Checker) checkElementAccessExpression(node *ast.Node, exprType *Type, c
 		c.error(indexExpression, diagnostics.Type_0_cannot_be_used_to_index_type_1, c.TypeToString(effectiveIndexType), c.TypeToString(objectType))
 		return c.errorType
 	}
+	if c.inPythonSourceFile(node) {
+		for _, info := range c.getIndexInfosOfType(objectType) {
+			if c.isTypeAssignableTo(effectiveIndexType, info.keyType) {
+				c.errorIfWritingToReadonlyIndex(info, objectType, node)
+			}
+		}
+		if c.PythonMemberIsOptional(objectType, effectiveIndexType, false) {
+			return c.pythonOptionalAccessType(node, indexedAccessType, indexExpression)
+		}
+	}
 	return c.getFlowTypeOfAccessExpression(node, c.getResolvedSymbolOrNil(node), indexedAccessType, indexExpression, checkMode)
 }
 
@@ -8484,6 +8507,9 @@ func (c *Checker) checkImportCallExpression(node *ast.Node) *Type {
  * @returns On success, the expression's signature's return type. On failure, anyType.
  */
 func (c *Checker) checkCallExpression(node *ast.Node, checkMode CheckMode) *Type {
+	if base := c.pythonSuperBase(node); base != nil {
+		return base
+	}
 	c.checkGrammarTypeArguments(node, node.TypeArgumentList())
 	signature := c.getResolvedSignature(node, nil /*candidatesOutArray*/, checkMode)
 	if signature == c.resolvingSignature {
@@ -11028,7 +11054,7 @@ func (c *Checker) checkDeleteExpressionMustBeOptional(expr *ast.Node, symbol *as
 	t := c.getTypeOfSymbol(symbol)
 	if c.strictNullChecks && t.flags&(TypeFlagsAnyOrUnknown|TypeFlagsNever) == 0 {
 		var isOptional bool
-		if c.exactOptionalPropertyTypes {
+		if c.exactOptionalPropertyTypes || c.inPythonSourceFile(expr) {
 			isOptional = symbol.Flags&ast.SymbolFlagsOptional != 0
 		} else {
 			isOptional = c.hasTypeFacts(t, TypeFactsIsUndefined)
@@ -11047,6 +11073,11 @@ func (c *Checker) checkVoidExpression(node *ast.Node) *Type {
 func (c *Checker) checkAwaitExpression(node *ast.Node) *Type {
 	c.checkGrammarAwaitOrAwaitUsing(node)
 	operandType := c.checkExpression(node.Expression())
+	if c.inPythonSourceFile(node) {
+		if result := c.pythonAwaitedResult(operandType); result != nil {
+			return result
+		}
+	}
 	awaitedType := c.checkAwaitedType(operandType, true /*withAlias*/, node, diagnostics.Type_of_await_operand_must_either_be_a_valid_promise_or_must_not_contain_a_callable_then_member)
 	if awaitedType == operandType && !c.isErrorType(awaitedType) && operandType.flags&TypeFlagsAnyOrUnknown == 0 {
 		c.addErrorOrSuggestion(false, createDiagnosticForNode(node, diagnostics.X_await_has_no_effect_on_the_type_of_this_expression))
@@ -11282,6 +11313,9 @@ func (c *Checker) checkIdentifier(node *ast.Node, checkMode CheckMode) *Type {
 		return c.nonInferrableAnyType
 	}
 	t := c.getNarrowedTypeOfSymbol(localOrExportSymbol, node)
+	if c.isPythonReceiverReference(node) && declaration.Type() == nil && !ast.IsConstructorDeclaration(declaration.Parent) && !c.pythonBuiltinMethodDecorator(declaration.Parent, "classmethod") {
+		t = c.getThisType(node)
+	}
 	assignmentKind := getAssignmentTargetKind(node)
 	if assignmentKind != AssignmentKindNone {
 		if localOrExportSymbol.Flags&ast.SymbolFlagsVariable == 0 && !(ast.IsInJSFile(node) && localOrExportSymbol.Flags&ast.SymbolFlagsValueModule != 0) {
@@ -11546,7 +11580,7 @@ func (c *Checker) checkPropertyAccessExpressionOrQualifiedName(node *ast.Node, l
 		if indexInfo == nil {
 			if prop := c.pythonProjectedProperty(apparentType, right.Text()); prop != nil {
 				c.symbolNodeLinks.Get(node).resolvedSymbol = prop
-				return c.BoundPythonCallable(c.getTypeOfSymbol(prop))
+				return c.pythonBoundMethodAccessType(leftType, prop, c.getTypeOfSymbol(prop))
 			}
 			if prop := c.pythonObjectSurfaceProperty(right.Text()); prop != nil {
 				c.symbolNodeLinks.Get(node).resolvedSymbol = prop
@@ -11616,6 +11650,9 @@ func (c *Checker) checkPropertyAccessExpressionOrQualifiedName(node *ast.Node, l
 }
 
 func (c *Checker) getFlowTypeOfAccessExpression(node *ast.Node, prop *ast.Symbol, propType *Type, errorNode *ast.Node, checkMode CheckMode) *Type {
+	if c.inPythonSourceFile(node) && prop != nil && prop.Flags&ast.SymbolFlagsOptional != 0 {
+		return c.pythonOptionalAccessType(node, propType, errorNode)
+	}
 	// Only compute control flow type if this is a property access expression that isn't an
 	// assignment target, and the referenced property was declared as a variable, property,
 	// accessor, or optional method.
@@ -12561,6 +12598,9 @@ func (c *Checker) checkAssertionDeferred(node *ast.Node) {
 // this operation rather than approximating assertion overlap independently.
 func (c *Checker) isValidTypeAssertion(exprType *Type, targetType *Type) bool {
 	exprType = c.getRegularTypeOfObjectLiteral(c.getBaseTypeOfLiteralType(exprType))
+	if c.pythonValueHierarchy != nil && (exprType.flags&TypeFlagsBooleanLike != 0 && targetType.flags&TypeFlagsBigIntLike != 0 || exprType.flags&TypeFlagsBigIntLike != 0 && targetType.flags&TypeFlagsBooleanLike != 0) {
+		return true
+	}
 	// checkAssertionDeferred first tries target -> widened source, then
 	// checkTypeComparableTo checks source -> target before reporting an error.
 	// Non-AST frontends need both checks, not just the initial fast path.
@@ -12584,6 +12624,18 @@ func (c *Checker) checkBinaryLikeExpression(left *ast.Node, operatorToken *ast.N
 	}
 	leftType := c.checkExpressionEx(left, checkMode)
 	rightType := c.checkExpressionEx(right, checkMode)
+	if c.inPythonSourceFile(left) && isPythonComparisonOperator(operator) {
+		if previous := pythonComparisonOperand(left); previous != nil {
+			leftType = c.checkExpressionEx(previous, checkMode)
+		}
+	}
+	if c.inPythonSourceFile(left) && ast.IsAssignmentOperator(operator) && operator != ast.KindEqualsToken {
+		spelling := strings.TrimSuffix(scanner.TokenToString(operator), "=")
+		if result, errors := c.ResolvePythonAugmentedAssignment(spelling, leftType, rightType); len(errors) == 0 {
+			c.checkAssignmentOperator(left, operator, right, leftType, result)
+			return result
+		}
+	}
 	if ast.IsLogicalOrCoalescingBinaryOperator(operator) {
 		parent := left.Parent.Parent
 		for ast.IsParenthesizedExpression(parent) || ast.IsLogicalOrCoalescingBinaryExpression(parent) {
@@ -17108,6 +17160,12 @@ func (c *Checker) getTypeForVariableLikeDeclaration(declaration *ast.Node, inclu
 		if receiver := c.pythonReceiverType(declaration); receiver != nil {
 			return receiver
 		}
+		if c.inPythonSourceFile(declaration) && declaration.AsParameterDeclaration().DotDotDotToken != nil {
+			if declaration.AsParameterDeclaration().DotDotDotToken.Kind == ast.KindAsteriskAsteriskToken {
+				return c.NewObjectTypeFromFacets(ObjectFacets{Items: []ObjectFacetIndex{{Key: c.stringType, Value: c.anyType}}, PythonMapping: true})
+			}
+			return c.createArrayType(c.anyType)
+		}
 	}
 	if c.noImplicitAny && ast.IsVariableDeclaration(declaration) && !ast.IsBindingPattern(declaration.Name()) &&
 		c.getCombinedModifierFlagsCached(declaration)&ast.ModifierFlagsExport == 0 && declaration.Flags&ast.NodeFlagsAmbient == 0 {
@@ -20887,7 +20945,7 @@ func (c *Checker) checkAndAggregateReturnExpressionTypes(fn *ast.Node, checkMode
 		return nil, true
 	}
 	if c.strictNullChecks && len(aggregatedTypes) != 0 && hasReturnWithNoExpression {
-		aggregatedTypes = core.AppendIfUnique(aggregatedTypes, c.undefinedType)
+		aggregatedTypes = core.AppendIfUnique(aggregatedTypes, core.IfElse(c.inPythonSourceFile(fn), c.nullType, c.undefinedType))
 	}
 	return aggregatedTypes, false
 }
@@ -21047,6 +21105,9 @@ func (c *Checker) createGeneratorType(yieldType *Type, returnType *Type, nextTyp
 		// The global Generator type doesn't exist, so report an error
 		resolver.getGlobalIterableIteratorTypeChecked()
 		return c.emptyObjectType
+	}
+	if c.pythonValueHierarchy != nil && !isAsyncGenerator {
+		return c.createTypeFromGenericGlobalType(globalGeneratorType, []*Type{yieldType, nextType, returnType})
 	}
 	return c.createTypeFromGenericGlobalType(globalGeneratorType, []*Type{yieldType, returnType, nextType})
 }
@@ -28151,7 +28212,7 @@ func (c *Checker) isAssignmentToReadonlyEntity(expr *ast.Node, symbol *ast.Symbo
 	}
 	if c.isReadonlySymbol(symbol) {
 		// Allow assignments to readonly properties within constructors of the same class declaration.
-		if symbol.Flags&ast.SymbolFlagsProperty != 0 && ast.IsAccessExpression(expr) && expr.Expression().Kind == ast.KindThisKeyword {
+		if symbol.Flags&ast.SymbolFlagsProperty != 0 && ast.IsAccessExpression(expr) && (expr.Expression().Kind == ast.KindThisKeyword || c.isPythonReceiverReference(expr.Expression())) {
 			// Look for if this is the constructor for the class that `symbol` is a property of.
 			ctor := c.getControlFlowContainer(expr)
 			if ctor == nil || !ast.IsConstructorDeclaration(ctor) {

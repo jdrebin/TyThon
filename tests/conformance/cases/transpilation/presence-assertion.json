@@ -1,0 +1,17 @@
+{
+  "description": "Presence assertions erase without evaluating a value more than once.",
+  "tags": [
+    "transpilation"
+  ],
+  "source": [
+    "value = {\"name\": \"Ada\"}",
+    "print(value[\"name\"]!)"
+  ],
+  "transpile": {
+    "output": [
+      "value = {\"name\": \"Ada\"}",
+      "print(value[\"name\"] )"
+    ],
+    "stdout": "Ada\n"
+  }
+}

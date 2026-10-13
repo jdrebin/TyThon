@@ -5,7 +5,30 @@ import (
 
 	"github.com/jdrebin/TyThon/tsc/internal/ast"
 	"github.com/jdrebin/TyThon/tsc/internal/collections"
+	"github.com/jdrebin/TyThon/tsc/internal/diagnostics"
 )
+
+// Use the native reference flow graph for presence, keeping its internal
+// undefined marker out of the Python value type and public member contract.
+func (c *Checker) pythonOptionalAccessType(node *ast.Node, value *Type, errorNode *ast.Node) *Type {
+	if getAssignmentTargetKind(node) == AssignmentKindDefinite || isDeleteTarget(node) {
+		return value
+	}
+	parent := node.Parent
+	for parent != nil && ast.IsParenthesizedExpression(parent) {
+		parent = parent.Parent
+	}
+	if parent != nil && ast.IsNonNullExpression(parent) {
+		return value
+	}
+	declared := c.getUnionType([]*Type{value, c.undefinedType})
+	flow := c.getFlowTypeOfReferenceEx(node, declared, declared, nil, nil)
+	if c.containsUndefinedType(flow) {
+		c.error(errorNode, diagnostics.NewAdHocMessage("Member may be absent; establish its presence before reading it."))
+		return value
+	}
+	return c.removeType(flow, c.undefinedType)
+}
 
 func pythonDeclarationIsOptional(node *ast.Node) bool {
 	if node == nil {

@@ -1,0 +1,20 @@
+{
+  "description": "Conditional inference preserves the runtime family of tuple tails.",
+  "tags": [
+    "collections"
+  ],
+  "source": [
+    "type Tail(T) = U if T extends (any, *(infer U)) else never",
+    "value: Tail((int, str))"
+  ],
+  "diagnostics": [],
+  "hover": [
+    {
+      "at": {
+        "line": 1,
+        "text": "value"
+      },
+      "text": "(variable) value: (str,)"
+    }
+  ]
+}

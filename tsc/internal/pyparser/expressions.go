@@ -163,7 +163,6 @@ func (p *Parser) parseNotOrHigher(minPrecedence int) *ast.Node {
 }
 
 func (p *Parser) parseBinaryExpressionRest(minPrecedence int, left *ast.Node, pos int) *ast.Node {
-	comparisons := 0
 	for {
 		if p.token == ast.KindGreaterThanToken {
 			p.reScanGreaterThanToken()
@@ -177,13 +176,8 @@ func (p *Parser) parseBinaryExpressionRest(minPrecedence int, left *ast.Node, po
 		if precedence == precNone || precedence < minPrecedence {
 			return left
 		}
-		if precedence == precComparison {
-			comparisons++
-			if comparisons > 1 {
-				// a < b < c is a chain, not (a < b) < c; it needs its own node kind.
-				p.parseErrorAtCurrentToken(diagnostics.Unexpected_token)
-			}
-		}
+		// Comparisons retain their source-order binary spine. The checker
+		// compares adjacent operands; a ParenthesizedExpression ends a chain.
 		if negated {
 			p.nextToken() // not
 		}

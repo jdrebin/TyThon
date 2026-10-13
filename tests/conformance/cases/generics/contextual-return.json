@@ -1,0 +1,11 @@
+{
+  "description": "An expected return type participates in generic call inference.",
+  "tags": [
+    "generics"
+  ],
+  "source": [
+    "declare def make<T>() -> T",
+    "value: str = make()"
+  ],
+  "diagnostics": []
+}

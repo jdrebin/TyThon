@@ -1,0 +1,14 @@
+{
+  "description": "Formatting preserves and consistently spaces conditional syntax.",
+  "tags": [
+    "formatting"
+  ],
+  "source": [
+    "type Result(T)=str if T extends str else int"
+  ],
+  "formatting": {
+    "output": [
+      "type Result(T) = str if T extends str else int"
+    ]
+  }
+}

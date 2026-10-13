@@ -1,0 +1,19 @@
+{
+  "description": "Attribute presence guards retain the declared None alternative.",
+  "tags": [
+    "optional"
+  ],
+  "source": [
+    "def read(row: {optional name: str | None}) -> str:",
+    "    if hasattr(row, \"name\"):",
+    "        return row.name",
+    "    return \"\""
+  ],
+  "diagnostics": [
+    {
+      "line": 2,
+      "kind": "type",
+      "messageContains": "not assignable"
+    }
+  ]
+}

@@ -1,0 +1,13 @@
+{
+  "description": "Augmented assignment uses the declared in-place operator contract.",
+  "tags": [
+    "protocols"
+  ],
+  "source": [
+    "interface Counter:",
+    "    __iadd__: (value: int) -> Counter",
+    "counter: Counter",
+    "counter += 1"
+  ],
+  "diagnostics": []
+}

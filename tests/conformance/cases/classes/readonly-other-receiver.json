@@ -1,0 +1,20 @@
+{
+  "description": "A constructor may initialize its own readonly storage, but may not write another instance.",
+  "tags": [
+    "classes"
+  ],
+  "source": [
+    "class Record:",
+    "    readonly id: int",
+    "    def __init__(self, other: Record):",
+    "        self.id = 1",
+    "        other.id = 2"
+  ],
+  "diagnostics": [
+    {
+      "line": 4,
+      "kind": "type",
+      "messageContains": "read-only"
+    }
+  ]
+}

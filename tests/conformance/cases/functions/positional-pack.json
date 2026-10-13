@@ -1,0 +1,14 @@
+{
+  "description": "Generic positional packs retain tuple positions.",
+  "tags": [
+    "functions"
+  ],
+  "source": [
+    "def pack<T>(*args: T) -> T:",
+    "    return args",
+    "value = pack(\"Ada\", 12)",
+    "name: str = value[0]",
+    "number: int = value[1]"
+  ],
+  "diagnostics": []
+}

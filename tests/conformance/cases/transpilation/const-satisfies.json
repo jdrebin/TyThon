@@ -1,0 +1,17 @@
+{
+  "description": "Const and satisfies syntax erase while retaining dictionary behavior.",
+  "tags": [
+    "transpilation"
+  ],
+  "source": [
+    "value = {\"id\": 1} as const satisfies {\"id\": int}",
+    "print(value[\"id\"])"
+  ],
+  "transpile": {
+    "output": [
+      "value = {\"id\": 1}                               ",
+      "print(value[\"id\"])"
+    ],
+    "stdout": "1\n"
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "description": "Never-valued members retain their keys.",
+  "tags": [
+    "mapped"
+  ],
+  "source": [
+    "type NeverValues = { (K): never for K in \"dead\" | *<\"attr\"> }",
+    "value: NeverValues"
+  ],
+  "diagnostics": [],
+  "completions": [
+    {
+      "kind": "item",
+      "expression": "value[",
+      "exact": [
+        "\"dead\""
+      ]
+    },
+    {
+      "kind": "attribute",
+      "expression": "value.at",
+      "include": [
+        "attr"
+      ]
+    }
+  ]
+}

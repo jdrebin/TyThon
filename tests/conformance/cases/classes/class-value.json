@@ -1,0 +1,13 @@
+{
+  "description": "Typeof a class denotes its constructor value.",
+  "tags": [
+    "classes"
+  ],
+  "source": [
+    "class Record:",
+    "    id = 1",
+    "constructor: typeof Record = Record",
+    "instance: Record = constructor()"
+  ],
+  "diagnostics": []
+}

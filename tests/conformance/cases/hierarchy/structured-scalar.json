@@ -1,0 +1,16 @@
+{
+  "description": "Atomic scalar values do not satisfy Object.",
+  "tags": [
+    "hierarchy"
+  ],
+  "source": [
+    "value: Object = 1"
+  ],
+  "diagnostics": [
+    {
+      "line": 0,
+      "kind": "type",
+      "messageContains": "not assignable"
+    }
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "description": "Assignment errors report the annotated binding.",
+  "tags": [
+    "diagnostics"
+  ],
+  "source": [
+    "value: int = \"wrong\""
+  ],
+  "diagnostics": [
+    {
+      "line": 0,
+      "text": "value",
+      "kind": "type",
+      "messageContains": "not assignable"
+    }
+  ]
+}

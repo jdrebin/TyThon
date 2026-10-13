@@ -1,0 +1,13 @@
+{
+  "description": "Formatted string expressions produce text values.",
+  "tags": [
+    "runtime"
+  ],
+  "source": [
+    "value = 12",
+    "text: str = f\"value={value}\"",
+    "multiline: str = \"\"\"first",
+    "second\"\"\""
+  ],
+  "diagnostics": []
+}

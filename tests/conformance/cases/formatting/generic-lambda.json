@@ -1,0 +1,14 @@
+{
+  "description": "Pinned formatter output, idempotence, and editor edit correctness for generic-lambda.",
+  "tags": [
+    "formatting"
+  ],
+  "source": [
+    "f=lambda<T> value:T:value"
+  ],
+  "formatting": {
+    "output": [
+      "f = lambda<T> value: T: value"
+    ]
+  }
+}

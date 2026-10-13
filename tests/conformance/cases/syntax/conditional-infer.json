@@ -1,0 +1,20 @@
+{
+  "description": "Typed keyword infer uses its designated semantic scope.",
+  "tags": [
+    "syntax"
+  ],
+  "source": [
+    "type Result(T) = U if T extends infer U else never"
+  ],
+  "syntax": [
+    {
+      "at": {
+        "line": 0,
+        "text": "infer"
+      },
+      "include": [
+        "keyword.operator.expression.infer.tython"
+      ]
+    }
+  ]
+}

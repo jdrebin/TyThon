@@ -1,0 +1,14 @@
+{
+  "description": "Pinned formatter output, idempotence, and editor edit correctness for annotation.",
+  "tags": [
+    "formatting"
+  ],
+  "source": [
+    "value:int=1"
+  ],
+  "formatting": {
+    "output": [
+      "value: int = 1"
+    ]
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "description": "String item signatures impose no constraint on attribute values.",
+  "tags": [
+    "keys"
+  ],
+  "source": [
+    "type Row = { id: int, (str): str }",
+    "row: Row",
+    "result: int = row.id"
+  ],
+  "diagnostics": []
+}

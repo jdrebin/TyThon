@@ -1,0 +1,11 @@
+{
+  "description": "An entirely optional shape accepts an empty value.",
+  "tags": [
+    "optional"
+  ],
+  "source": [
+    "type User = { optional \"name\": str | None, optional label: str }",
+    "value: User = {}"
+  ],
+  "diagnostics": []
+}

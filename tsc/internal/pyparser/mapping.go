@@ -161,9 +161,9 @@ func (p *Parser) finishIndexSignature(modifiers *ast.ModifierList, parameter *as
 
 // parseMappedType parses `{ [readonly] [optional | -optional] KEY: V for X in I [if L extends R] }`.
 //
-// KEY is kept verbatim as the MappedType name type: a bare name selects the
-// attribute namespace and a parenthesised type `(K)` the item-key namespace, so
-// the ParenthesizedType node is significant. A filter wraps the key as
+// A bare name becomes a literal attribute key (*<"name">); a parenthesised
+// type `(K)` keeps the computed key, so the ParenthesizedType node is
+// significant. A filter wraps the key as
 // `L extends R ? KEY : never`, the shape TypeScript uses for key filtering.
 func (p *Parser) parseMappedType() *ast.Node {
 	pos := p.nodePos()
@@ -188,7 +188,10 @@ func (p *Parser) parseMappedType() *ast.Node {
 	if p.isAttributeName() {
 		keyPos := p.nodePos()
 		name := p.parseIdentifierName()
-		key = p.finishNode(p.factory.NewTypeReferenceNode(name, nil), keyPos)
+		literal := p.finishNode(p.factory.NewStringLiteral(name.Text(), ast.TokenFlagsNone), keyPos)
+		payload := p.finishNode(p.factory.NewLiteralTypeNode(literal), keyPos)
+		attribute := p.finishNode(p.newIdentifier("*"), keyPos)
+		key = p.finishNode(p.factory.NewTypeReferenceNode(attribute, p.newNodeList(name.Loc, []*ast.Node{payload})), keyPos)
 	} else {
 		key = p.parseType()
 	}

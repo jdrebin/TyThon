@@ -1,0 +1,14 @@
+{
+  "description": "Base assertions project the static member contract while retaining runtime inheritance.",
+  "tags": [
+    "classes"
+  ],
+  "source": [
+    "class Base:",
+    "    id = 1",
+    "class Child(Base as {id: int}):",
+    "    name = \"Ada\"",
+    "value: int = Child().id"
+  ],
+  "diagnostics": []
+}

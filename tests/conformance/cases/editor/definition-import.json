@@ -1,0 +1,29 @@
+{
+  "description": "Go to definition follows imported declarations to their source file.",
+  "tags": [
+    "editor"
+  ],
+  "source": [
+    "from helpers import greet",
+    "result = greet(\"Ada\")"
+  ],
+  "files": {
+    "helpers.d.ty": [
+      "declare def greet(name: str) -> str"
+    ]
+  },
+  "diagnostics": [],
+  "definitions": [
+    {
+      "at": {
+        "line": 1,
+        "text": "greet"
+      },
+      "target": {
+        "file": "helpers.d.ty",
+        "line": 0,
+        "text": "greet"
+      }
+    }
+  ]
+}

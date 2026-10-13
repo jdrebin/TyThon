@@ -1,0 +1,17 @@
+{
+  "description": "Type-only imports supply annotation types.",
+  "tags": [
+    "modules"
+  ],
+  "source": [
+    "from helpers import type Record",
+    "value: Record"
+  ],
+  "files": {
+    "helpers.d.ty": [
+      "interface Record:",
+      "    id: int"
+    ]
+  },
+  "diagnostics": []
+}

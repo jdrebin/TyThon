@@ -1,0 +1,32 @@
+{
+  "description": "A const list remains a readonly list.",
+  "tags": [
+    "collections"
+  ],
+  "source": [
+    "value = [1, \"a\"] as const"
+  ],
+  "diagnostics": [],
+  "hover": [
+    {
+      "at": {
+        "line": 0,
+        "text": "value"
+      },
+      "text": "(variable) value: readonly [1, \"a\"]"
+    }
+  ],
+  "completions": [
+    {
+      "expression": "value.",
+      "kind": "attribute",
+      "include": [
+        "count",
+        "index"
+      ],
+      "exclude": [
+        "append"
+      ]
+    }
+  ]
+}

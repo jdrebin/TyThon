@@ -1458,6 +1458,9 @@ func (c *Checker) GetItemKeyType(t *Type) *Type {
 		keys = append(keys, c.NewPythonAttributeKeyType(c.getStringLiteralType(property.Name)))
 	}
 	for _, info := range infos {
+		if info.keyType.flags&TypeFlagsUniqueESSymbol != 0 && c.IsPythonPrivateAttributeName(info.keyType.AsUniqueESSymbolType().name) {
+			continue
+		}
 		keys = append(keys, info.keyType)
 	}
 	if len(keys) == 0 {

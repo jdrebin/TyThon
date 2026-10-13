@@ -241,6 +241,9 @@ func (p *Parser) parseTypeReference() *ast.Node {
 	pos := p.nodePos()
 	name := p.parseEntityName()
 	typeArguments := p.parseTypeArgumentsOfTypeReference()
+	if ast.IsIdentifier(name) && name.Text() == "self" && typeArguments == nil {
+		return p.finishNode(p.factory.NewThisTypeNode(), pos)
+	}
 	return p.finishNode(p.factory.NewTypeReferenceNode(name, typeArguments), pos)
 }
 

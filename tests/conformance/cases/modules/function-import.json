@@ -1,0 +1,17 @@
+{
+  "description": "Function-local imports expose module values in the local scope.",
+  "tags": [
+    "modules"
+  ],
+  "source": [
+    "def read() -> str:",
+    "    from helpers import greet",
+    "    return greet(\"Ada\")"
+  ],
+  "files": {
+    "helpers.d.ty": [
+      "declare def greet(name: str) -> str"
+    ]
+  },
+  "diagnostics": []
+}

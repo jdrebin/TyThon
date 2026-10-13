@@ -1,0 +1,57 @@
+{
+  "description": "Generic identity calls infer and widen the returned string in a mutable binding.",
+  "tags": [
+    "functions"
+  ],
+  "source": [
+    "def identity<T>(value: T) -> T:",
+    "    return value",
+    "result = identity(\"hello\")"
+  ],
+  "diagnostics": [],
+  "hover": [
+    {
+      "at": {
+        "line": 2,
+        "text": "result"
+      },
+      "text": "(variable) result: str"
+    }
+  ],
+  "semantic": [
+    {
+      "at": {
+        "line": 0,
+        "text": "identity"
+      },
+      "kind": "FunctionDeclaration"
+    },
+    {
+      "at": {
+        "line": 0,
+        "text": "T",
+        "occurrence": 1
+      },
+      "kind": "TypeParameter"
+    },
+    {
+      "at": {
+        "line": 1,
+        "text": "value"
+      },
+      "kind": "Parameter"
+    }
+  ],
+  "syntax": [
+    {
+      "at": {
+        "line": 0,
+        "text": "<"
+      },
+      "include": [
+        "punctuation.definition.typeparameters.begin.tython"
+      ],
+      "exclude": []
+    }
+  ]
+}

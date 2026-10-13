@@ -1,0 +1,12 @@
+{
+  "description": "Stored dictionary values satisfy shapes with a subset of their members.",
+  "tags": [
+    "dictionaries"
+  ],
+  "source": [
+    "declare def consume(value: {\"id\": int}) -> None",
+    "value = {\"id\": 1, \"name\": \"Ada\"}",
+    "consume(value)"
+  ],
+  "diagnostics": []
+}

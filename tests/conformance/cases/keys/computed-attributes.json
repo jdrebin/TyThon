@@ -1,0 +1,21 @@
+{
+  "description": "Computed exact attribute keys behave as ordinary declared attributes.",
+  "tags": [
+    "keys"
+  ],
+  "source": [
+    "type Record = { (*<\"id\">): int }",
+    "record: Record",
+    "result = record.id"
+  ],
+  "diagnostics": [],
+  "hover": [
+    {
+      "at": {
+        "line": 2,
+        "text": "result"
+      },
+      "text": "(variable) result: int"
+    }
+  ]
+}

@@ -1,0 +1,15 @@
+{
+  "description": "Generator signatures preserve yield, send, and return channels.",
+  "tags": [
+    "protocols"
+  ],
+  "source": [
+    "def values() -> Generator<int, str, bool>:",
+    "    received = yield 1",
+    "    text: str = received",
+    "    yield from [2, 3]",
+    "    return True",
+    "iterator: Generator<int, str, bool> = values()"
+  ],
+  "diagnostics": []
+}

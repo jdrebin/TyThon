@@ -1,0 +1,16 @@
+{
+  "description": "Readonly lists cannot be assigned to tuples.",
+  "tags": [
+    "collections"
+  ],
+  "source": [
+    "value: () = [] as const"
+  ],
+  "diagnostics": [
+    {
+      "line": 0,
+      "kind": "type",
+      "messageContains": "Tuple and list types are not assignable"
+    }
+  ]
+}

@@ -1,0 +1,16 @@
+{
+  "description": "Async context manager entry is awaited for the with-binding type.",
+  "tags": [
+    "protocols"
+  ],
+  "source": [
+    "interface Manager:",
+    "    __aenter__: () -> Awaitable<str>",
+    "    __aexit__: (kind: any, error: any, trace: any) -> Awaitable<bool>",
+    "manager: Manager",
+    "async def read() -> str:",
+    "    async with manager as value:",
+    "        return value"
+  ],
+  "diagnostics": []
+}

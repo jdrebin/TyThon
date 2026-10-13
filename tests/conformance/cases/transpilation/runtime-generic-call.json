@@ -1,0 +1,9 @@
+{
+  "description": "Explicit type arguments and generic declarations erase to executable Python.",
+  "tags": ["transpilation", "runtime", "generics"],
+  "source": ["def identity<T>(value: T) -> T:", "    return value", "print(identity<int>(42))"],
+  "transpile": {
+    "output": ["def identity   (value   )     :", "    return value", "print(identity     (42))"],
+    "stdout": "42\n"
+  }
+}

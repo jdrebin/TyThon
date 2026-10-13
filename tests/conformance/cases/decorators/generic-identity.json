@@ -1,0 +1,16 @@
+{
+  "description": "Identity decorators preserve generic call inference.",
+  "tags": [
+    "decorators"
+  ],
+  "source": [
+    "def identity<T>(value: T) -> T:",
+    "    return value",
+    "@identity",
+    "def echo<T>(value: T) -> T:",
+    "    return value",
+    "number: int = echo(1)",
+    "text: str = echo(\"Ada\")"
+  ],
+  "diagnostics": []
+}

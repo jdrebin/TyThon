@@ -1,0 +1,21 @@
+{
+  "description": "Template attribute domains select values for matching concrete names.",
+  "tags": [
+    "keys"
+  ],
+  "source": [
+    "type Getters = { (*<f\"get_{str}\">): int }",
+    "getters: Getters",
+    "result = getters.get_name"
+  ],
+  "diagnostics": [],
+  "hover": [
+    {
+      "at": {
+        "line": 2,
+        "text": "result"
+      },
+      "text": "(variable) result: int"
+    }
+  ]
+}

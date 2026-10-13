@@ -1,0 +1,19 @@
+{
+  "description": "Try, except, else, and finally suites contribute checked control flow.",
+  "tags": [
+    "runtime"
+  ],
+  "source": [
+    "def read(flag: bool) -> str:",
+    "    try:",
+    "        if flag:",
+    "            raise ValueError(\"missing\")",
+    "    except ValueError as error:",
+    "        return \"missing\"",
+    "    else:",
+    "        return \"ready\"",
+    "    finally:",
+    "        flag = False"
+  ],
+  "diagnostics": []
+}

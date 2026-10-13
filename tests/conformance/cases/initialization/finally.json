@@ -1,0 +1,16 @@
+{
+  "description": "Finally assignments establish required fields before a normal constructor exit.",
+  "tags": [
+    "initialization"
+  ],
+  "source": [
+    "class Record:",
+    "    id: str",
+    "    def __init__(self):",
+    "        try:",
+    "            return",
+    "        finally:",
+    "            self.id = \"Ada\""
+  ],
+  "diagnostics": []
+}

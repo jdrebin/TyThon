@@ -1,0 +1,13 @@
+{
+  "description": "A computed mapped key preserves both attribute and item namespaces.",
+  "tags": [
+    "mapped"
+  ],
+  "source": [
+    "type Copy(T) = { (K): T[K] for K in keyof T }",
+    "value: Copy({ id: int, \"id\": str })",
+    "attribute: int = value.id",
+    "item: str = value[\"id\"]"
+  ],
+  "diagnostics": []
+}

@@ -1,0 +1,14 @@
+{
+  "description": "Pinned formatter output, idempotence, and editor edit correctness for generic-callable.",
+  "tags": [
+    "formatting"
+  ],
+  "source": [
+    "type Identity=<T>(value:T)->T"
+  ],
+  "formatting": {
+    "output": [
+      "type Identity = <T>(value: T) -> T"
+    ]
+  }
+}

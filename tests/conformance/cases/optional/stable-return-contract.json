@@ -1,0 +1,21 @@
+{
+  "description": "Presence facts do not make optional members required in inferred return types.",
+  "tags": [
+    "optional"
+  ],
+  "source": [
+    "type User = { optional \"name\": str | None, optional label: str }",
+    "def update(user: User):",
+    "    user.label = \"Ada\"",
+    "    return user",
+    "value: User",
+    "required: {label: str} = update(value)"
+  ],
+  "diagnostics": [
+    {
+      "line": 5,
+      "kind": "type",
+      "messageContains": "not assignable"
+    }
+  ]
+}

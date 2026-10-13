@@ -1,0 +1,11 @@
+{
+  "description": "Assertions contextually type lambda parameters.",
+  "tags": [
+    "operators"
+  ],
+  "source": [
+    "callback = (lambda value: value) as (value: str) -> str",
+    "result: str = callback(\"Ada\")"
+  ],
+  "diagnostics": []
+}

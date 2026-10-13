@@ -1,0 +1,20 @@
+{
+  "description": "Decorator factories compose result types from the inside out.",
+  "tags": [
+    "decorators"
+  ],
+  "source": [
+    "def factory(prefix: str):",
+    "    def label(fn: () -> int) -> str:",
+    "        return prefix",
+    "    return label",
+    "def length(value: str) -> int:",
+    "    return 1",
+    "@length",
+    "@factory(\"Ada\")",
+    "def answer() -> int:",
+    "    return 42",
+    "result: int = answer"
+  ],
+  "diagnostics": []
+}

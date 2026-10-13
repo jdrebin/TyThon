@@ -1,0 +1,13 @@
+{
+  "description": "Const type parameters infer literal object members.",
+  "tags": [
+    "operators"
+  ],
+  "source": [
+    "def identity<const T>(value: T) -> T:",
+    "    return value",
+    "value = identity({\"id\": 1})",
+    "exact: 1 = value[\"id\"]"
+  ],
+  "diagnostics": []
+}

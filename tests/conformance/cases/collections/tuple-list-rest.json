@@ -1,0 +1,10 @@
+{
+  "description": "Collection annotation (str, *[]int) accepts the corresponding runtime value.",
+  "tags": [
+    "collections"
+  ],
+  "source": [
+    "value: (str, *[]int) = (\"Ada\", 1, 2)"
+  ],
+  "diagnostics": []
+}

@@ -1,0 +1,18 @@
+{
+  "description": "Relative imports resolve within typed packages.",
+  "tags": [
+    "modules"
+  ],
+  "source": [
+    "from .helpers import greet",
+    "result: str = greet(\"Ada\")"
+  ],
+  "entry": "pkg/main.ty",
+  "files": {
+    "pkg/__init__.ty": [],
+    "pkg/helpers.d.ty": [
+      "declare def greet(name: str) -> str"
+    ]
+  },
+  "diagnostics": []
+}

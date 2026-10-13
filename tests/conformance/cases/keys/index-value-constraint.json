@@ -1,0 +1,16 @@
+{
+  "description": "Declared item values satisfy every applicable index signature.",
+  "tags": [
+    "keys"
+  ],
+  "source": [
+    "type Row = { \"id\": int, (str): str }"
+  ],
+  "diagnostics": [
+    {
+      "line": 0,
+      "kind": "type",
+      "messageContains": "not assignable"
+    }
+  ]
+}

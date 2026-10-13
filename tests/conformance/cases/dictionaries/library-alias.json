@@ -1,0 +1,11 @@
+{
+  "description": "Dict composes an exact item shape with declared dictionary methods.",
+  "tags": [
+    "dictionaries"
+  ],
+  "source": [
+    "value: Dict({\"id\": int}) = {\"id\": 1}",
+    "result: int | None = value.get(\"id\")"
+  ],
+  "diagnostics": []
+}

@@ -1,0 +1,14 @@
+{
+  "description": "Formatting preserves and consistently spaces satisfies syntax.",
+  "tags": [
+    "formatting"
+  ],
+  "source": [
+    "value={\"id\":1} satisfies {\"id\":int}"
+  ],
+  "formatting": {
+    "output": [
+      "value = {\"id\": 1} satisfies {\"id\": int}"
+    ]
+  }
+}

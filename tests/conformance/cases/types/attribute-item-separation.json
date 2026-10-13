@@ -1,0 +1,30 @@
+{
+  "description": "An object's attribute and item namespaces remain independent.",
+  "tags": [
+    "types"
+  ],
+  "source": [
+    "type User = { name: str, \"id\": int }",
+    "user: User"
+  ],
+  "diagnostics": [],
+  "completions": [
+    {
+      "expression": "user.",
+      "kind": "attribute",
+      "include": [
+        "name"
+      ],
+      "exclude": [
+        "id"
+      ]
+    },
+    {
+      "expression": "user[",
+      "kind": "item",
+      "exact": [
+        "\"id\""
+      ]
+    }
+  ]
+}

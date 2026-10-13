@@ -1,0 +1,19 @@
+{
+  "description": "Attribute lookup rejects undeclared members.",
+  "tags": [
+    "interfaces"
+  ],
+  "source": [
+    "interface User:",
+    "    name: str",
+    "user: User",
+    "result = user.missing"
+  ],
+  "diagnostics": [
+    {
+      "line": 3,
+      "kind": "type",
+      "messageContains": "does not exist"
+    }
+  ]
+}

@@ -1,0 +1,16 @@
+{
+  "description": "Module objects expose imported declaration values.",
+  "tags": [
+    "modules"
+  ],
+  "source": [
+    "import helpers",
+    "result: str = helpers.greet(\"Ada\")"
+  ],
+  "files": {
+    "helpers.d.ty": [
+      "declare def greet(name: str) -> str"
+    ]
+  },
+  "diagnostics": []
+}

@@ -1,0 +1,16 @@
+{
+  "description": "User declarations cannot create library intrinsic identities.",
+  "tags": [
+    "hierarchy"
+  ],
+  "source": [
+    "type Forged = intrinsic"
+  ],
+  "diagnostics": [
+    {
+      "line": 0,
+      "kind": "type",
+      "messageContains": "intrinsic"
+    }
+  ]
+}

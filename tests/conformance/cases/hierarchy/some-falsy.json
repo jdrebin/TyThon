@@ -1,0 +1,12 @@
+{
+  "description": "Some accepts non-None falsy values.",
+  "tags": [
+    "hierarchy"
+  ],
+  "source": [
+    "zero: Some = 0",
+    "empty: Some = \"\"",
+    "false: Some = False"
+  ],
+  "diagnostics": []
+}

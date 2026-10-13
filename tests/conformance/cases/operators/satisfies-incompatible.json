@@ -1,0 +1,16 @@
+{
+  "description": "Satisfies rejects incompatible member values.",
+  "tags": [
+    "operators"
+  ],
+  "source": [
+    "value = {\"id\": \"Ada\"} satisfies {\"id\": int}"
+  ],
+  "diagnostics": [
+    {
+      "line": 0,
+      "kind": "type",
+      "messageContains": "does not satisfy"
+    }
+  ]
+}

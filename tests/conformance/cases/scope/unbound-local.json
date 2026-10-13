@@ -1,0 +1,19 @@
+{
+  "description": "A local assigned on only one branch requires assignment before a read.",
+  "tags": [
+    "scope"
+  ],
+  "source": [
+    "def read(flag: bool) -> str:",
+    "    if flag:",
+    "        value = \"Ada\"",
+    "    return value"
+  ],
+  "diagnostics": [
+    {
+      "line": 3,
+      "kind": "type",
+      "messageContains": "used before being assigned"
+    }
+  ]
+}

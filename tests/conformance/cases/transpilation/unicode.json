@@ -1,0 +1,14 @@
+{
+  "description": "Erasure preserves runtime tokens and source layout for unicode.",
+  "tags": [
+    "transpilation"
+  ],
+  "source": [
+    "value: str = \"😀\""
+  ],
+  "transpile": {
+    "output": [
+      "value      = \"😀\""
+    ]
+  }
+}

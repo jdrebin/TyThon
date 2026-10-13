@@ -1,0 +1,15 @@
+{
+  "description": "Primitive subclasses retain their primitive base and structural members.",
+  "tags": [
+    "hierarchy"
+  ],
+  "source": [
+    "class Label(str):",
+    "    id = 1",
+    "label = Label()",
+    "text: str = label",
+    "structured: Object = label",
+    "number: int = label.id"
+  ],
+  "diagnostics": []
+}

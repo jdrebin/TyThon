@@ -1,0 +1,16 @@
+{
+  "description": "Formatting preserves and consistently spaces interface syntax.",
+  "tags": [
+    "formatting"
+  ],
+  "source": [
+    "interface Box<T>:",
+    " value:T"
+  ],
+  "formatting": {
+    "output": [
+      "interface Box<T>:",
+      "    value: T"
+    ]
+  }
+}

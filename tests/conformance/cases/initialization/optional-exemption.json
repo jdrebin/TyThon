@@ -1,0 +1,11 @@
+{
+  "description": "Optional fields do not require constructor assignment.",
+  "tags": [
+    "initialization"
+  ],
+  "source": [
+    "class Record:",
+    "    optional id: str"
+  ],
+  "diagnostics": []
+}

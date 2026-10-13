@@ -1,0 +1,14 @@
+{
+  "description": "Python numeric literal spellings retain their primitive types.",
+  "tags": [
+    "runtime"
+  ],
+  "source": [
+    "binary: int = 0b101",
+    "octal: int = 0o17",
+    "hexadecimal: int = 0xFF",
+    "separated: int = 1_000",
+    "real: float = 1.5e2"
+  ],
+  "diagnostics": []
+}

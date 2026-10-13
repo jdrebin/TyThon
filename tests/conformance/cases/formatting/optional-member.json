@@ -1,0 +1,14 @@
+{
+  "description": "Formatting preserves and consistently spaces optional-member syntax.",
+  "tags": [
+    "formatting"
+  ],
+  "source": [
+    "type Row={optional \"name\":str}"
+  ],
+  "formatting": {
+    "output": [
+      "type Row = {optional \"name\": str}"
+    ]
+  }
+}

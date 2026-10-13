@@ -1,0 +1,15 @@
+{
+  "description": "Context manager entry supplies the with-binding type.",
+  "tags": [
+    "protocols"
+  ],
+  "source": [
+    "interface Manager:",
+    "    __enter__: () -> str",
+    "    __exit__: (kind: any, error: any, trace: any) -> bool",
+    "manager: Manager",
+    "with manager as value:",
+    "    result: str = value"
+  ],
+  "diagnostics": []
+}

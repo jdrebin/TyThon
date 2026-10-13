@@ -1,0 +1,12 @@
+{
+  "description": "Assert conditions narrow subsequent reads.",
+  "tags": [
+    "flow"
+  ],
+  "source": [
+    "def read(value: str | None) -> str:",
+    "    assert value is not None",
+    "    return value"
+  ],
+  "diagnostics": []
+}

@@ -1,0 +1,20 @@
+{
+  "description": "Pinned formatter output, idempotence, and editor edit correctness for fmt-off.",
+  "tags": [
+    "formatting"
+  ],
+  "source": [
+    "# fmt: off",
+    "value=1",
+    "# fmt: on",
+    "other=2"
+  ],
+  "formatting": {
+    "output": [
+      "# fmt: off",
+      "value=1",
+      "# fmt: on",
+      "other = 2"
+    ]
+  }
+}

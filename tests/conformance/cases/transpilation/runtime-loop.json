@@ -1,0 +1,9 @@
+{
+  "description": "Erasure keeps loop ordering, accumulation, and conditional execution.",
+  "tags": ["transpilation", "runtime", "control-flow"],
+  "source": ["total: int = 0", "for value in [1, 2, 3]:", "    if value > 1:", "        total += value", "print(total)"],
+  "transpile": {
+    "output": ["total      = 0", "for value in [1, 2, 3]:", "    if value > 1:", "        total += value", "print(total)"],
+    "stdout": "5\n"
+  }
+}

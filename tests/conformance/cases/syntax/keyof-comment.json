@@ -1,0 +1,20 @@
+{
+  "description": "The word keyof retains comment coloring inside a comment.",
+  "tags": [
+    "syntax"
+  ],
+  "source": [
+    "# keyof"
+  ],
+  "syntax": [
+    {
+      "at": {
+        "line": 0,
+        "text": "keyof"
+      },
+      "exclude": [
+        "keyword.operator.expression.keyof.tython"
+      ]
+    }
+  ]
+}

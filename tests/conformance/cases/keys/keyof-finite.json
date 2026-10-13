@@ -1,0 +1,22 @@
+{
+  "description": "Keyof enumerates declared attribute and item keys, excluding object fallback members.",
+  "tags": [
+    "keys"
+  ],
+  "source": [
+    "type Keys = keyof { id: int, \"id\": str }",
+    "type Attrs = Extract(Keys, *)",
+    "type Items = Exclude(Keys, *)",
+    "attr: Attrs",
+    "name: *<\"id\"> = attr",
+    "item: Items = \"id\"",
+    "invalid: Keys = \"__str__\""
+  ],
+  "diagnostics": [
+    {
+      "line": 6,
+      "kind": "type",
+      "messageContains": "not assignable"
+    }
+  ]
+}

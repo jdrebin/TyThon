@@ -1,0 +1,16 @@
+{
+  "description": "Tuple unpacking gives each target its position type and starred targets a list.",
+  "tags": [
+    "runtime"
+  ],
+  "source": [
+    "pair: (str, int) = (\"Ada\", 12)",
+    "name, count = pair",
+    "text: str = name",
+    "number: int = count",
+    "row: (str, int, int) = (\"Ada\", 1, 2)",
+    "first, *rest = row",
+    "numbers: []int = rest"
+  ],
+  "diagnostics": []
+}

@@ -1,0 +1,10 @@
+{
+  "description": "Hover verbosity expands a named structural type on request.",
+  "tags": ["editor", "hover"],
+  "source": ["interface Named:", "    name: str", "value: Named"],
+  "diagnostics": [],
+  "hover": [
+    {"at": {"line": 2, "text": "value"}, "verbosity": 0, "text": "(variable) value: Named"},
+    {"at": {"line": 2, "text": "value"}, "verbosity": 1, "text": "(variable) value: { name: str }"}
+  ]
+}

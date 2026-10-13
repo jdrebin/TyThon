@@ -1,0 +1,20 @@
+{
+  "description": "Remapping a key to never omits that member.",
+  "tags": [
+    "mapped"
+  ],
+  "source": [
+    "type Items(T) = { (K if K extends str else never): T[K] for K in keyof T }",
+    "value: Items({ attr: int, \"name\": str }) = {\"name\": \"Ada\"}"
+  ],
+  "diagnostics": [],
+  "completions": [
+    {
+      "kind": "item",
+      "expression": "value[",
+      "exact": [
+        "\"name\""
+      ]
+    }
+  ]
+}

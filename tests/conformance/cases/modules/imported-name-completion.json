@@ -1,0 +1,24 @@
+{
+  "description": "Imported names participate in visible-name completion.",
+  "tags": [
+    "modules"
+  ],
+  "source": [
+    "from helpers import greet"
+  ],
+  "files": {
+    "helpers.d.ty": [
+      "declare def greet(name: str) -> str"
+    ]
+  },
+  "diagnostics": [],
+  "completions": [
+    {
+      "kind": "name",
+      "expression": "gre",
+      "include": [
+        "greet"
+      ]
+    }
+  ]
+}

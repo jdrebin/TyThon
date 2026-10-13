@@ -1,0 +1,20 @@
+{
+  "description": "Decorated declarations must satisfy the decorator input contract.",
+  "tags": [
+    "decorators"
+  ],
+  "source": [
+    "def decorate(value: str) -> int:",
+    "    return 1",
+    "@decorate",
+    "def answer() -> int:",
+    "    return 42"
+  ],
+  "diagnostics": [
+    {
+      "line": 2,
+      "kind": "type",
+      "messageContains": "not assignable"
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "description": "Pinned formatter output, idempotence, and editor edit correctness for list.",
+  "tags": [
+    "formatting"
+  ],
+  "source": [
+    "values=[1,2,3]"
+  ],
+  "formatting": {
+    "output": [
+      "values = [1, 2, 3]"
+    ]
+  }
+}

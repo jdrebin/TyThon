@@ -1,0 +1,56 @@
+{
+  "description": "Interface properties and bound methods are available on instances.",
+  "tags": [
+    "interfaces"
+  ],
+  "source": [
+    "interface User:",
+    "    name: str",
+    "    def greet(self, message: str) -> str",
+    "user: User"
+  ],
+  "diagnostics": [],
+  "hover": [
+    {
+      "at": {
+        "line": 1,
+        "text": "name"
+      },
+      "text": "(property) name: str"
+    }
+  ],
+  "semantic": [
+    {
+      "at": {
+        "line": 0,
+        "text": "User"
+      },
+      "kind": "InterfaceDeclaration"
+    },
+    {
+      "at": {
+        "line": 1,
+        "text": "name"
+      },
+      "kind": "PropertySignature"
+    },
+    {
+      "at": {
+        "line": 2,
+        "text": "greet"
+      },
+      "kind": "MethodSignature"
+    }
+  ],
+  "completions": [
+    {
+      "expression": "user.",
+      "kind": "attribute",
+      "include": [
+        "name",
+        "greet"
+      ],
+      "exclude": []
+    }
+  ]
+}

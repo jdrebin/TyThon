@@ -1,0 +1,30 @@
+{
+  "description": "A mapped filter selects ordinary item keys.",
+  "tags": [
+    "mapped"
+  ],
+  "source": [
+    "type Items(T) = { (K): T[K] for K in keyof T if K extends str }",
+    "value: Items({ attr: int, \"name\": str }) = {\"name\": \"Ada\"}",
+    "result = value[\"name\"]"
+  ],
+  "diagnostics": [],
+  "hover": [
+    {
+      "at": {
+        "line": 2,
+        "text": "result"
+      },
+      "text": "(variable) result: str"
+    }
+  ],
+  "completions": [
+    {
+      "kind": "item",
+      "expression": "value[",
+      "exact": [
+        "\"name\""
+      ]
+    }
+  ]
+}

@@ -1,0 +1,19 @@
+{
+  "description": "Readonly fields reject later assignment.",
+  "tags": [
+    "classes"
+  ],
+  "source": [
+    "class Record:",
+    "    readonly id: int = 1",
+    "record = Record()",
+    "record.id = 2"
+  ],
+  "diagnostics": [
+    {
+      "line": 3,
+      "kind": "type",
+      "messageContains": "read-only"
+    }
+  ]
+}

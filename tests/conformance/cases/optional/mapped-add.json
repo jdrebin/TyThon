@@ -1,0 +1,11 @@
+{
+  "description": "The optional mapped modifier allows source members to be absent.",
+  "tags": [
+    "optional"
+  ],
+  "source": [
+    "type Partial(T) = { optional (K): T[K] for K in keyof T }",
+    "value: Partial({\"id\": int}) = {}"
+  ],
+  "diagnostics": []
+}

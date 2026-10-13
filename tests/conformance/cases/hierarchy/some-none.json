@@ -1,0 +1,16 @@
+{
+  "description": "Some excludes None.",
+  "tags": [
+    "hierarchy"
+  ],
+  "source": [
+    "value: Some = None"
+  ],
+  "diagnostics": [
+    {
+      "line": 0,
+      "kind": "type",
+      "messageContains": "not assignable"
+    }
+  ]
+}

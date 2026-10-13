@@ -1,0 +1,18 @@
+{
+  "description": "An argument cannot bind the same parameter both positionally and by name.",
+  "tags": [
+    "functions"
+  ],
+  "source": [
+    "def read(value: int) -> int:",
+    "    return value",
+    "read(1, value=2)"
+  ],
+  "diagnostics": [
+    {
+      "line": 2,
+      "kind": "type",
+      "messageContains": "multiple"
+    }
+  ]
+}

@@ -1,0 +1,28 @@
+{
+  "description": "An open attribute signature validates arbitrary attribute names.",
+  "tags": [
+    "keys"
+  ],
+  "source": [
+    "type Dynamic = { *: int }",
+    "value: Dynamic",
+    "result = value.any_name"
+  ],
+  "diagnostics": [],
+  "hover": [
+    {
+      "at": {
+        "line": 2,
+        "text": "result"
+      },
+      "text": "(variable) result: int"
+    }
+  ],
+  "completions": [
+    {
+      "kind": "attribute",
+      "expression": "value.any_",
+      "exact": []
+    }
+  ]
+}

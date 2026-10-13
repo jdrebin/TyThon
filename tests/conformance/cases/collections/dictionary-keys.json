@@ -1,0 +1,29 @@
+{
+  "description": "Dictionary key completions expose the declared item keys.",
+  "tags": [
+    "collections"
+  ],
+  "source": [
+    "value = {\"name\": \"Ada\", \"age\": 1}"
+  ],
+  "diagnostics": [],
+  "completions": [
+    {
+      "expression": "value[",
+      "kind": "item",
+      "exact": [
+        "\"age\"",
+        "\"name\""
+      ]
+    }
+  ],
+  "semantic": [
+    {
+      "at": {
+        "line": 0,
+        "text": "value"
+      },
+      "kind": "VariableDeclaration"
+    }
+  ]
+}

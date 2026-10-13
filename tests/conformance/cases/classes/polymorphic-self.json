@@ -1,0 +1,15 @@
+{
+  "description": "Self return types preserve the derived receiver type.",
+  "tags": [
+    "classes"
+  ],
+  "source": [
+    "class Base:",
+    "    def identity(self) -> self:",
+    "        return self",
+    "class Derived(Base):",
+    "    name = \"Ada\"",
+    "value: Derived = Derived().identity()"
+  ],
+  "diagnostics": []
+}

@@ -1,0 +1,25 @@
+{
+  "description": "Derived interfaces expose inherited and own properties.",
+  "tags": [
+    "interfaces"
+  ],
+  "source": [
+    "interface Named:",
+    "    name: str",
+    "interface User(Named):",
+    "    age: int",
+    "user: User"
+  ],
+  "diagnostics": [],
+  "completions": [
+    {
+      "expression": "user.",
+      "kind": "attribute",
+      "include": [
+        "name",
+        "age"
+      ],
+      "exclude": []
+    }
+  ]
+}

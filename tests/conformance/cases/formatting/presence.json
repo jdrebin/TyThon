@@ -1,0 +1,14 @@
+{
+  "description": "Pinned formatter output, idempotence, and editor edit correctness for presence.",
+  "tags": [
+    "formatting"
+  ],
+  "source": [
+    "value=user[\"name\"]!"
+  ],
+  "formatting": {
+    "output": [
+      "value = user[\"name\"]!"
+    ]
+  }
+}

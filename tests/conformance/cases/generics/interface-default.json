@@ -1,0 +1,22 @@
+{
+  "description": "Generic interfaces apply their declared parameter defaults.",
+  "tags": [
+    "generics"
+  ],
+  "source": [
+    "interface Box<T = str>:",
+    "    value: T",
+    "box: Box",
+    "result = box.value"
+  ],
+  "diagnostics": [],
+  "hover": [
+    {
+      "at": {
+        "line": 3,
+        "text": "result"
+      },
+      "text": "(variable) result: str"
+    }
+  ]
+}

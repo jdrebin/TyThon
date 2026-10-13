@@ -1,0 +1,17 @@
+{
+  "description": "Required members cannot be deleted through their declared shape.",
+  "tags": [
+    "optional"
+  ],
+  "source": [
+    "def remove(value: {id: int}):",
+    "    del value.id"
+  ],
+  "diagnostics": [
+    {
+      "line": 1,
+      "kind": "type",
+      "messageContains": "optional"
+    }
+  ]
+}

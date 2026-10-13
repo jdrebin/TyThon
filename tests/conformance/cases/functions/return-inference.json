@@ -1,0 +1,13 @@
+{
+  "description": "Return inference combines explicit branches and implicit None.",
+  "tags": [
+    "functions"
+  ],
+  "source": [
+    "def choose(flag: bool):",
+    "    if flag:",
+    "        return 1",
+    "value: int | None = choose(True)"
+  ],
+  "diagnostics": []
+}

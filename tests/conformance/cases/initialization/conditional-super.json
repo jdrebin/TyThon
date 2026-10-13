@@ -1,0 +1,23 @@
+{
+  "description": "A conditional super initializer preserves the uninitialized alternative.",
+  "tags": [
+    "initialization"
+  ],
+  "source": [
+    "class Base:",
+    "    id: int",
+    "    def __init__(self, id: int):",
+    "        self.id = id",
+    "class Child(Base):",
+    "    def __init__(self, flag: bool):",
+    "        if flag:",
+    "            super().__init__(1)"
+  ],
+  "diagnostics": [
+    {
+      "line": 4,
+      "kind": "type",
+      "messageContains": "not definitely assigned"
+    }
+  ]
+}

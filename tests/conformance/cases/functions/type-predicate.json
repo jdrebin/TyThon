@@ -1,0 +1,14 @@
+{
+  "description": "Declared type predicates narrow successful conditional branches.",
+  "tags": [
+    "functions"
+  ],
+  "source": [
+    "declare def is_text(value: str | int) -> value is str",
+    "def read(value: str | int) -> str:",
+    "    if is_text(value):",
+    "        return value",
+    "    return \"\""
+  ],
+  "diagnostics": []
+}

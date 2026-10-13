@@ -349,6 +349,12 @@ func (c *Checker) narrowTypeByTypePredicate(f *FlowState, t *Type, predicate *Ty
 	if predicate.t != nil && !(IsTypeAny(t) && (predicate.t == c.globalObjectType || predicate.t == c.globalFunctionType)) {
 		predicateArgument := c.getTypePredicateArgument(predicate, callExpression)
 		if predicateArgument != nil {
+			if c.inPythonSourceFile(callExpression) && ast.IsPropertyAccessExpression(f.reference) && c.isMatchingReference(f.reference.Expression(), predicateArgument) {
+				property := c.getPropertyOfType(predicate.t, f.reference.Name().Text())
+				if property != nil && property.Flags&ast.SymbolFlagsOptional == 0 && assumeTrue {
+					return c.getTypeWithFacts(t, TypeFactsNEUndefined)
+				}
+			}
 			if c.isMatchingReference(f.reference, predicateArgument) {
 				return c.getNarrowedType(t, predicate.t, assumeTrue, false /*checkDerived*/)
 			}
@@ -478,6 +484,12 @@ func (c *Checker) narrowTypeByTruthiness(f *FlowState, t *Type, expr *ast.Node, 
 }
 
 func (c *Checker) narrowTypeByCallExpression(f *FlowState, t *Type, callExpression *ast.Node, assumeTrue bool) *Type {
+	if c.inPythonSourceFile(callExpression) && ast.IsPropertyAccessExpression(f.reference) && ast.IsIdentifier(callExpression.Expression()) && callExpression.Expression().Text() == "hasattr" && len(callExpression.Arguments()) == 2 {
+		args := callExpression.Arguments()
+		if c.isMatchingReference(f.reference.Expression(), args[0]) && ast.IsStringLiteral(args[1]) && args[1].Text() == f.reference.Name().Text() {
+			return c.getTypeWithFacts(t, core.IfElse(assumeTrue, TypeFactsNEUndefined, TypeFactsEQUndefined))
+		}
+	}
 	if c.hasMatchingArgument(callExpression, f.reference) {
 		var predicate *TypePredicate
 		if assumeTrue || !isCallChain(callExpression) {
@@ -559,7 +571,7 @@ func (c *Checker) narrowTypeByBinaryExpression(f *FlowState, t *Type, expr *ast.
 			return c.narrowTypeByPrivateIdentifierInInExpression(f, t, expr, assumeTrue)
 		}
 		target := c.getReferenceCandidate(expr.Right)
-		if c.containsMissingType(t) && ast.IsAccessExpression(f.reference) && c.isMatchingReference(f.reference.Expression(), target) {
+		if (c.containsMissingType(t) || c.inPythonSourceFile(expr.AsNode()) && c.containsUndefinedType(t)) && ast.IsAccessExpression(f.reference) && c.isMatchingReference(f.reference.Expression(), target) {
 			leftType := c.getTypeOfExpression(expr.Left)
 			if isTypeUsableAsPropertyName(leftType) {
 				if accessedName, ok := c.getAccessedPropertyName(f.reference); ok && accessedName == getPropertyNameFromType(leftType) {
@@ -2162,6 +2174,9 @@ func (c *Checker) getTypeOfSwitchClause(clause *ast.Node) *Type {
 }
 
 func (c *Checker) getEffectsSignature(node *ast.Node) *Signature {
+	if c.inPythonSourceFile(node) && ast.IsCallExpression(node) && ast.IsPropertyAccessExpression(node.Expression()) && node.Expression().Name().Text() == "__init__" {
+		return c.getResolvedSignature(node, nil, CheckModeNormal)
+	}
 	links := c.signatureLinks.Get(node)
 	signature := links.effectsSignature
 	if signature == nil {
@@ -2574,6 +2589,10 @@ func (c *Checker) getTypePredicateArgument(predicate *TypePredicate, callExpress
 	} else {
 		invokedExpression := ast.SkipParentheses(callExpression.Expression())
 		if ast.IsAccessExpression(invokedExpression) {
+			if invokedExpression.Name() != nil && invokedExpression.Name().Text() == "__init__" && c.pythonSuperBase(invokedExpression.Expression()) != nil {
+				method := ast.FindAncestor(callExpression, ast.IsFunctionLike)
+				return method.Parameters()[0].Name()
+			}
 			return ast.SkipParentheses(invokedExpression.Expression())
 		}
 	}

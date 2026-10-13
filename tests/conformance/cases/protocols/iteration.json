@@ -1,0 +1,13 @@
+{
+  "description": "For loops obtain element types from iterator protocols.",
+  "tags": [
+    "protocols"
+  ],
+  "source": [
+    "def read(values: []str) -> str:",
+    "    for value in values:",
+    "        return value",
+    "    return \"\""
+  ],
+  "diagnostics": []
+}

@@ -1,0 +1,19 @@
+{
+  "description": "Circular imports resolve forward type declarations.",
+  "tags": [
+    "modules"
+  ],
+  "source": [
+    "from peer import Other",
+    "interface Entry:",
+    "    other: Other"
+  ],
+  "files": {
+    "peer.d.ty": [
+      "from main import Entry",
+      "interface Other:",
+      "    entry: Entry"
+    ]
+  },
+  "diagnostics": []
+}

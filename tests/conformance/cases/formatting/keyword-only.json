@@ -1,0 +1,16 @@
+{
+  "description": "Formatting preserves and consistently spaces keyword-only syntax.",
+  "tags": [
+    "formatting"
+  ],
+  "source": [
+    "def read(value:str,/,*,enabled:bool=True)->str:",
+    " return value"
+  ],
+  "formatting": {
+    "output": [
+      "def read(value: str, /, *, enabled: bool = True) -> str:",
+      "    return value"
+    ]
+  }
+}

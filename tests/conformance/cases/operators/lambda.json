@@ -1,0 +1,12 @@
+{
+  "description": "Generic lambdas support const inference.",
+  "tags": [
+    "operators"
+  ],
+  "source": [
+    "identity = lambda<const T> value: T: value",
+    "value = identity({\"id\": 1})",
+    "exact: 1 = value[\"id\"]"
+  ],
+  "diagnostics": []
+}

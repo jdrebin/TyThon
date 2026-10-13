@@ -1,0 +1,20 @@
+{
+  "description": "The word keyof retains string coloring inside a string.",
+  "tags": [
+    "syntax"
+  ],
+  "source": [
+    "value = \"keyof\""
+  ],
+  "syntax": [
+    {
+      "at": {
+        "line": 0,
+        "text": "keyof"
+      },
+      "exclude": [
+        "keyword.operator.expression.keyof.tython"
+      ]
+    }
+  ]
+}

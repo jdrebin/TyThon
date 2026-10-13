@@ -1,0 +1,17 @@
+{
+  "description": "Declaration-only functions erase without creating runtime bindings.",
+  "tags": [
+    "transpilation"
+  ],
+  "source": [
+    "declare def external(value: str) -> str",
+    "print(\"ready\")"
+  ],
+  "transpile": {
+    "output": [
+      "                                       ",
+      "print(\"ready\")"
+    ],
+    "stdout": "ready\n"
+  }
+}

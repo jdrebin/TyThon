@@ -1,0 +1,21 @@
+{
+  "description": "Contextual string completion follows the return context.",
+  "tags": [
+    "completions"
+  ],
+  "source": [
+    "type Mode = \"read\" | \"write\"",
+    "declare def configure(mode: Mode) -> None"
+  ],
+  "diagnostics": [],
+  "completions": [
+    {
+      "kind": "string",
+      "expression": "def read() -> Mode:\n    return \"¦\"",
+      "exact": [
+        "read",
+        "write"
+      ]
+    }
+  ]
+}

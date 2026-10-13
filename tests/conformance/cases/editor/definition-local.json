@@ -1,0 +1,23 @@
+{
+  "description": "Go to definition locates the declaration of a referenced local name.",
+  "tags": [
+    "editor"
+  ],
+  "source": [
+    "value = 12",
+    "result = value"
+  ],
+  "diagnostics": [],
+  "definitions": [
+    {
+      "at": {
+        "line": 1,
+        "text": "value"
+      },
+      "target": {
+        "line": 0,
+        "text": "value"
+      }
+    }
+  ]
+}

@@ -1,0 +1,28 @@
+{
+  "description": "An annotated float retains its declared type and symbol identity.",
+  "tags": [
+    "primitives"
+  ],
+  "source": [
+    "value: float = 1.5"
+  ],
+  "diagnostics": [],
+  "hover": [
+    {
+      "at": {
+        "line": 0,
+        "text": "value"
+      },
+      "text": "(variable) value: float"
+    }
+  ],
+  "semantic": [
+    {
+      "at": {
+        "line": 0,
+        "text": "value"
+      },
+      "kind": "VariableDeclaration"
+    }
+  ]
+}

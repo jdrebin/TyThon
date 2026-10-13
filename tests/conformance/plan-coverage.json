@@ -1,0 +1,861 @@
+{
+  "features": [
+    {
+      "id": "typed-file-scope",
+      "section": "Checking scope: TyThon sources only",
+      "cases": [],
+      "integrations": [
+        "source-discovery",
+        "document-scope",
+        "program-snapshots",
+        "cli-emission"
+      ]
+    },
+    {
+      "id": "python-emission",
+      "section": "Files and erasure",
+      "cases": [
+        "transpilation/"
+      ],
+      "integrations": [
+        "cli-emission"
+      ]
+    },
+    {
+      "id": "formatter-syntax",
+      "section": "Bundled formatter work",
+      "cases": [
+        "formatting/",
+        "diagnostics/malformed-call"
+      ],
+      "integrations": [
+        "formatter-process"
+      ]
+    },
+    {
+      "id": "formatter-editor-contract",
+      "section": "Bundled formatter work",
+      "cases": [],
+      "integrations": [
+        "formatter-provider",
+        "formatter-process"
+      ]
+    },
+    {
+      "id": "structural-types",
+      "section": "Governing compatibility rule",
+      "cases": [
+        "types/",
+        "interfaces/",
+        "generics/intersection"
+      ],
+      "integrations": []
+    },
+    {
+      "id": "type-utilities-and-specialization",
+      "section": "Type declarations and generic syntax",
+      "cases": [
+        "generics/",
+        "functions/generic",
+        "keys/type-dot-specialization"
+      ],
+      "integrations": []
+    },
+    {
+      "id": "const-satisfies-assertions",
+      "section": "Type declarations and generic syntax",
+      "cases": [
+        "operators/",
+        "transpilation/const-satisfies",
+        "formatting/const-parameter",
+        "formatting/satisfies"
+      ],
+      "integrations": []
+    },
+    {
+      "id": "nominal-attribute-keys",
+      "section": "The unified key algebra",
+      "cases": [
+        "keys/attribute-brand",
+        "keys/computed-attributes",
+        "keys/private-key-enumeration"
+      ],
+      "integrations": []
+    },
+    {
+      "id": "keyof-and-indexed-access",
+      "section": "`keyof`, indexed access, and filtering",
+      "cases": [
+        "keys/separate-namespaces",
+        "keys/keyof-finite",
+        "keys/numeric-string-domains",
+        "keys/type-dot-specialization"
+      ],
+      "integrations": []
+    },
+    {
+      "id": "index-domain-constraints",
+      "section": "Hover and standard-library follow-up (September 2026)",
+      "cases": [
+        "keys/index-value-constraint",
+        "keys/attribute-index-independence"
+      ],
+      "integrations": []
+    },
+    {
+      "id": "dynamic-and-patterned-attributes",
+      "section": "Object shapes",
+      "cases": [
+        "keys/open-attributes",
+        "keys/patterned-attributes",
+        "classes/open-attribute-contract"
+      ],
+      "integrations": []
+    },
+    {
+      "id": "optional-members-and-presence",
+      "section": "Object shapes",
+      "cases": [
+        "optional/"
+      ],
+      "integrations": []
+    },
+    {
+      "id": "mapped-types",
+      "section": "Mapped types and comprehensions",
+      "cases": [
+        "mapped/",
+        "optional/mapped-copy",
+        "optional/mapped-add",
+        "optional/mapped-remove"
+      ],
+      "integrations": []
+    },
+    {
+      "id": "dictionary-contracts",
+      "section": "Dictionaries and structural item shapes",
+      "cases": [
+        "dictionaries/",
+        "collections/dictionary-keys"
+      ],
+      "integrations": []
+    },
+    {
+      "id": "primitive-families",
+      "section": "Primitive values and the nominal value hierarchy",
+      "cases": [
+        "primitives/",
+        "hierarchy/"
+      ],
+      "integrations": [],
+      "note": "Also covered by the 144 primitive-assignment matrix cases. Full byte/complex literal precision is explicitly partial in the plan."
+    },
+    {
+      "id": "collection-families",
+      "section": "Lists and tuples",
+      "cases": [
+        "collections/"
+      ],
+      "integrations": []
+    },
+    {
+      "id": "python-call-binding",
+      "section": "Functions, calls, and lambdas",
+      "cases": [
+        "functions/keywords",
+        "functions/positional-only",
+        "functions/keyword-only",
+        "functions/default-inference",
+        "functions/default-compatibility",
+        "functions/positional-pack",
+        "functions/keyword-pack",
+        "functions/keyword-duplicate",
+        "functions/callable-parameter-kinds",
+        "functions/missing-argument",
+        "functions/argument-type-error"
+      ],
+      "integrations": []
+    },
+    {
+      "id": "function-inference-and-overloads",
+      "section": "Functions, calls, and lambdas",
+      "cases": [
+        "functions/return-inference",
+        "functions/return-error",
+        "functions/overloads",
+        "functions/overload-decorator",
+        "functions/typed-lambda",
+        "functions/generic"
+      ],
+      "integrations": []
+    },
+    {
+      "id": "callable-interfaces",
+      "section": "Classes, interfaces, and inheritance",
+      "cases": [
+        "functions/call-signature",
+        "classes/callable-instance",
+        "formatting/call-signature"
+      ],
+      "integrations": []
+    },
+    {
+      "id": "class-construction-and-members",
+      "section": "Classes, interfaces, and inheritance",
+      "cases": [
+        "classes/"
+      ],
+      "integrations": [],
+      "note": "Includes class values, generic constructors, binding, inheritance, projected bases, readonly initialization, and polymorphic self."
+    },
+    {
+      "id": "required-field-initialization",
+      "section": "Required instance fields and inferred build roots",
+      "cases": [
+        "initialization/"
+      ],
+      "integrations": [
+        "cli-emission"
+      ]
+    },
+    {
+      "id": "initializer-assertions",
+      "section": "Initializer assertions and cooperative forwarding",
+      "cases": [
+        "initialization/explicit-assertion",
+        "initialization/cooperative-forwarding",
+        "initialization/explicit-base",
+        "initialization/none-return"
+      ],
+      "integrations": []
+    },
+    {
+      "id": "decorator-results-and-order",
+      "section": "Decorator input and output",
+      "cases": [
+        "decorators/",
+        "transpilation/decorator-order"
+      ],
+      "integrations": []
+    },
+    {
+      "id": "descriptor-protocols",
+      "section": "Decorators, descriptors, and dynamic attributes",
+      "cases": [
+        "descriptors/"
+      ],
+      "integrations": []
+    },
+    {
+      "id": "narrowing-and-flow",
+      "section": "Checker-reuse tightening",
+      "cases": [
+        "flow/",
+        "functions/type-predicate",
+        "functions/assertion-signature"
+      ],
+      "integrations": []
+    },
+    {
+      "id": "runtime-scopes",
+      "section": "Python runtime semantics requiring adapters",
+      "cases": [
+        "scope/",
+        "runtime/comprehensions",
+        "runtime/match-sequence"
+      ],
+      "integrations": []
+    },
+    {
+      "id": "operators-and-literals",
+      "section": "Python runtime semantics requiring adapters",
+      "cases": [
+        "runtime/comparison",
+        "runtime/numeric-literals",
+        "runtime/formatted-strings",
+        "protocols/inplace",
+        "protocols/reflected"
+      ],
+      "integrations": []
+    },
+    {
+      "id": "iteration-and-unpacking",
+      "section": "Python runtime semantics requiring adapters",
+      "cases": [
+        "protocols/iteration",
+        "protocols/async-iteration",
+        "runtime/unpacking",
+        "runtime/comprehensions"
+      ],
+      "integrations": []
+    },
+    {
+      "id": "async-and-generators",
+      "section": "Python runtime semantics requiring adapters",
+      "cases": [
+        "protocols/async-await",
+        "protocols/async-iteration",
+        "protocols/generator-channels"
+      ],
+      "integrations": []
+    },
+    {
+      "id": "context-managers-and-exceptions",
+      "section": "Python runtime semantics requiring adapters",
+      "cases": [
+        "protocols/context-manager",
+        "protocols/async-context-manager",
+        "runtime/try-suites"
+      ],
+      "integrations": []
+    },
+    {
+      "id": "modules-and-declarations",
+      "section": "Libraries and declarations",
+      "cases": [
+        "modules/"
+      ],
+      "integrations": [
+        "source-discovery",
+        "declaration-checking"
+      ]
+    },
+    {
+      "id": "diagnostic-contract",
+      "section": "Native editor behavior",
+      "cases": [
+        "diagnostics/",
+        "functions/argument-type-error",
+        "interfaces/missing-member"
+      ],
+      "integrations": [
+        "editor-protocol"
+      ]
+    },
+    {
+      "id": "hover-and-classification",
+      "section": "Native editor behavior",
+      "cases": [
+        "primitives/",
+        "interfaces/",
+        "classes/generic-constructor",
+        "descriptors/property"
+      ],
+      "integrations": [
+        "hover-documentation",
+        "editor-protocol"
+      ]
+    },
+    {
+      "id": "navigation-and-signatures",
+      "section": "Native editor behavior",
+      "cases": [
+        "editor/"
+      ],
+      "integrations": [
+        "editor-protocol"
+      ]
+    },
+    {
+      "id": "completion-contexts",
+      "section": "Native editor behavior",
+      "cases": [
+        "completions/",
+        "collections/fixed-tuple",
+        "types/attribute-item-separation"
+      ],
+      "integrations": [
+        "editor-protocol"
+      ]
+    },
+    {
+      "id": "contextual-string-completion",
+      "section": "Context-aware string completions",
+      "cases": [
+        "completions/string-argument",
+        "completions/string-keyword",
+        "completions/string-unfinished",
+        "completions/string-annotation",
+        "completions/string-prefix",
+        "completions/string-list",
+        "completions/string-return",
+        "completions/string-ordinary",
+        "completions/string-unknown-prefix"
+      ],
+      "integrations": [
+        "editor-protocol",
+        "completion-fallback"
+      ]
+    },
+    {
+      "id": "syntax-highlighting",
+      "section": "Native editor behavior",
+      "cases": [
+        "syntax/"
+      ],
+      "integrations": [
+        "language-icons",
+        "grammar-assets"
+      ]
+    },
+    {
+      "id": "position-preserving-projection",
+      "section": "Python ecosystem integration (initial implementation)",
+      "cases": [
+        "primitives/unicode",
+        "formatting/crlf"
+      ],
+      "integrations": [
+        "tooling-projection"
+      ]
+    },
+    {
+      "id": "python-ecosystem-provider-boundaries",
+      "section": "Python ecosystem integration (initial implementation)",
+      "cases": [],
+      "integrations": [
+        "python-tools",
+        "hover-documentation",
+        "completion-fallback",
+        "document-scope"
+      ]
+    },
+    {
+      "id": "python-declaration-bridge",
+      "section": "Python library declaration bridge: initial import path",
+      "cases": [],
+      "integrations": [
+        "declaration-importer",
+        "declaration-checking"
+      ]
+    },
+    {
+      "id": "cancellation-and-process-limits",
+      "section": "Language-server resource safety",
+      "cases": [],
+      "integrations": [
+        "request-lifecycle",
+        "server-launch",
+        "contained-server"
+      ]
+    },
+    {
+      "id": "incomplete-source-recovery",
+      "section": "Language-server resource safety",
+      "cases": [
+        "diagnostics/malformed-call",
+        "completions/string-unfinished"
+      ],
+      "integrations": [
+        "parser-recovery"
+      ]
+    },
+    {
+      "id": "snapshot-and-dependency-reuse",
+      "section": "Native program reuse and project discovery",
+      "cases": [],
+      "integrations": [
+        "program-snapshots",
+        "source-discovery"
+      ]
+    },
+    {
+      "id": "library-authoring",
+      "section": "Hover and standard-library follow-up (September 2026)",
+      "cases": [],
+      "integrations": [
+        "program-snapshots"
+      ]
+    },
+    {
+      "id": "preview-and-packaged-compiler",
+      "section": "Hands-on preview distribution",
+      "cases": [],
+      "integrations": [
+        "compiler-selection",
+        "installed-package"
+      ]
+    },
+    {
+      "id": "semantic-token-protocol",
+      "section": "Native editor behavior",
+      "cases": [
+        "primitives/unicode"
+      ],
+      "integrations": [
+        "contained-server",
+        "installed-package"
+      ],
+      "note": "Native classification and grammar fixtures run locally. Serialized full/range tokens and legend negotiation are verified by the explicit integration suites."
+    }
+  ],
+  "integrations": [
+    {
+      "id": "cli-emission",
+      "command": [
+        "go",
+        "test",
+        "./tsc/cmd/tsc",
+        "-run",
+        "^(TestCollectPythonInputsDiscoversImportedProjectDeclarations|TestCollectPythonInputsRejectsPythonFiles|TestPythonEmitSeparateTreeAndRepeatBuild|TestPythonEmitRejectsUnsafeTargets|TestPythonEmitInfersCommonSourceRoot)$",
+        "-count=1",
+        "-timeout=120s"
+      ],
+      "files": [
+        {
+          "path": "tsc/cmd/tsc/python_test.go",
+          "tests": [
+            "TestCollectPythonInputsDiscoversImportedProjectDeclarations",
+            "TestCollectPythonInputsRejectsPythonFiles",
+            "TestPythonEmitSeparateTreeAndRepeatBuild",
+            "TestPythonEmitRejectsUnsafeTargets",
+            "TestPythonEmitInfersCommonSourceRoot"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "source-discovery",
+      "command": [
+        "go",
+        "test",
+        "./tsc/internal/python",
+        "-run",
+        "^(TestGetFileKind|TestRelatedFileNames|TestProjectDiscoverySharesOverlaysDeclarationsAndCycles|TestProjectDiscoveryIgnoresPythonEntriesAndOverlays)$",
+        "-count=1",
+        "-timeout=120s"
+      ],
+      "files": [
+        {
+          "path": "tsc/internal/python/filekind_test.go",
+          "tests": [
+            "TestGetFileKind",
+            "TestRelatedFileNames"
+          ]
+        },
+        {
+          "path": "tsc/internal/python/project_sources_test.go",
+          "tests": [
+            "TestProjectDiscoverySharesOverlaysDeclarationsAndCycles",
+            "TestProjectDiscoveryIgnoresPythonEntriesAndOverlays"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "request-lifecycle",
+      "command": [
+        "go",
+        "test",
+        "./tsc/internal/lsp",
+        "-run",
+        "^(TestPythonRequestsCancelOnDocumentChange|TestPythonQueuedCancellationDoesNotStartChecking|TestPythonBuildHonorsInFlightCancellation)$",
+        "-count=1",
+        "-timeout=120s"
+      ],
+      "files": [
+        {
+          "path": "tsc/internal/lsp/python_request_lifecycle_test.go",
+          "tests": [
+            "TestPythonRequestsCancelOnDocumentChange",
+            "TestPythonQueuedCancellationDoesNotStartChecking",
+            "TestPythonBuildHonorsInFlightCancellation"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "program-snapshots",
+      "command": [
+        "go",
+        "test",
+        "./tsc/internal/lsp",
+        "-run",
+        "^(TestPythonLibraryAuthoringUsesEditedSource|TestPythonSnapshotReusesNativeCheckerUntilSourceChanges|TestPythonSnapshotTracksClosedImportsAndUnsavedOverlays|TestPythonLanguageServiceIgnoresPlainPythonDocuments|TestPythonSnapshotIsDiscardedAfterCancellation)$",
+        "-count=1",
+        "-timeout=120s"
+      ],
+      "files": [
+        {
+          "path": "tsc/internal/lsp/python_snapshot_test.go",
+          "tests": [
+            "TestPythonLibraryAuthoringUsesEditedSource",
+            "TestPythonSnapshotReusesNativeCheckerUntilSourceChanges",
+            "TestPythonSnapshotTracksClosedImportsAndUnsavedOverlays",
+            "TestPythonLanguageServiceIgnoresPlainPythonDocuments",
+            "TestPythonSnapshotIsDiscardedAfterCancellation"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "editor-protocol",
+      "command": [
+        "go",
+        "test",
+        "./tsc/internal/lsp",
+        "-run",
+        "^(TestPythonLSPAttributeInterfaceDefinition|TestPythonLSPAttributeCompletion|TestPythonLSPNamesTypesKeywordsAndSignatureHelp|TestPythonStringCompletionEdits|TestPythonLSPDecoratorCompletionsAndRanking)$",
+        "-count=1",
+        "-timeout=120s"
+      ],
+      "files": [
+        {
+          "path": "tsc/internal/lsp/python_completion_test.go",
+          "tests": [
+            "TestPythonLSPAttributeInterfaceDefinition",
+            "TestPythonLSPAttributeCompletion",
+            "TestPythonLSPNamesTypesKeywordsAndSignatureHelp"
+          ]
+        },
+        {
+          "path": "tsc/internal/lsp/python_string_completion_test.go",
+          "tests": [
+            "TestPythonStringCompletionEdits"
+          ]
+        },
+        {
+          "path": "tsc/internal/lsp/python_decorator_completion_test.go",
+          "tests": [
+            "TestPythonLSPDecoratorCompletionsAndRanking"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "tooling-projection",
+      "command": [
+        "go",
+        "test",
+        "./tsc/internal/python",
+        "-run",
+        "^(TestToolingProjectionPreservesUTF16Offsets|TestToolingProjectionOrdinaryPythonUnchanged)$",
+        "-count=1",
+        "-timeout=120s"
+      ],
+      "files": [
+        {
+          "path": "tsc/internal/python/tooling_projection_test.go",
+          "tests": [
+            "TestToolingProjectionPreservesUTF16Offsets",
+            "TestToolingProjectionOrdinaryPythonUnchanged"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "parser-recovery",
+      "command": [
+        "go",
+        "test",
+        "./tsc/internal/pyparser",
+        "-run",
+        "^(TestParseExpressions|TestParseStatements|TestParseStatementErrors|TestParseTerminates|TestParseDeclarations|TestParseDisplaysAndControlFlow|TestMappedTypeHasMemberList)$",
+        "-count=1",
+        "-timeout=120s"
+      ],
+      "files": [
+        {
+          "path": "tsc/internal/pyparser/statements_test.go",
+          "tests": [
+            "TestParseExpressions",
+            "TestParseStatements",
+            "TestParseStatementErrors",
+            "TestParseTerminates",
+            "TestParseDeclarations",
+            "TestParseDisplaysAndControlFlow",
+            "TestMappedTypeHasMemberList"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "declaration-checking",
+      "command": [
+        "go",
+        "test",
+        "./tsc/internal/python",
+        "-run",
+        "^(TestImportedPythonDeclarationsUseNativeChecking)$",
+        "-count=1",
+        "-timeout=120s"
+      ],
+      "files": [
+        {
+          "path": "tsc/internal/python/declaration_import_test.go",
+          "tests": [
+            "TestImportedPythonDeclarationsUseNativeChecking"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "formatter-process",
+      "command": [
+        "node",
+        "packages/vscode-tython/test/formatter.test.mjs"
+      ],
+      "files": [
+        {
+          "path": "packages/vscode-tython/test/formatter.test.mjs"
+        }
+      ]
+    },
+    {
+      "id": "formatter-provider",
+      "command": [
+        "node",
+        "packages/vscode-tython/test/formatterProvider.test.mjs"
+      ],
+      "files": [
+        {
+          "path": "packages/vscode-tython/test/formatterProvider.test.mjs"
+        }
+      ]
+    },
+    {
+      "id": "hover-documentation",
+      "command": [
+        "node",
+        "packages/vscode-tython/test/hoverLatency.test.mjs"
+      ],
+      "files": [
+        {
+          "path": "packages/vscode-tython/test/hoverLatency.test.mjs"
+        }
+      ]
+    },
+    {
+      "id": "completion-fallback",
+      "command": [
+        "node",
+        "packages/vscode-tython/test/completionFallback.test.mjs"
+      ],
+      "files": [
+        {
+          "path": "packages/vscode-tython/test/completionFallback.test.mjs"
+        }
+      ]
+    },
+    {
+      "id": "server-launch",
+      "command": [
+        "node",
+        "packages/vscode-tython/test/serverLaunch.test.mjs"
+      ],
+      "files": [
+        {
+          "path": "packages/vscode-tython/test/serverLaunch.test.mjs"
+        }
+      ]
+    },
+    {
+      "id": "compiler-selection",
+      "command": [
+        "node",
+        "packages/vscode-tython/test/compilerPath.test.mjs"
+      ],
+      "files": [
+        {
+          "path": "packages/vscode-tython/test/compilerPath.test.mjs"
+        }
+      ]
+    },
+    {
+      "id": "document-scope",
+      "command": [
+        "node",
+        "packages/vscode-tython/test/documentScope.test.mjs"
+      ],
+      "files": [
+        {
+          "path": "packages/vscode-tython/test/documentScope.test.mjs"
+        }
+      ]
+    },
+    {
+      "id": "language-icons",
+      "command": [
+        "node",
+        "packages/vscode-tython/test/icons.test.mjs"
+      ],
+      "files": [
+        {
+          "path": "packages/vscode-tython/test/icons.test.mjs"
+        }
+      ]
+    },
+    {
+      "id": "grammar-assets",
+      "command": [
+        "node",
+        "packages/vscode-tython/test/grammar.test.mjs"
+      ],
+      "files": [
+        {
+          "path": "packages/vscode-tython/test/grammar.test.mjs"
+        }
+      ]
+    },
+    {
+      "id": "python-tools",
+      "command": [
+        "node",
+        "packages/vscode-tython/test/pythonTools.test.mjs"
+      ],
+      "files": [
+        {
+          "path": "packages/vscode-tython/test/pythonTools.test.mjs"
+        }
+      ],
+      "manual": "Requires the pinned Jedi/Ruff environment; run npm run -w tython tools:prepare first."
+    },
+    {
+      "id": "declaration-importer",
+      "command": [
+        "node",
+        "packages/vscode-tython/test/declarations.test.mjs"
+      ],
+      "files": [
+        {
+          "path": "packages/vscode-tython/test/declarations.test.mjs"
+        }
+      ],
+      "manual": "Requires the Python tools environment. Real Pyright resolution additionally needs Linux containment and TYPED_PYTHON_TEST_TYPESERVER=1."
+    },
+    {
+      "id": "contained-server",
+      "command": [
+        "node",
+        "packages/vscode-tython/test/containedLsp.test.mjs"
+      ],
+      "files": [
+        {
+          "path": "packages/vscode-tython/test/containedLsp.test.mjs"
+        }
+      ],
+      "manual": "Requires Linux systemd containment, a built compiler/extension, and the Python tools environment."
+    },
+    {
+      "id": "installed-package",
+      "command": [
+        "node",
+        "packages/vscode-tython/test/packagedPreview.test.mjs"
+      ],
+      "files": [
+        {
+          "path": "packages/vscode-tython/test/packagedPreview.test.mjs"
+        }
+      ],
+      "manual": "Requires an extracted target-platform VSIX passed with --arg /path/to/extension; Linux desktop runs also require systemd containment."
+    }
+  ],
+  "deferred": [
+    "Complete standard-library coverage, automatic stub ingestion, and external dependency/version matrices.",
+    "Fine-grained per-module incremental checking, automatic dependency watching, project-wide refactors, and run/debug/test UI integration.",
+    "Runtime annotation projection, defer aliases, completion call rows, operator hover, and user-declared unique keys.",
+    "Exact collection slice shapes, spread type shapes, deeper metaclasses/descriptors, and unresolved kwargs/initializer contract decisions.",
+    "Selection formatting, complete Black syntax coverage, and string normalization.",
+    "Marketplace identity, publishing, and release-provenance repair are distribution work, not executable language features."
+  ]
+}

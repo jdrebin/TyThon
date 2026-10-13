@@ -1,0 +1,20 @@
+{
+  "description": "Item-only shapes expose their declared keys without claiming dictionary methods.",
+  "tags": [
+    "dictionaries"
+  ],
+  "source": [
+    "value: {\"id\": int}",
+    "result: int = value[\"id\"]"
+  ],
+  "diagnostics": [],
+  "completions": [
+    {
+      "kind": "attribute",
+      "expression": "value.co",
+      "exclude": [
+        "copy"
+      ]
+    }
+  ]
+}

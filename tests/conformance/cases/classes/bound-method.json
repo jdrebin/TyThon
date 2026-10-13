@@ -1,0 +1,13 @@
+{
+  "description": "Instance method calls bind the receiver.",
+  "tags": [
+    "classes"
+  ],
+  "source": [
+    "class Record:",
+    "    def echo(self, value: str) -> str:",
+    "        return value",
+    "result: str = Record().echo(\"Ada\")"
+  ],
+  "diagnostics": []
+}

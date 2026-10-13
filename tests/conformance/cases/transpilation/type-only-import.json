@@ -1,0 +1,17 @@
+{
+  "description": "Type-only imports require no runtime module.",
+  "tags": [
+    "transpilation"
+  ],
+  "source": [
+    "import type absent",
+    "print(\"ready\")"
+  ],
+  "transpile": {
+    "output": [
+      "                  ",
+      "print(\"ready\")"
+    ],
+    "stdout": "ready\n"
+  }
+}

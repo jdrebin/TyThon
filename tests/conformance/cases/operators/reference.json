@@ -1,0 +1,12 @@
+{
+  "description": "Const assertions preserve mutability of referenced objects.",
+  "tags": [
+    "operators"
+  ],
+  "source": [
+    "other = {\"name\": \"Ada\"}",
+    "value = {\"other\": other} as const",
+    "value[\"other\"][\"name\"] = \"Grace\""
+  ],
+  "diagnostics": []
+}

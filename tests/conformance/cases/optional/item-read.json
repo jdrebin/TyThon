@@ -1,0 +1,17 @@
+{
+  "description": "Optional item reads require evidence of presence.",
+  "tags": [
+    "optional"
+  ],
+  "source": [
+    "def read(row: {optional \"name\": str}):",
+    "    return row[\"name\"]"
+  ],
+  "diagnostics": [
+    {
+      "line": 1,
+      "kind": "type",
+      "messageContains": "may be absent"
+    }
+  ]
+}

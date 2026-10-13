@@ -1,0 +1,19 @@
+{
+  "description": "Dynamic attributes require an explicit structural contract.",
+  "tags": [
+    "classes"
+  ],
+  "source": [
+    "class Record:",
+    "    def __getattr__(self, name: str) -> int:",
+    "        return 1",
+    "value = Record().undeclared"
+  ],
+  "diagnostics": [
+    {
+      "line": 3,
+      "kind": "type",
+      "messageContains": "does not exist"
+    }
+  ]
+}

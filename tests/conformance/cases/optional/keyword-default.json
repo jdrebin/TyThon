@@ -1,0 +1,14 @@
+{
+  "description": "Optional keyword spreads can supply compatible defaulted parameters.",
+  "tags": [
+    "optional"
+  ],
+  "source": [
+    "type Payload = {optional \"name\": str}",
+    "def greet(name: str = \"Ada\") -> str:",
+    "    return name",
+    "def forward(payload: Payload) -> str:",
+    "    return greet(**payload)"
+  ],
+  "diagnostics": []
+}

@@ -1,0 +1,20 @@
+{
+  "description": "Conditional type calls resolve a matching branch.",
+  "tags": [
+    "types"
+  ],
+  "source": [
+    "type Choose(T) = str if T extends int else bool",
+    "value: Choose(int)"
+  ],
+  "diagnostics": [],
+  "hover": [
+    {
+      "at": {
+        "line": 1,
+        "text": "value"
+      },
+      "text": "(variable) value: str"
+    }
+  ]
+}

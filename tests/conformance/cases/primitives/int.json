@@ -1,0 +1,28 @@
+{
+  "description": "An annotated int retains its declared type and symbol identity.",
+  "tags": [
+    "primitives"
+  ],
+  "source": [
+    "value: int = 1"
+  ],
+  "diagnostics": [],
+  "hover": [
+    {
+      "at": {
+        "line": 0,
+        "text": "value"
+      },
+      "text": "(variable) value: int"
+    }
+  ],
+  "semantic": [
+    {
+      "at": {
+        "line": 0,
+        "text": "value"
+      },
+      "kind": "VariableDeclaration"
+    }
+  ]
+}

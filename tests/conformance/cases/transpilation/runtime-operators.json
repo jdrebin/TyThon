@@ -1,0 +1,16 @@
+{
+  "description": "Erasure preserves runtime tokens and source layout for runtime-operators.",
+  "tags": [
+    "transpilation"
+  ],
+  "source": [
+    "value = 1 + 2 * 3",
+    "valid = value > 0"
+  ],
+  "transpile": {
+    "output": [
+      "value = 1 + 2 * 3",
+      "valid = value > 0"
+    ]
+  }
+}

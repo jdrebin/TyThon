@@ -1,0 +1,14 @@
+{
+  "description": "Formatting preserves and consistently spaces type-import syntax.",
+  "tags": [
+    "formatting"
+  ],
+  "source": [
+    "from helpers import type Row"
+  ],
+  "formatting": {
+    "output": [
+      "from helpers import type Row"
+    ]
+  }
+}

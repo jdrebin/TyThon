@@ -1,0 +1,18 @@
+{
+  "description": "Calls validate argument types.",
+  "tags": [
+    "functions"
+  ],
+  "source": [
+    "def take(value: int) -> int:",
+    "    return value",
+    "take(\"wrong\")"
+  ],
+  "diagnostics": [
+    {
+      "line": 2,
+      "kind": "type",
+      "messageContains": "not assignable"
+    }
+  ]
+}

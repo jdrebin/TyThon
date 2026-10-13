@@ -1,0 +1,45 @@
+{
+  "description": "Tuple positions and protocol methods use separate completion surfaces.",
+  "tags": [
+    "collections"
+  ],
+  "source": [
+    "value = (1, \"a\")"
+  ],
+  "diagnostics": [],
+  "hover": [
+    {
+      "at": {
+        "line": 0,
+        "text": "value"
+      },
+      "text": "(variable) value: (1, \"a\")"
+    }
+  ],
+  "completions": [
+    {
+      "expression": "value.",
+      "kind": "attribute",
+      "include": [
+        "count",
+        "index"
+      ],
+      "exclude": [
+        "append",
+        "length",
+        "0",
+        "1"
+      ]
+    },
+    {
+      "expression": "value[",
+      "kind": "item",
+      "exact": [
+        "-2",
+        "-1",
+        "0",
+        "1"
+      ]
+    }
+  ]
+}

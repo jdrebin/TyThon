@@ -1,0 +1,19 @@
+{
+  "description": "An erased annotation-only class retains a valid Python suite.",
+  "tags": [
+    "transpilation"
+  ],
+  "source": [
+    "class Record:",
+    "    id: int",
+    "print(Record.__name__)"
+  ],
+  "transpile": {
+    "output": [
+      "class Record:",
+      "    ...    ",
+      "print(Record.__name__)"
+    ],
+    "stdout": "Record\n"
+  }
+}

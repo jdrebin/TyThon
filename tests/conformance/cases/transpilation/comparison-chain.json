@@ -1,0 +1,21 @@
+{
+  "description": "Comparison chains evaluate their shared middle operand once.",
+  "tags": [
+    "transpilation"
+  ],
+  "source": [
+    "def middle():",
+    "    print(\"called\")",
+    "    return 5",
+    "print(0 < middle() < 10)"
+  ],
+  "transpile": {
+    "output": [
+      "def middle():",
+      "    print(\"called\")",
+      "    return 5",
+      "print(0 < middle() < 10)"
+    ],
+    "stdout": "called\nTrue\n"
+  }
+}

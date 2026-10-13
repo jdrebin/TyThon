@@ -1,0 +1,15 @@
+{
+  "description": "Async iteration reads elements from async iterator protocols.",
+  "tags": [
+    "protocols"
+  ],
+  "source": [
+    "async def values() -> AsyncIterator<int>:",
+    "    yield 1",
+    "async def read() -> int:",
+    "    async for value in values():",
+    "        return value",
+    "    return 0"
+  ],
+  "diagnostics": []
+}

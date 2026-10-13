@@ -1679,6 +1679,13 @@ func (b *Binder) bindChildren(node *ast.Node) {
 		b.bindForInOrForOfStatement(node)
 	case ast.KindIfStatement:
 		b.bindIfStatement(node)
+	case ast.KindAssertStatement:
+		passed := b.createBranchLabel()
+		failed := b.createBranchLabel()
+		b.bindCondition(node.AsAssertStatement().Test, passed, failed)
+		b.currentFlow = b.finishFlowLabel(failed)
+		b.bind(node.AsAssertStatement().Message)
+		b.currentFlow = b.finishFlowLabel(passed)
 	case ast.KindReturnStatement:
 		b.bindReturnStatement(node)
 	case ast.KindThrowStatement:
@@ -2207,7 +2214,7 @@ func (b *Binder) maybeBindExpressionFlowIfCall(node *ast.Node) {
 	// A top level or comma expression call expression with a dotted function name and at least one argument
 	// is potentially an assertion and is therefore included in the control flow.
 	if ast.IsCallExpression(node) {
-		if node.Expression().Kind != ast.KindSuperKeyword && ast.IsDottedName(node.Expression()) {
+		if node.Expression().Kind != ast.KindSuperKeyword && (ast.IsDottedName(node.Expression()) || b.file.LanguageVariant == core.LanguageVariantPython && ast.IsPropertyAccessExpression(node.Expression()) && node.Expression().Name().Text() == "__init__") {
 			b.currentFlow = b.createFlowCall(b.currentFlow, node)
 		}
 	}

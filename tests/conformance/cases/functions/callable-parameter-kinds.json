@@ -1,0 +1,11 @@
+{
+  "description": "Callable types preserve positional-only and keyword-only parameters.",
+  "tags": [
+    "functions"
+  ],
+  "source": [
+    "callback: (value: str, /, *, strict: bool = ...) -> int",
+    "result: int = callback(\"Ada\", strict=True)"
+  ],
+  "diagnostics": []
+}

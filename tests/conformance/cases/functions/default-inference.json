@@ -1,0 +1,21 @@
+{
+  "description": "Unannotated parameters infer their type from defaults.",
+  "tags": [
+    "functions"
+  ],
+  "source": [
+    "def identity(value = \"Ada\"):",
+    "    return value",
+    "result = identity()"
+  ],
+  "diagnostics": [],
+  "hover": [
+    {
+      "at": {
+        "line": 2,
+        "text": "result"
+      },
+      "text": "(variable) result: str"
+    }
+  ]
+}

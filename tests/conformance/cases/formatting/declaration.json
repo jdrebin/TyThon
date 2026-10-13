@@ -1,0 +1,14 @@
+{
+  "description": "Pinned formatter output, idempotence, and editor edit correctness for declaration.",
+  "tags": [
+    "formatting"
+  ],
+  "source": [
+    "declare def greet(name:str)->str"
+  ],
+  "formatting": {
+    "output": [
+      "declare def greet(name: str) -> str"
+    ]
+  }
+}

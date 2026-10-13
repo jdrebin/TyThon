@@ -23,5 +23,7 @@ interface Generator<Y, S, R>:
     def __next__(self) -> Y
     def send(self, value: S) -> Y
 
+declare def super() -> object
+
 interface Awaitable<T>:
     def __await__(self) -> Iterator<T>

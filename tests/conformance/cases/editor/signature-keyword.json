@@ -1,0 +1,26 @@
+{
+  "description": "Signature help selects the parameter supplied by a keyword argument.",
+  "tags": [
+    "editor"
+  ],
+  "source": [
+    "def greet(name: str, count: int) -> str:",
+    "    return name",
+    "result = greet(\"Ada\", count=2)"
+  ],
+  "diagnostics": [],
+  "signatures": [
+    {
+      "at": {
+        "line": 2,
+        "text": "2"
+      },
+      "label": "(name: str, count: int) -> str",
+      "parameters": [
+        "name: str",
+        "count: int"
+      ],
+      "activeParameter": 1
+    }
+  ]
+}

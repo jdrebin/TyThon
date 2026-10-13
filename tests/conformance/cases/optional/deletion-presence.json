@@ -1,0 +1,20 @@
+{
+  "description": "Deleting an optional member invalidates its presence proof.",
+  "tags": [
+    "optional"
+  ],
+  "source": [
+    "type User = { optional \"name\": str | None, optional label: str }",
+    "def read(user: User):",
+    "    user.label = \"Ada\"",
+    "    del user.label",
+    "    return user.label"
+  ],
+  "diagnostics": [
+    {
+      "line": 4,
+      "kind": "type",
+      "messageContains": "may be absent"
+    }
+  ]
+}

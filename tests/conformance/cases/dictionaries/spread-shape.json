@@ -1,0 +1,13 @@
+{
+  "description": "Dictionary spread preserves the source key and value types.",
+  "tags": [
+    "dictionaries"
+  ],
+  "source": [
+    "base = {\"id\": 1}",
+    "value = {**base, \"name\": \"Ada\"}",
+    "id: int = value[\"id\"]",
+    "name: str = value[\"name\"]"
+  ],
+  "diagnostics": []
+}

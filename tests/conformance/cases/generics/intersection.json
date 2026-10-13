@@ -1,0 +1,13 @@
+{
+  "description": "Intersection shapes combine independent structural requirements.",
+  "tags": [
+    "generics"
+  ],
+  "source": [
+    "type Row = { \"id\": int } & { \"name\": str }",
+    "row: Row = {\"id\": 1, \"name\": \"Ada\"}",
+    "id: int = row[\"id\"]",
+    "name: str = row[\"name\"]"
+  ],
+  "diagnostics": []
+}

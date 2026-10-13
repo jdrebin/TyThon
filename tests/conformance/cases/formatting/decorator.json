@@ -1,0 +1,18 @@
+{
+  "description": "Formatting preserves and consistently spaces decorator syntax.",
+  "tags": [
+    "formatting"
+  ],
+  "source": [
+    "@identity",
+    "def read(value:int)->int:",
+    " return value"
+  ],
+  "formatting": {
+    "output": [
+      "@identity",
+      "def read(value: int) -> int:",
+      "    return value"
+    ]
+  }
+}

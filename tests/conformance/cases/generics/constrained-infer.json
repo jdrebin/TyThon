@@ -1,0 +1,18 @@
+{
+  "description": "Constrained tuple inference preserves the matched literal type.",
+  "tags": [
+    "generics"
+  ],
+  "source": [
+    "type Head(T) = U if T extends (infer U extends str, *()any) else never",
+    "value: Head((\"Ada\", int)) = \"Ada\"",
+    "other: Head((\"Ada\", int)) = \"Grace\""
+  ],
+  "diagnostics": [
+    {
+      "line": 2,
+      "kind": "type",
+      "messageContains": "not assignable"
+    }
+  ]
+}

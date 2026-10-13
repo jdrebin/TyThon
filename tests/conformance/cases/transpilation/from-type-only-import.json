@@ -1,0 +1,17 @@
+{
+  "description": "Type-only from imports erase the whole statement and require no runtime module.",
+  "tags": [
+    "transpilation"
+  ],
+  "source": [
+    "from absent import type Row",
+    "print(\"ready\")"
+  ],
+  "transpile": {
+    "output": [
+      "                           ",
+      "print(\"ready\")"
+    ],
+    "stdout": "ready\n"
+  }
+}

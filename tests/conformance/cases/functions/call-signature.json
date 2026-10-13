@@ -1,0 +1,50 @@
+{
+  "description": "An interface with an unnamed def describes a callable object.",
+  "tags": [
+    "functions"
+  ],
+  "source": [
+    "interface User:",
+    "    def(param: int) -> int",
+    "user: User",
+    "result: int = user(param=1)"
+  ],
+  "diagnostics": [],
+  "hover": [
+    {
+      "at": {
+        "line": 3,
+        "text": "result"
+      },
+      "text": "(variable) result: int"
+    }
+  ],
+  "semantic": [
+    {
+      "at": {
+        "line": 0,
+        "text": "User"
+      },
+      "kind": "InterfaceDeclaration"
+    },
+    {
+      "at": {
+        "line": 1,
+        "text": "param"
+      },
+      "kind": "Parameter"
+    }
+  ],
+  "syntax": [
+    {
+      "at": {
+        "line": 0,
+        "text": "interface"
+      },
+      "include": [
+        "storage.type.interface.tython"
+      ],
+      "exclude": []
+    }
+  ]
+}

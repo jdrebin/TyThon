@@ -1,0 +1,20 @@
+{
+  "description": "Typed keyword typeof uses its designated semantic scope.",
+  "tags": [
+    "syntax"
+  ],
+  "source": [
+    "type Constructor = typeof Record"
+  ],
+  "syntax": [
+    {
+      "at": {
+        "line": 0,
+        "text": "typeof"
+      },
+      "include": [
+        "keyword.operator.expression.typeof.tython"
+      ]
+    }
+  ]
+}

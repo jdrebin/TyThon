@@ -1,0 +1,21 @@
+{
+  "description": "Global and nonlocal directives resolve assignments in their declared scopes.",
+  "tags": [
+    "scope"
+  ],
+  "source": [
+    "value: str = \"Ada\"",
+    "def update() -> str:",
+    "    global value",
+    "    value = \"Grace\"",
+    "    return value",
+    "def outer() -> str:",
+    "    captured: str = \"Ada\"",
+    "    def inner() -> str:",
+    "        nonlocal captured",
+    "        captured = \"Grace\"",
+    "        return captured",
+    "    return inner()"
+  ],
+  "diagnostics": []
+}

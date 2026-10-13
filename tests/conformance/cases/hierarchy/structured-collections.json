@@ -1,0 +1,12 @@
+{
+  "description": "Object includes Python collection values.",
+  "tags": [
+    "hierarchy"
+  ],
+  "source": [
+    "sequence: Object = [1]",
+    "pair: Object = (1, 2)",
+    "mapping: Object = {\"id\": 1}"
+  ],
+  "diagnostics": []
+}

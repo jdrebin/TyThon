@@ -1,0 +1,24 @@
+{
+  "description": "Constructor arguments infer generic instance member types.",
+  "tags": [
+    "classes"
+  ],
+  "source": [
+    "class Box<T>:",
+    "    value: T",
+    "    def __init__(self, value: T):",
+    "        self.value = value",
+    "box = Box(\"Ada\")",
+    "result = box.value"
+  ],
+  "diagnostics": [],
+  "hover": [
+    {
+      "at": {
+        "line": 5,
+        "text": "result"
+      },
+      "text": "(variable) result: str"
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "description": "Pinned formatter output, idempotence, and editor edit correctness for dictionary.",
+  "tags": [
+    "formatting"
+  ],
+  "source": [
+    "value={\"id\":1,\"name\":\"Ada\"}"
+  ],
+  "formatting": {
+    "output": [
+      "value = {\"id\": 1, \"name\": \"Ada\"}"
+    ]
+  }
+}

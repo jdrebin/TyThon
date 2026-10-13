@@ -11,17 +11,13 @@ import (
 )
 
 // acceptedDemoDiagnostics are the diagnostics the demo trees are allowed to
-// produce. Remaining frontend gaps and Generator argument order are
-// listed here, along with intentional error fixtures. TestNativeDemoDiagnostics
+// produce. Remaining frontend gaps are listed here alongside intentional
+// error fixtures. TestNativeDemoDiagnostics
 // fails on any other diagnostic from those trees, and when one of these
 // disappears.
 var acceptedDemoDiagnostics = []string{
 	// Required fields without initializers or constructor assignments.
 	`vscode-extension-demo/advanced_classes.ty:56: Attribute 'marker' has no initializer and is not definitely assigned in __init__.`,
-	// Generator<Y, S, R> is still checked as TypeScript's Generator<Y, R, N>.
-	`vscode-extension-demo/advanced_async_and_generators.ty:32: Type 'boolean' is not assignable to type 'string'.`,
-	`vscode-extension-demo/advanced_async_and_generators.ty:34: Type 'boolean' is not assignable to type 'string'.`,
-	`vscode-extension-demo/diagnostic_gallery.ty:39: A function whose declared type is neither 'undefined', 'void', nor 'any' must return a value.`,
 
 	// @overload is parked, so an unannotated implementation trips noImplicitAny.
 	`vscode-extension-demo/frontier_bytes_overload.ty:13: Parameter 'value' implicitly has an 'any' type.`,
@@ -45,10 +41,6 @@ var acceptedDemoDiagnostics = []string{
 	// demo_catalog.d.ty is produced by the import command, not checked in.
 	`vscode-extension-demo/python-library/consumer.ty:4: Cannot find module 'demo_catalog' or its corresponding type declarations.`,
 
-	// value_hierarchy.ty rejects these on purpose.
-	`vscode-extension-demo/value_hierarchy.ty:6: Type 'null' is not assignable to type '{}'.`,
-	`vscode-extension-demo/value_hierarchy.ty:7: Conversion of type 'boolean' to type 'bigint' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.`,
-
 	// expected_errors.ty: the bad object, the missing key, the bad default, and
 	// the bad annotation.
 	`packages/vscode-tython/preview/negative/expected_errors.ty:3: Type '{ [x: "id"]: string; }' is not assignable to type '{ [x: "id"]: bigint; }'.`,
@@ -58,9 +50,8 @@ var acceptedDemoDiagnostics = []string{
 }
 
 // TestNativeDemoDiagnostics checks each demo tree as one program, the same
-// way the editor does. Unexpected diagnostics fail. Add a regression in
-// regressions_test.go for each one, then delete it from the failure list by
-// fixing the checker.
+// way the editor does. Unexpected diagnostics fail. Intended language behavior
+// belongs in the feature fixtures under tests/conformance/cases.
 func TestNativeDemoDiagnostics(t *testing.T) {
 	root := repoRoot(t)
 	var got []string

@@ -1,0 +1,28 @@
+{
+  "description": "An annotated None retains its declared type and symbol identity.",
+  "tags": [
+    "primitives"
+  ],
+  "source": [
+    "value: None = None"
+  ],
+  "diagnostics": [],
+  "hover": [
+    {
+      "at": {
+        "line": 0,
+        "text": "value"
+      },
+      "text": "(variable) value: None"
+    }
+  ],
+  "semantic": [
+    {
+      "at": {
+        "line": 0,
+        "text": "value"
+      },
+      "kind": "VariableDeclaration"
+    }
+  ]
+}

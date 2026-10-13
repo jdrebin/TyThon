@@ -1,0 +1,14 @@
+{
+  "description": "Pinned formatter output, idempotence, and editor edit correctness for type-alias.",
+  "tags": [
+    "formatting"
+  ],
+  "source": [
+    "type Names=[]str"
+  ],
+  "formatting": {
+    "output": [
+      "type Names = []str"
+    ]
+  }
+}

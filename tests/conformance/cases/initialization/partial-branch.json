@@ -1,0 +1,20 @@
+{
+  "description": "A field assigned in only one constructor branch remains possibly uninitialized.",
+  "tags": [
+    "initialization"
+  ],
+  "source": [
+    "class Record:",
+    "    id: str",
+    "    def __init__(self, flag: bool):",
+    "        if flag:",
+    "            self.id = \"Ada\""
+  ],
+  "diagnostics": [
+    {
+      "line": 1,
+      "kind": "type",
+      "messageContains": "not definitely assigned"
+    }
+  ]
+}

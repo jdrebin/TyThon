@@ -1,0 +1,12 @@
+{
+  "description": "Object accepts class instances with structural members.",
+  "tags": [
+    "hierarchy"
+  ],
+  "source": [
+    "class Record:",
+    "    id = 1",
+    "value: Object = Record()"
+  ],
+  "diagnostics": []
+}

@@ -1,0 +1,31 @@
+{
+  "description": "Call signatures can overload by argument type.",
+  "tags": [
+    "functions"
+  ],
+  "source": [
+    "interface Convert:",
+    "    def(value: int) -> int",
+    "    def(value: str) -> str",
+    "convert: Convert",
+    "number: int = convert(1)",
+    "text: str = convert(\"ok\")"
+  ],
+  "diagnostics": [],
+  "hover": [
+    {
+      "at": {
+        "line": 4,
+        "text": "number"
+      },
+      "text": "(variable) number: int"
+    },
+    {
+      "at": {
+        "line": 5,
+        "text": "text"
+      },
+      "text": "(variable) text: str"
+    }
+  ]
+}

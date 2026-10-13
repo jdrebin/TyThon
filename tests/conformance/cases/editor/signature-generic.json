@@ -1,0 +1,25 @@
+{
+  "description": "Signature help presents the instantiated generic signature.",
+  "tags": [
+    "editor"
+  ],
+  "source": [
+    "def identity<T>(value: T) -> T:",
+    "    return value",
+    "result = identity(\"Ada\")"
+  ],
+  "diagnostics": [],
+  "signatures": [
+    {
+      "at": {
+        "line": 2,
+        "text": "\"Ada\""
+      },
+      "label": "(value: \"Ada\") -> \"Ada\"",
+      "parameters": [
+        "value: \"Ada\""
+      ],
+      "activeParameter": 0
+    }
+  ]
+}

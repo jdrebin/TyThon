@@ -1,0 +1,34 @@
+{
+  "description": "Presence assertions and inequality have distinct token scopes.",
+  "tags": [
+    "syntax"
+  ],
+  "source": [
+    "value = user.name!",
+    "valid = value != None"
+  ],
+  "syntax": [
+    {
+      "at": {
+        "line": 0,
+        "text": "!"
+      },
+      "include": [
+        "keyword.operator.presence.tython"
+      ],
+      "exclude": []
+    },
+    {
+      "at": {
+        "line": 1,
+        "text": "!="
+      },
+      "include": [
+        "keyword.operator.comparison.python"
+      ],
+      "exclude": [
+        "keyword.operator.presence.tython"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "description": "Overload declarations select the signature matching the call arguments.",
+  "tags": [
+    "functions"
+  ],
+  "source": [
+    "@overload",
+    "def select(value: str) -> str: ...",
+    "@overload",
+    "def select(value: int) -> int: ...",
+    "def select(value: str | int) -> str | int:",
+    "    return value",
+    "text: str = select(\"Ada\")",
+    "number: int = select(1)"
+  ],
+  "diagnostics": []
+}

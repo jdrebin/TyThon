@@ -1,0 +1,14 @@
+{
+  "description": "Formatting preserves and consistently spaces mapped syntax.",
+  "tags": [
+    "formatting"
+  ],
+  "source": [
+    "type Copy(T)={(K):T[K] for K in keyof T}"
+  ],
+  "formatting": {
+    "output": [
+      "type Copy(T) = {(K): T[K] for K in keyof T}"
+    ]
+  }
+}

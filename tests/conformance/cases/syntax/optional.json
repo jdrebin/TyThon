@@ -1,0 +1,31 @@
+{
+  "description": "Optional is contextual: a modifier in a type, an ordinary variable elsewhere.",
+  "tags": [
+    "syntax"
+  ],
+  "source": [
+    "type Patch = { optional name: str }",
+    "optional = 1"
+  ],
+  "syntax": [
+    {
+      "at": {
+        "line": 0,
+        "text": "optional"
+      },
+      "include": [
+        "storage.modifier.tython"
+      ],
+      "exclude": []
+    },
+    {
+      "at": {
+        "line": 1,
+        "text": "optional"
+      },
+      "exclude": [
+        "storage.modifier.tython"
+      ]
+    }
+  ]
+}

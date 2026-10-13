@@ -1,0 +1,14 @@
+{
+  "description": "Pinned formatter output, idempotence, and editor edit correctness for tuple.",
+  "tags": [
+    "formatting"
+  ],
+  "source": [
+    "value=(1,\"a\")"
+  ],
+  "formatting": {
+    "output": [
+      "value = (1, \"a\")"
+    ]
+  }
+}

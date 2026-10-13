@@ -1,0 +1,12 @@
+{
+  "description": "Homomorphic mapping preserves optional members.",
+  "tags": [
+    "optional"
+  ],
+  "source": [
+    "type User = { optional \"name\": str | None, optional label: str }",
+    "type Copy(T) = { (K): T[K] for K in keyof T }",
+    "value: Copy(User) = {}"
+  ],
+  "diagnostics": []
+}

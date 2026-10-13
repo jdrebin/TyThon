@@ -1,0 +1,14 @@
+{
+  "description": "Type-level attribute access follows specialization and utility application.",
+  "tags": [
+    "keys"
+  ],
+  "source": [
+    "interface Box<T>:",
+    "    value: T",
+    "type User(T) = { name: T }",
+    "first: Box<str>.value = \"Ada\"",
+    "second: User(int).name = 12"
+  ],
+  "diagnostics": []
+}

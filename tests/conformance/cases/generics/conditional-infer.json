@@ -1,0 +1,13 @@
+{
+  "description": "Conditional inference extracts the type argument of an interface.",
+  "tags": [
+    "generics"
+  ],
+  "source": [
+    "interface Box<T>:",
+    "    value: T",
+    "type Unbox(T) = U if T extends Box<infer U> else never",
+    "value: Unbox(Box<str>) = \"Ada\""
+  ],
+  "diagnostics": []
+}

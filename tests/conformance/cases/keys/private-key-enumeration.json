@@ -1,0 +1,12 @@
+{
+  "description": "The attribute-key interface exposes no public keys.",
+  "tags": [
+    "keys"
+  ],
+  "source": [
+    "type Empty = keyof *",
+    "def impossible(value: Empty) -> never:",
+    "    return value"
+  ],
+  "diagnostics": []
+}

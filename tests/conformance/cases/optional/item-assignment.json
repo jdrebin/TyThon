@@ -1,0 +1,12 @@
+{
+  "description": "Assigning an optional item establishes presence for subsequent reads.",
+  "tags": [
+    "optional"
+  ],
+  "source": [
+    "def read(row: {optional \"name\": str}):",
+    "    row[\"name\"] = \"Ada\"",
+    "    return row[\"name\"]"
+  ],
+  "diagnostics": []
+}

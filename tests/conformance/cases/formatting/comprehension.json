@@ -1,0 +1,14 @@
+{
+  "description": "Formatting preserves and consistently spaces comprehension syntax.",
+  "tags": [
+    "formatting"
+  ],
+  "source": [
+    "values=[x for x in [1,2] if x>0]"
+  ],
+  "formatting": {
+    "output": [
+      "values = [x for x in [1, 2] if x > 0]"
+    ]
+  }
+}

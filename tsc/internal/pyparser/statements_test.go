@@ -40,6 +40,7 @@ func TestParseExpressions(t *testing.T) {
 		{"not a == b\n", "(ExpressionStatement (PrefixUnaryExpression (BinaryExpression `a` EqualsEqualsToken `b`)))"},
 		{"a // b % c\n", "(ExpressionStatement (BinaryExpression (BinaryExpression `a` SlashSlashToken `b`) PercentToken `c`))"},
 		{"a >= b >> 2\n", "(ExpressionStatement (BinaryExpression `a` GreaterThanEqualsToken (BinaryExpression `b` GreaterThanGreaterThanToken 2)))"},
+		{"a < b < c\n", "(ExpressionStatement (BinaryExpression (BinaryExpression `a` LessThanToken `b`) LessThanToken `c`))"},
 		{"a is b\n", "(ExpressionStatement (BinaryExpression `a` IsKeyword `b`))"},
 		{"a in b\n", "(ExpressionStatement (BinaryExpression `a` InKeyword `b`))"},
 		// Postfix.
@@ -118,7 +119,7 @@ func TestParseStatementErrors(t *testing.T) {
 		"class :\n    pass\n",
 		"def f():\npass\n",
 		"x = 1 2\n",
-		"a < b < c\n",
+		"a < b <\n",
 		"f(\n",
 	} {
 		t.Run(src, func(t *testing.T) {

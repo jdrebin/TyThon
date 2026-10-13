@@ -1,0 +1,18 @@
+{
+  "description": "Filtering every key yields an empty member requirement.",
+  "tags": [
+    "mapped"
+  ],
+  "source": [
+    "type Items(T) = { (K): T[K] for K in keyof T if K extends str }",
+    "value: Items({ attr: int }) = {}"
+  ],
+  "diagnostics": [],
+  "completions": [
+    {
+      "kind": "item",
+      "expression": "value[",
+      "exact": []
+    }
+  ]
+}

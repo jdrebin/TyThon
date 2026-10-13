@@ -1,0 +1,22 @@
+{
+  "description": "Keyword argument completion follows declared parameter names.",
+  "tags": [
+    "functions"
+  ],
+  "source": [
+    "def greet(name: str, *, loud: bool = False) -> str:",
+    "    return name"
+  ],
+  "diagnostics": [],
+  "completions": [
+    {
+      "expression": "greet(",
+      "kind": "keyword",
+      "include": [
+        "name",
+        "loud"
+      ],
+      "exclude": []
+    }
+  ]
+}

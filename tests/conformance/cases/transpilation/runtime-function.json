@@ -1,0 +1,9 @@
+{
+  "description": "Erased parameter and return annotations preserve function execution.",
+  "tags": ["transpilation", "runtime", "functions"],
+  "source": ["def twice(value: int) -> int:", "    return value * 2", "print(twice(21))"],
+  "transpile": {
+    "output": ["def twice(value     )       :", "    return value * 2", "print(twice(21))"],
+    "stdout": "42\n"
+  }
+}

@@ -1,0 +1,35 @@
+{
+  "description": "Erasure preserves top-down decorator evaluation and bottom-up application.",
+  "tags": [
+    "transpilation"
+  ],
+  "source": [
+    "def factory(name):",
+    "    print(\"evaluate\", name)",
+    "    def decorate(value):",
+    "        print(\"apply\", name)",
+    "        return value",
+    "    return decorate",
+    "@factory(\"outer\")",
+    "@factory(\"inner\")",
+    "def answer() -> int:",
+    "    return 42",
+    "print(answer())"
+  ],
+  "transpile": {
+    "output": [
+      "def factory(name):",
+      "    print(\"evaluate\", name)",
+      "    def decorate(value):",
+      "        print(\"apply\", name)",
+      "        return value",
+      "    return decorate",
+      "@factory(\"outer\")",
+      "@factory(\"inner\")",
+      "def answer()       :",
+      "    return 42",
+      "print(answer())"
+    ],
+    "stdout": "evaluate outer\nevaluate inner\napply inner\napply outer\n42\n"
+  }
+}

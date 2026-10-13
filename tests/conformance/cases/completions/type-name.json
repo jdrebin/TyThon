@@ -1,0 +1,7 @@
+{
+  "description": "Annotation completion offers matching interface names.",
+  "tags": ["completions", "types"],
+  "source": ["interface User:", "    name: str", "interface Account:", "    id: int"],
+  "diagnostics": [],
+  "completions": [{"kind": "type", "expression": "value: Us", "include": ["User"], "exclude": ["Account"]}]
+}

@@ -1,0 +1,21 @@
+{
+  "description": "Multiple interface bases must agree on inherited member contracts.",
+  "tags": [
+    "classes"
+  ],
+  "source": [
+    "interface Left:",
+    "    id: int",
+    "interface Right:",
+    "    id: str",
+    "interface Combined(Left, Right):",
+    "    name: str"
+  ],
+  "diagnostics": [
+    {
+      "line": 4,
+      "kind": "type",
+      "messageContains": "simultaneously extend"
+    }
+  ]
+}

@@ -1,0 +1,10 @@
+{
+  "description": "Bytes literals retain their byte identity.",
+  "tags": [
+    "hierarchy"
+  ],
+  "source": [
+    "value: bytes = b\"Ada\""
+  ],
+  "diagnostics": []
+}

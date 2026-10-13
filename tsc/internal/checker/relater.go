@@ -210,6 +210,9 @@ func (c *Checker) isTypeRelatedTo(source *Type, target *Type, relation *Relation
 func (c *Checker) isSimpleTypeRelatedTo(source *Type, target *Type, relation *Relation, errorReporter ErrorReporter) bool {
 	s := source.flags
 	t := target.flags
+	if c.pythonValueHierarchy != nil && target == c.emptyTypeLiteralType && relation != c.identityRelation {
+		return true
+	}
 	if t&TypeFlagsAny != 0 || s&TypeFlagsNever != 0 || source == c.wildcardType {
 		return true
 	}
@@ -2151,7 +2154,7 @@ func (c *Checker) createTypePredicateFromTypePredicateNode(node *ast.Node, signa
 	if predicateNode.Type != nil {
 		t = c.getTypeFromTypeNode(predicateNode.Type)
 	}
-	if ast.IsThisTypeNode(predicateNode.ParameterName) {
+	if ast.IsThisTypeNode(predicateNode.ParameterName) || signature.thisParameter != nil && predicateNode.ParameterName.Text() == signature.thisParameter.Name {
 		kind := core.IfElse(predicateNode.AssertsModifier != nil, TypePredicateKindAssertsThis, TypePredicateKindThis)
 		return c.newTypePredicate(kind, "" /*parameterName*/, 0 /*parameterIndex*/, t)
 	}
@@ -3913,6 +3916,9 @@ func (r *Relater) structuredTypeRelatedToWorker(source *Type, target *Type, repo
 		if r.relation != r.c.identityRelation {
 			// Supply implicit Python value bases on the source side only. A
 			// structural target shape must not acquire extra nominal requirements.
+			if r.c.isArrayOrTupleType(source) && r.c.isPythonMarkerOnlyType(target) {
+				source = r.c.pythonSequenceInstance(source)
+			}
 			source = r.c.pythonValueApparentType(source, r.c.getApparentType(source))
 		} else if r.c.isGenericMappedType(source) {
 			return TernaryFalse

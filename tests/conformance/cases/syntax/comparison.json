@@ -1,0 +1,23 @@
+{
+  "description": "Runtime angle brackets remain comparison operators.",
+  "tags": [
+    "syntax"
+  ],
+  "source": [
+    "value = left < middle > right"
+  ],
+  "syntax": [
+    {
+      "at": {
+        "line": 0,
+        "text": "<"
+      },
+      "include": [
+        "keyword.operator.comparison.python"
+      ],
+      "exclude": [
+        "punctuation.definition.typeparameters.begin.tython"
+      ]
+    }
+  ]
+}

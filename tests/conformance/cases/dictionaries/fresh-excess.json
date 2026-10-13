@@ -1,0 +1,17 @@
+{
+  "description": "Fresh dictionary arguments enforce excess-property checks.",
+  "tags": [
+    "dictionaries"
+  ],
+  "source": [
+    "declare def consume(value: {\"id\": int}) -> None",
+    "consume({\"id\": 1, \"extra\": 2})"
+  ],
+  "diagnostics": [
+    {
+      "line": 1,
+      "kind": "type",
+      "messageContains": "extra"
+    }
+  ]
+}

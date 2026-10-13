@@ -1,0 +1,13 @@
+{
+  "description": "Assignments narrow a union while preserving its declared assignment domain.",
+  "tags": [
+    "flow"
+  ],
+  "source": [
+    "value: str | int = \"Ada\"",
+    "text: str = value",
+    "value = 12",
+    "number: int = value"
+  ],
+  "diagnostics": []
+}

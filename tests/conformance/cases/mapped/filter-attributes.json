@@ -1,0 +1,28 @@
+{
+  "description": "A mapped filter selects attribute keys.",
+  "tags": [
+    "mapped"
+  ],
+  "source": [
+    "type Attributes(T) = { (K): T[K] for K in keyof T if K extends * }",
+    "value: Attributes({ id: int, \"name\": str })",
+    "result = value.id"
+  ],
+  "diagnostics": [],
+  "hover": [
+    {
+      "at": {
+        "line": 2,
+        "text": "result"
+      },
+      "text": "(variable) result: int"
+    }
+  ],
+  "completions": [
+    {
+      "kind": "item",
+      "expression": "value[",
+      "exact": []
+    }
+  ]
+}

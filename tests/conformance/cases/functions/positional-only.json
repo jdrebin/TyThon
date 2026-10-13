@@ -1,0 +1,23 @@
+{
+  "description": "Positional-only parameters are excluded from keyword completion.",
+  "tags": [
+    "functions"
+  ],
+  "source": [
+    "def greet(name: str, /, *, loud: bool = False) -> str:",
+    "    return name"
+  ],
+  "diagnostics": [],
+  "completions": [
+    {
+      "expression": "greet(",
+      "kind": "keyword",
+      "include": [
+        "loud"
+      ],
+      "exclude": [
+        "name"
+      ]
+    }
+  ]
+}

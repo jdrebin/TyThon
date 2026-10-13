@@ -1,0 +1,23 @@
+{
+  "description": "Type keywords in strings retain string scopes.",
+  "tags": [
+    "syntax"
+  ],
+  "source": [
+    "value = \"interface User type Name\""
+  ],
+  "syntax": [
+    {
+      "at": {
+        "line": 0,
+        "text": "interface User type Name"
+      },
+      "include": [
+        "string.quoted.single.python"
+      ],
+      "exclude": [
+        "storage.type.interface.tython"
+      ]
+    }
+  ]
+}

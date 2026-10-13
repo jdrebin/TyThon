@@ -1,0 +1,25 @@
+{
+  "description": "Imported declarations supply hover and argument checking.",
+  "tags": [
+    "modules"
+  ],
+  "source": [
+    "from helpers import greet",
+    "result: str = greet(\"Ada\")"
+  ],
+  "files": {
+    "helpers.d.ty": [
+      "declare def greet(name: str) -> str"
+    ]
+  },
+  "diagnostics": [],
+  "hover": [
+    {
+      "at": {
+        "line": 1,
+        "text": "result"
+      },
+      "text": "(variable) result: str"
+    }
+  ]
+}

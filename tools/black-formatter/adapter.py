@@ -39,7 +39,8 @@ token.tok_name[181] = "TY_ANNOTATION_COLON"
 REPLACEMENTS = {
     "type_stmt:": "type_stmt: \"type\" NAME ['(' [ty_typeparams] ')'] '=' ty_test",
     "typeparams:": "typeparams: '[' typeparam (',' typeparam)* [','] ']' | TY_LANGLE ty_typeparams '>'",
-    "funcdef:": "funcdef: 'def' NAME [typeparams] parameters ['->' ty_test] (':' suite | NEWLINE)",
+    "funcdef:": "funcdef: 'def' [NAME] [typeparams] parameters ['->' ty_test] (':' suite | NEWLINE)",
+    "import_as_name:": 'import_as_name: ["type"] NAME [\'as\' NAME]',
     "tname:": "tname: NAME [':' ty_test]",
     "tname_star:": "tname_star: NAME [':' ty_test]",
     "annassign:": "annassign: ':' ty_test ['=' (yield_expr|testlist_star_expr)]",
@@ -69,7 +70,7 @@ ty_atom: (NAME | NUMBER | STRING+ | fstring | '.' '.' '.' | '*' [ty_primary] |
 ty_arglist: ty_argument (',' ty_argument)* [',']
 ty_argument: ty_test [':' ty_test] ['=' test]
 ty_members: ty_member (ty_comp_for | (',' ty_member)* [','])
-ty_member: ["readonly"] ["optional" | '-' "optional"] ty_test ':' ty_test | 'def' NAME [typeparams] parameters '->' ty_test
+ty_member: ["readonly"] ["optional" | '-' "optional"] ty_test ':' ty_test | 'def' [NAME] [typeparams] parameters '->' ty_test
 ty_comp_for: 'for' NAME 'in' ty_union ['if' ty_union "extends" ty_union]
 ty_generic_callable: ty_callable_typeparams parameters '->' ty_test
 ty_callable_typeparams: TY_LANGLE ty_typeparams '>'
@@ -125,6 +126,7 @@ def classify(self, kind, value, context):
         "extends",
         "satisfies",
         "const",
+        "type",
     }:
         return [self.grammar.tokens[token.NAME], self.grammar.soft_keywords[value]]
     return _classify(self, kind, value, context)
@@ -139,6 +141,11 @@ import black.linegen
 import black.parsing
 from black.nodes import syms, preceding_leaf
 from blib2to3.pytree import Node
+
+_is_class = black.lines.Line.is_class.fget
+black.lines.Line.is_class = property(
+    lambda line: _is_class(line) or bool(line) and line.leaves[0].value == "interface"
+)
 
 assert (
     black.__version__ == "26.5.1"

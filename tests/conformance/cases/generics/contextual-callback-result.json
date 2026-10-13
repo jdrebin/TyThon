@@ -1,0 +1,17 @@
+{
+  "description": "Contextual generic callbacks retain their inferred result type in assignments.",
+  "tags": [
+    "generics"
+  ],
+  "source": [
+    "declare def apply<T, U>(value: T, fn: (item: T) -> U) -> U",
+    "result: str = apply(1, lambda item: item)"
+  ],
+  "diagnostics": [
+    {
+      "line": 1,
+      "kind": "type",
+      "messageContains": "not assignable"
+    }
+  ]
+}

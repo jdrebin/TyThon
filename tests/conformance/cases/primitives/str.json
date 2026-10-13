@@ -1,0 +1,28 @@
+{
+  "description": "An annotated str retains its declared type and symbol identity.",
+  "tags": [
+    "primitives"
+  ],
+  "source": [
+    "value: str = \"hello\""
+  ],
+  "diagnostics": [],
+  "hover": [
+    {
+      "at": {
+        "line": 0,
+        "text": "value"
+      },
+      "text": "(variable) value: str"
+    }
+  ],
+  "semantic": [
+    {
+      "at": {
+        "line": 0,
+        "text": "value"
+      },
+      "kind": "VariableDeclaration"
+    }
+  ]
+}

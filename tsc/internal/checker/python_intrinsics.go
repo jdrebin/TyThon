@@ -68,5 +68,9 @@ func (c *Checker) pythonIntrinsicTypeOfAlias(symbol *ast.Symbol) *Type {
 		uniqueType = c.newUniqueESSymbolType(symbol, b.String())
 		c.uniqueESSymbolTypes[symbol] = uniqueType
 	}
+	if c.pythonPrivateTypeKeys == nil {
+		c.pythonPrivateTypeKeys = make(map[string]*Type)
+	}
+	c.pythonPrivateTypeKeys[symbol.Name] = uniqueType
 	return uniqueType
 }

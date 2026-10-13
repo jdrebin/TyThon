@@ -1,0 +1,20 @@
+{
+  "description": "Typed keyword keyof uses its designated semantic scope.",
+  "tags": [
+    "syntax"
+  ],
+  "source": [
+    "type Keys = keyof {id: int}"
+  ],
+  "syntax": [
+    {
+      "at": {
+        "line": 0,
+        "text": "keyof"
+      },
+      "include": [
+        "keyword.operator.expression.keyof.tython"
+      ]
+    }
+  ]
+}

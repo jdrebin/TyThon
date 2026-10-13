@@ -1,0 +1,12 @@
+{
+  "description": "Removing optionality preserves explicit None in the member value.",
+  "tags": [
+    "optional"
+  ],
+  "source": [
+    "type Required(T) = { -optional (K): T[K] for K in keyof T }",
+    "value: Required({optional \"name\": str | None}) = {\"name\": None}",
+    "result: str | None = value[\"name\"]"
+  ],
+  "diagnostics": []
+}

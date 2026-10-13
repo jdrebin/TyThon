@@ -1,0 +1,18 @@
+{
+  "description": "Required call arguments cannot be omitted.",
+  "tags": [
+    "functions"
+  ],
+  "source": [
+    "def take(value: int) -> int:",
+    "    return value",
+    "take()"
+  ],
+  "diagnostics": [
+    {
+      "line": 2,
+      "kind": "type",
+      "messageContains": "Expected 1 arguments, but got 0."
+    }
+  ]
+}

@@ -101,7 +101,7 @@ func TestParseType(t *testing.T) {
 		{"(int,)", "(TypeOperator (TupleType (TypeReference `int`)))"},
 		{"(int, str)", "(TypeOperator (TupleType (TypeReference `int`) (TypeReference `str`)))"},
 		{"()", "(TypeOperator TupleType)"},
-		{"() int", "(TypeOperator (ArrayType (TypeReference `int`)))"},
+		{"() int", "(TypeOperator (TupleType (RestType (ArrayType (TypeReference `int`)))))"},
 		{"[int, str]", "(TupleType (TypeReference `int`) (TypeReference `str`))"},
 		{"[]", "TupleType"},
 		{"[] int", "(ArrayType (TypeReference `int`))"},
@@ -174,23 +174,23 @@ func TestParseMappingTypes(t *testing.T) {
 		},
 		{
 			"{K: T[K] for K in keyof T}",
-			"(MappedType (TypeParameter `K` (TypeOperator (TypeReference `T`))) (TypeReference `K`) (IndexedAccessType (TypeReference `T`) (TypeReference `K`)))",
+			"(MappedType (TypeParameter `K` (TypeOperator (TypeReference `T`))) (TypeReference `*` (LiteralType 'K')) (IndexedAccessType (TypeReference `T`) (TypeReference `K`)))",
 		},
 		{
 			"{readonly K: T[K] for K in keyof T}",
-			"(MappedType ReadonlyKeyword (TypeParameter `K` (TypeOperator (TypeReference `T`))) (TypeReference `K`) (IndexedAccessType (TypeReference `T`) (TypeReference `K`)))",
+			"(MappedType ReadonlyKeyword (TypeParameter `K` (TypeOperator (TypeReference `T`))) (TypeReference `*` (LiteralType 'K')) (IndexedAccessType (TypeReference `T`) (TypeReference `K`)))",
 		},
 		{
 			"{optional K: T[K] for K in keyof T}",
-			"(MappedType (TypeParameter `K` (TypeOperator (TypeReference `T`))) (TypeReference `K`) QuestionToken (IndexedAccessType (TypeReference `T`) (TypeReference `K`)))",
+			"(MappedType (TypeParameter `K` (TypeOperator (TypeReference `T`))) (TypeReference `*` (LiteralType 'K')) QuestionToken (IndexedAccessType (TypeReference `T`) (TypeReference `K`)))",
 		},
 		{
 			"{-optional K: T[K] for K in keyof T}",
-			"(MappedType (TypeParameter `K` (TypeOperator (TypeReference `T`))) (TypeReference `K`) MinusToken (IndexedAccessType (TypeReference `T`) (TypeReference `K`)))",
+			"(MappedType (TypeParameter `K` (TypeOperator (TypeReference `T`))) (TypeReference `*` (LiteralType 'K')) MinusToken (IndexedAccessType (TypeReference `T`) (TypeReference `K`)))",
 		},
 		{
 			"{K: T[K] for K in keyof T if K extends str}",
-			"(MappedType (TypeParameter `K` (TypeOperator (TypeReference `T`))) (ConditionalType (TypeReference `K`) (TypeReference `str`) (TypeReference `K`) NeverKeyword) (IndexedAccessType (TypeReference `T`) (TypeReference `K`)))",
+			"(MappedType (TypeParameter `K` (TypeOperator (TypeReference `T`))) (ConditionalType (TypeReference `K`) (TypeReference `str`) (TypeReference `*` (LiteralType 'K')) NeverKeyword) (IndexedAccessType (TypeReference `T`) (TypeReference `K`)))",
 		},
 	}
 	for _, c := range cases {

@@ -56,6 +56,11 @@ func (c *Checker) pythonNonNullableBase() *Type {
 
 func (c *Checker) pythonValueApparentType(original, apparent *Type) *Type {
 	h := c.pythonValueHierarchy
+	// Context-sensitive callbacks use this native wildcard during the first
+	// inference pass. Wrapping it would prevent the second pass from running.
+	if apparent == c.anyFunctionType {
+		return apparent
+	}
 	if h == nil || h.building || apparent.flags&TypeFlagsObject == 0 || c.isArrayOrTupleType(apparent) {
 		// Native sequence backings are internal checker representations. Their
 		// Python facade owns value bases; wrapping the backing destroys tuple
@@ -119,11 +124,16 @@ func (c *Checker) isPythonMarkerOnlyType(t *Type) bool {
 		return false
 	}
 	resolved := c.resolveStructuredTypeMembers(t)
-	if len(resolved.indexInfos) != 0 || len(resolved.CallSignatures()) != 0 || len(resolved.ConstructSignatures()) != 0 {
+	if len(resolved.CallSignatures()) != 0 || len(resolved.ConstructSignatures()) != 0 {
 		return false
 	}
+	for _, info := range resolved.indexInfos {
+		if info.keyType.flags&TypeFlagsUniqueESSymbol == 0 || !c.IsPythonPrivateAttributeName(info.keyType.AsUniqueESSymbolType().name) {
+			return false
+		}
+	}
 	properties := c.getPropertiesOfObjectType(t)
-	if len(properties) == 0 {
+	if len(properties) == 0 && len(resolved.indexInfos) == 0 {
 		return false
 	}
 	for _, property := range properties {

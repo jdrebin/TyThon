@@ -1,0 +1,15 @@
+{
+  "description": "Polymorphic receiver returns preserve derived members across repeated calls.",
+  "tags": [
+    "classes"
+  ],
+  "source": [
+    "class Base:",
+    "    def identity(self) -> self:",
+    "        return self",
+    "class Derived(Base):",
+    "    name = \"Ada\"",
+    "value: str = Derived().identity().identity().name"
+  ],
+  "diagnostics": []
+}

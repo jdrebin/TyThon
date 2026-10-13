@@ -1,0 +1,13 @@
+{
+  "description": "Chained comparisons and identity operators produce boolean conditions.",
+  "tags": [
+    "runtime"
+  ],
+  "source": [
+    "def between(value: int) -> bool:",
+    "    return 0 < value < 10",
+    "def missing(value: str | None) -> bool:",
+    "    return value is None"
+  ],
+  "diagnostics": []
+}

@@ -1,0 +1,20 @@
+{
+  "description": "Mapped declaration hovers preserve the generic binder and indexed value expression.",
+  "tags": [
+    "editor",
+    "mapped"
+  ],
+  "source": [
+    "type Copy(T) = { (K): T[K] for K in keyof T }"
+  ],
+  "diagnostics": [],
+  "hover": [
+    {
+      "at": {
+        "line": 0,
+        "text": "Copy"
+      },
+      "text": "type Copy(T) = { ((K)): T[K] for K in keyof T }"
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "description": "Satisfies checks compatibility and retains the source sequence type.",
+  "tags": [
+    "operators"
+  ],
+  "source": [
+    "value = [1] satisfies ([]int | []str)",
+    "integers: []int = value"
+  ],
+  "diagnostics": []
+}

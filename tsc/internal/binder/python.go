@@ -60,6 +60,17 @@ func (b *Binder) bindPythonTargets(target *ast.Node, declaration *ast.Node) {
 // bound as an ordinary expression.
 func (b *Binder) bindPythonMatchPattern(pattern *ast.Node) bool {
 	switch pattern.Kind {
+	case ast.KindTupleExpression, ast.KindArrayLiteralExpression:
+		for _, element := range pattern.Elements() {
+			if ast.IsIdentifier(element) {
+				if element.Text() != "_" {
+					b.bindPythonCapture(element)
+				}
+			} else if !b.bindPythonMatchPattern(element) {
+				b.bind(element)
+			}
+		}
+		return true
 	case ast.KindCallExpression:
 		b.bind(pattern.Expression())
 		for _, argument := range pattern.Arguments() {

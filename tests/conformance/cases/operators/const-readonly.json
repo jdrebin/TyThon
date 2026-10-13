@@ -1,0 +1,17 @@
+{
+  "description": "Inline const object members are readonly.",
+  "tags": [
+    "operators"
+  ],
+  "source": [
+    "value = {\"id\": 1} as const",
+    "value[\"id\"] = 1"
+  ],
+  "diagnostics": [
+    {
+      "line": 1,
+      "kind": "type",
+      "messageContains": "readonly"
+    }
+  ]
+}

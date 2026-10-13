@@ -1,0 +1,11 @@
+{
+  "description": "Const assertions preserve atomic literal types.",
+  "tags": [
+    "operators"
+  ],
+  "source": [
+    "value = \"Ada\" as const",
+    "exact: \"Ada\" = value"
+  ],
+  "diagnostics": []
+}

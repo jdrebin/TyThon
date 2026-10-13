@@ -1,0 +1,25 @@
+{
+  "description": "Grammar state is carried between lines of a multiline string.",
+  "tags": [
+    "syntax"
+  ],
+  "source": [
+    "value = \"\"\"hello",
+    "interface User:",
+    "\"\"\""
+  ],
+  "syntax": [
+    {
+      "at": {
+        "line": 1,
+        "text": "interface User"
+      },
+      "include": [
+        "string.quoted.multi.python"
+      ],
+      "exclude": [
+        "storage.type.interface.tython"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,12 @@
+{
+  "description": "Postfix presence assertions retain the declared None alternative.",
+  "tags": [
+    "optional"
+  ],
+  "source": [
+    "type User = { optional \"name\": str | None, optional label: str }",
+    "def read(user: User) -> str | None:",
+    "    return user[\"name\"]!"
+  ],
+  "diagnostics": []
+}

@@ -1,0 +1,14 @@
+{
+  "description": "Formatting preserves and consistently spaces required-mapped syntax.",
+  "tags": [
+    "formatting"
+  ],
+  "source": [
+    "type Required(T)={-optional (K):T[K] for K in keyof T}"
+  ],
+  "formatting": {
+    "output": [
+      "type Required(T) = {-optional (K): T[K] for K in keyof T}"
+    ]
+  }
+}

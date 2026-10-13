@@ -1,0 +1,23 @@
+{
+  "description": "A base initializer must run on every normal exit to establish inherited storage.",
+  "tags": [
+    "initialization"
+  ],
+  "source": [
+    "class Base:",
+    "    id: int",
+    "    def __init__(self, id: int):",
+    "        self.id = id",
+    "class Child(Base):",
+    "    def __init__(self, flag: bool):",
+    "        if flag:",
+    "            Base.__init__(self, 1)"
+  ],
+  "diagnostics": [
+    {
+      "line": 4,
+      "kind": "type",
+      "messageContains": "not definitely assigned"
+    }
+  ]
+}

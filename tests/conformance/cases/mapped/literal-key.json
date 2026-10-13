@@ -1,0 +1,21 @@
+{
+  "description": "An unparenthesized mapped identifier declares the literal attribute K.",
+  "tags": [
+    "mapped"
+  ],
+  "source": [
+    "type Collapse(T) = { K: T[K] for K in keyof T }",
+    "value: Collapse({ \"first\": int, \"second\": int })",
+    "result = value.K"
+  ],
+  "diagnostics": [],
+  "hover": [
+    {
+      "at": {
+        "line": 2,
+        "text": "result"
+      },
+      "text": "(variable) result: int"
+    }
+  ]
+}

@@ -1,0 +1,41 @@
+{
+  "description": "Readonly properties cannot be assigned outside initialization.",
+  "tags": [
+    "interfaces"
+  ],
+  "source": [
+    "interface User:",
+    "    readonly name: str",
+    "user: User",
+    "user.name = \"Ada\""
+  ],
+  "diagnostics": [
+    {
+      "line": 3,
+      "kind": "type",
+      "messageContains": "read-only"
+    }
+  ],
+  "semantic": [
+    {
+      "at": {
+        "line": 1,
+        "text": "name"
+      },
+      "kind": "PropertySignature",
+      "readonly": true
+    }
+  ],
+  "syntax": [
+    {
+      "at": {
+        "line": 1,
+        "text": "readonly"
+      },
+      "include": [
+        "storage.modifier.tython"
+      ],
+      "exclude": []
+    }
+  ]
+}

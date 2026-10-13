@@ -1,0 +1,16 @@
+{
+  "description": "Pinned formatter output, idempotence, and editor edit correctness for function.",
+  "tags": [
+    "formatting"
+  ],
+  "source": [
+    "def greet( name:str)->str:",
+    "  return name"
+  ],
+  "formatting": {
+    "output": [
+      "def greet(name: str) -> str:",
+      "    return name"
+    ]
+  }
+}

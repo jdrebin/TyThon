@@ -1,0 +1,40 @@
+{
+  "description": "Unicode preceding an identifier must not shift hover or semantic ranges.",
+  "tags": [
+    "primitives"
+  ],
+  "source": [
+    "value: int = 1",
+    "record = {\"😀\": value}"
+  ],
+  "diagnostics": [],
+  "hover": [
+    {
+      "at": {
+        "line": 1,
+        "text": "value"
+      },
+      "text": "(variable) value: int"
+    }
+  ],
+  "semantic": [
+    {
+      "at": {
+        "line": 1,
+        "text": "value"
+      },
+      "kind": "VariableDeclaration"
+    }
+  ],
+  "syntax": [
+    {
+      "at": {
+        "line": 1,
+        "text": "😀"
+      },
+      "include": [
+        "string.quoted.single.python"
+      ]
+    }
+  ]
+}

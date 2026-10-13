@@ -1,0 +1,13 @@
+{
+  "description": "Assignment expressions bind values usable in the containing scope.",
+  "tags": [
+    "flow"
+  ],
+  "source": [
+    "def read(value: str | None) -> str:",
+    "    if (text := value) is not None:",
+    "        return text",
+    "    return \"\""
+  ],
+  "diagnostics": []
+}

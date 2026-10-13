@@ -1,0 +1,16 @@
+{
+  "description": "Erasure preserves runtime tokens and source layout for runtime-comments.",
+  "tags": [
+    "transpilation"
+  ],
+  "source": [
+    "# keep this comment",
+    "value: str = \"type int\""
+  ],
+  "transpile": {
+    "output": [
+      "# keep this comment",
+      "value      = \"type int\""
+    ]
+  }
+}

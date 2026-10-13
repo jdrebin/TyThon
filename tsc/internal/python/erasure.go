@@ -183,6 +183,16 @@ func typedPythonErasureMask(source string) ([]bool, []ErasureDiagnostic) {
 			}
 		case strings.HasPrefix(text, "import type "):
 			markErased(removed, line.start, line.end)
+		case strings.HasPrefix(text, "from "):
+			if declaration, errors := parseImportDeclaration(line); len(errors) == 0 && declaration != nil {
+				allTypeOnly := len(declaration.Bindings) != 0
+				for _, binding := range declaration.Bindings {
+					allTypeOnly = allTypeOnly && binding.TypeOnly
+				}
+				if allTypeOnly {
+					markErased(removed, line.start, line.end)
+				}
+			}
 		}
 		index++
 	}

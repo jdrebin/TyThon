@@ -1,0 +1,20 @@
+{
+  "description": "Reassigning a receiver invalidates its local member presence facts.",
+  "tags": [
+    "optional"
+  ],
+  "source": [
+    "type Row = {optional name: str}",
+    "def read(row: Row, other: Row):",
+    "    row.name = \"Ada\"",
+    "    row = other",
+    "    return row.name"
+  ],
+  "diagnostics": [
+    {
+      "line": 4,
+      "kind": "type",
+      "messageContains": "may be absent"
+    }
+  ]
+}

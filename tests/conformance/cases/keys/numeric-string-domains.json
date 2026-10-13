@@ -1,0 +1,13 @@
+{
+  "description": "Numeric and string item domains remain independent.",
+  "tags": [
+    "keys"
+  ],
+  "source": [
+    "type Table = { (int): str, (str): int }",
+    "table: Table",
+    "text: str = table[1]",
+    "number: int = table[\"1\"]"
+  ],
+  "diagnostics": []
+}

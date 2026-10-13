@@ -1,0 +1,14 @@
+{
+  "description": "Sequence patterns bind members using their declared position types.",
+  "tags": [
+    "runtime"
+  ],
+  "source": [
+    "def read(value: (str, int)) -> str:",
+    "    match value:",
+    "        case (name, count):",
+    "            return name",
+    "    return \"\""
+  ],
+  "diagnostics": []
+}

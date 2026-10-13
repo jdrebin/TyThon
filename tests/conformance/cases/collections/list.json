@@ -1,0 +1,31 @@
+{
+  "description": "Mutable homogeneous lists expose list methods.",
+  "tags": [
+    "collections"
+  ],
+  "source": [
+    "value: []int = [1, 2]"
+  ],
+  "diagnostics": [],
+  "hover": [
+    {
+      "at": {
+        "line": 0,
+        "text": "value"
+      },
+      "text": "(variable) value: []int"
+    }
+  ],
+  "completions": [
+    {
+      "expression": "value.",
+      "kind": "attribute",
+      "include": [
+        "append",
+        "pop",
+        "count"
+      ],
+      "exclude": []
+    }
+  ]
+}

@@ -1,0 +1,12 @@
+{
+  "description": "Type indexing through optional members retains explicit None without adding absence.",
+  "tags": [
+    "optional"
+  ],
+  "source": [
+    "type User = { optional \"name\": str | None, optional label: str }",
+    "value: User[\"name\"] = None",
+    "label: User.label = \"Ada\""
+  ],
+  "diagnostics": []
+}

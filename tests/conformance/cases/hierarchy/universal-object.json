@@ -1,0 +1,13 @@
+{
+  "description": "Object root annotations accept primitive values and None.",
+  "tags": [
+    "hierarchy"
+  ],
+  "source": [
+    "text: object = \"Ada\"",
+    "number: object = 1",
+    "boolean: object = False",
+    "nothing: object = None"
+  ],
+  "diagnostics": []
+}

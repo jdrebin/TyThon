@@ -1,0 +1,16 @@
+{
+  "description": "Assertions require compatible source and target types.",
+  "tags": [
+    "operators"
+  ],
+  "source": [
+    "value = {\"name\": \"Ada\"} as {\"id\": int}"
+  ],
+  "diagnostics": [
+    {
+      "line": 0,
+      "kind": "type",
+      "messageContains": "Conversion"
+    }
+  ]
+}

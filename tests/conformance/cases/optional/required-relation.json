@@ -1,0 +1,18 @@
+{
+  "description": "A possibly absent item cannot satisfy a required item contract.",
+  "tags": [
+    "optional"
+  ],
+  "source": [
+    "type User = { optional \"name\": str | None, optional label: str }",
+    "value: User",
+    "required: {\"name\": str | None} = value"
+  ],
+  "diagnostics": [
+    {
+      "line": 2,
+      "kind": "type",
+      "messageContains": "not assignable"
+    }
+  ]
+}

@@ -1,0 +1,16 @@
+{
+  "description": "Formatting preserves and consistently spaces async syntax.",
+  "tags": [
+    "formatting"
+  ],
+  "source": [
+    "async def read()->str:",
+    " return \"Ada\""
+  ],
+  "formatting": {
+    "output": [
+      "async def read() -> str:",
+      "    return \"Ada\""
+    ]
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "description": "Class-body values expose inferred members on classes and instances.",
+  "tags": [
+    "classes"
+  ],
+  "source": [
+    "class Record:",
+    "    count = 1",
+    "first: int = Record.count",
+    "second: int = Record().count"
+  ],
+  "diagnostics": []
+}

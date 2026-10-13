@@ -1,0 +1,12 @@
+{
+  "description": "Recursive aliases permit nested values with the declared recursive structure.",
+  "tags": [
+    "generics"
+  ],
+  "source": [
+    "type Node = { \"value\": int, optional \"next\": Node }",
+    "node: Node = {\"value\": 1, \"next\": {\"value\": 2}}",
+    "result: int = node[\"next\"]![\"value\"]"
+  ],
+  "diagnostics": []
+}

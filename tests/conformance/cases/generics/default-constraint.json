@@ -1,0 +1,17 @@
+{
+  "description": "A generic default satisfies its declared constraint.",
+  "tags": [
+    "generics"
+  ],
+  "source": [
+    "interface Box<T extends str = int>:",
+    "    value: T"
+  ],
+  "diagnostics": [
+    {
+      "line": 0,
+      "kind": "type",
+      "messageContains": "constraint"
+    }
+  ]
+}

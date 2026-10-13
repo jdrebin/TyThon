@@ -1,0 +1,24 @@
+{
+  "description": "An incomplete parameter list produces a parse diagnostic.",
+  "tags": [
+    "diagnostics"
+  ],
+  "source": [
+    "def f(:"
+  ],
+  "diagnostics": [
+    {
+      "line": 0,
+      "kind": "parse",
+      "messageContains": "Parameter declaration expected."
+    },
+    {
+      "line": 1,
+      "kind": "parse",
+      "messageContains": "')' expected."
+    }
+  ],
+  "formatting": {
+    "errorContains": "Formatting refused"
+  }
+}

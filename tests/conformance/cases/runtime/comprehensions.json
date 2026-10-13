@@ -1,0 +1,15 @@
+{
+  "description": "Comprehensions infer element and result container types.",
+  "tags": [
+    "runtime"
+  ],
+  "source": [
+    "def lengths(values: []str) -> []int:",
+    "    return [len(value) for value in values if value]",
+    "def unique(values: []str) -> set<int>:",
+    "    return {len(value) for value in values}",
+    "def lazy(values: []str) -> Iterator<int>:",
+    "    return (len(value) for value in values)"
+  ],
+  "diagnostics": []
+}

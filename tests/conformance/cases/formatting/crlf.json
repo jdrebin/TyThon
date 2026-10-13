@@ -1,0 +1,16 @@
+{
+  "description": "Pinned formatter output, idempotence, and editor edit correctness for crlf.",
+  "tags": [
+    "formatting"
+  ],
+  "source": [
+    "value=1\r",
+    "other=2\r"
+  ],
+  "formatting": {
+    "output": [
+      "value = 1\r",
+      "other = 2\r"
+    ]
+  }
+}

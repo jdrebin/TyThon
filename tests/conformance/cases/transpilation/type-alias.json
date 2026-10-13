@@ -1,0 +1,16 @@
+{
+  "description": "Erasure preserves runtime tokens and source layout for type-alias.",
+  "tags": [
+    "transpilation"
+  ],
+  "source": [
+    "type Name = str",
+    "value = \"ok\""
+  ],
+  "transpile": {
+    "output": [
+      "               ",
+      "value = \"ok\""
+    ]
+  }
+}

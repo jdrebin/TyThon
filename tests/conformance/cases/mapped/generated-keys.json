@@ -1,0 +1,21 @@
+{
+  "description": "Template expressions generate new item names while preserving value types.",
+  "tags": [
+    "mapped"
+  ],
+  "source": [
+    "type Prefix(T) = { (f\"public_{K}\"): T[K] for K in keyof T if K extends str }",
+    "value: Prefix({\"id\": int}) = {\"public_id\": 1}",
+    "result = value[\"public_id\"]"
+  ],
+  "diagnostics": [],
+  "hover": [
+    {
+      "at": {
+        "line": 2,
+        "text": "result"
+      },
+      "text": "(variable) result: int"
+    }
+  ]
+}

@@ -1,0 +1,19 @@
+{
+  "description": "Variable-length tuple annotations retain tuple identity.",
+  "tags": [
+    "collections"
+  ],
+  "source": [
+    "value: ()int = (1, 2)"
+  ],
+  "diagnostics": [],
+  "hover": [
+    {
+      "at": {
+        "line": 0,
+        "text": "value"
+      },
+      "text": "(variable) value: ()int"
+    }
+  ]
+}

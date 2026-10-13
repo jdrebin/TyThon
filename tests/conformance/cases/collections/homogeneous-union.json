@@ -1,0 +1,10 @@
+{
+  "description": "Collection annotation ()(int | None) accepts the corresponding runtime value.",
+  "tags": [
+    "collections"
+  ],
+  "source": [
+    "value: ()(int | None) = (1, None)"
+  ],
+  "diagnostics": []
+}

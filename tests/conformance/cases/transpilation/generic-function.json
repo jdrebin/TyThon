@@ -1,0 +1,16 @@
+{
+  "description": "Erasure preserves runtime tokens and source layout for generic-function.",
+  "tags": [
+    "transpilation"
+  ],
+  "source": [
+    "def identity<T>(value: T) -> T:",
+    "    return value"
+  ],
+  "transpile": {
+    "output": [
+      "def identity   (value   )     :",
+      "    return value"
+    ]
+  }
+}

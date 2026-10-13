@@ -1,0 +1,28 @@
+{
+  "description": "An annotated bool retains its declared type and symbol identity.",
+  "tags": [
+    "primitives"
+  ],
+  "source": [
+    "value: bool = True"
+  ],
+  "diagnostics": [],
+  "hover": [
+    {
+      "at": {
+        "line": 0,
+        "text": "value"
+      },
+      "text": "(variable) value: bool"
+    }
+  ],
+  "semantic": [
+    {
+      "at": {
+        "line": 0,
+        "text": "value"
+      },
+      "kind": "VariableDeclaration"
+    }
+  ]
+}

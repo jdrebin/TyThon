@@ -1,0 +1,15 @@
+{
+  "description": "A decorator publishes its result as the decorated name.",
+  "tags": [
+    "decorators"
+  ],
+  "source": [
+    "def label(fn: () -> int) -> str:",
+    "    return \"Ada\"",
+    "@label",
+    "def answer() -> int:",
+    "    return 42",
+    "result: str = answer"
+  ],
+  "diagnostics": []
+}

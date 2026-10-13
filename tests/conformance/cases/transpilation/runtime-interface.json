@@ -1,0 +1,9 @@
+{
+  "description": "Type-only callable interfaces leave no runtime definitions or evaluation.",
+  "tags": ["transpilation", "runtime", "interfaces"],
+  "source": ["interface User:", "    def(param: int) -> int", "print('ready')"],
+  "transpile": {
+    "output": ["               ", "                          ", "print('ready')"],
+    "stdout": "ready\n"
+  }
+}

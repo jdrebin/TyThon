@@ -104,6 +104,9 @@ func (c *Checker) pythonDecoratorInputType(t *Type) *Type {
 		unbound.parameterKinds = append([]CallParameterKind{CallParameterPositionalOrKeyword}, objectCallParameterKinds(signature)...)
 		unbound.thisParameter = nil
 		unbound.minArgumentCount++
+		if predicate := c.getTypePredicateOfSignature(signature); predicate != nil && predicate.kind == TypePredicateKindAssertsThis {
+			unbound.resolvedTypePredicate = c.newTypePredicate(TypePredicateKindAssertsIdentifier, signature.thisParameter.Name, 0, predicate.t)
+		}
 		signatures = append(signatures, unbound)
 	}
 	return c.NewObjectTypeFromCallSignatures(signatures)

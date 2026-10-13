@@ -1,0 +1,16 @@
+{
+  "description": "Formatting preserves and consistently spaces const-parameter syntax.",
+  "tags": [
+    "formatting"
+  ],
+  "source": [
+    "def identity<const T>(value:T)->T:",
+    " return value"
+  ],
+  "formatting": {
+    "output": [
+      "def identity<const T>(value: T) -> T:",
+      "    return value"
+    ]
+  }
+}

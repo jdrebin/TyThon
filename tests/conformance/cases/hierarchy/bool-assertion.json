@@ -1,0 +1,19 @@
+{
+  "description": "An explicit bool-to-int assertion is permitted without changing assignability.",
+  "tags": [
+    "hierarchy"
+  ],
+  "source": [
+    "value = True as int"
+  ],
+  "diagnostics": [],
+  "hover": [
+    {
+      "at": {
+        "line": 0,
+        "text": "value"
+      },
+      "text": "(variable) value: int"
+    }
+  ]
+}

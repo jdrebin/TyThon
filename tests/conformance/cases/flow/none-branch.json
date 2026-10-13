@@ -1,0 +1,13 @@
+{
+  "description": "An is-None branch narrows the alternative to its non-None type.",
+  "tags": [
+    "flow"
+  ],
+  "source": [
+    "def read(value: str | None) -> str:",
+    "    if value is None:",
+    "        return \"\"",
+    "    return value"
+  ],
+  "diagnostics": []
+}

@@ -1,0 +1,13 @@
+{
+  "description": "Attribute and item keys with the same spelling select independent value types.",
+  "tags": [
+    "keys"
+  ],
+  "source": [
+    "type Hybrid = { id: int, \"id\": str }",
+    "attribute: Hybrid[*<\"id\">] = 12",
+    "item: Hybrid[\"id\"] = \"Ada\"",
+    "dotted: Hybrid.id = 42"
+  ],
+  "diagnostics": []
+}

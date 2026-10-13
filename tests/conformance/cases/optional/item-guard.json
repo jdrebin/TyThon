@@ -1,0 +1,14 @@
+{
+  "description": "Membership guards establish optional item presence.",
+  "tags": [
+    "optional"
+  ],
+  "source": [
+    "type User = { optional \"name\": str | None, optional label: str }",
+    "def read(user: User & MappingProtocol<User>) -> str | None:",
+    "    if \"name\" in user:",
+    "        return user[\"name\"]",
+    "    return None"
+  ],
+  "diagnostics": []
+}

@@ -1,0 +1,18 @@
+{
+  "description": "Static and class methods bind their receivers according to Python semantics.",
+  "tags": [
+    "descriptors"
+  ],
+  "source": [
+    "class Record:",
+    "    @staticmethod",
+    "    def echo(value: str) -> str:",
+    "        return value",
+    "    @classmethod",
+    "    def create(cls) -> Record:",
+    "        return cls()",
+    "record: Record = Record.create()",
+    "result: str = record.echo(\"Ada\")"
+  ],
+  "diagnostics": []
+}

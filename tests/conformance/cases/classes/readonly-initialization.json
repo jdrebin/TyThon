@@ -1,0 +1,14 @@
+{
+  "description": "Readonly fields may be initialized through the constructor receiver.",
+  "tags": [
+    "classes"
+  ],
+  "source": [
+    "class Record:",
+    "    readonly id: int",
+    "    def __init__(self, id: int):",
+    "        self.id = id",
+    "result: int = Record(12).id"
+  ],
+  "diagnostics": []
+}

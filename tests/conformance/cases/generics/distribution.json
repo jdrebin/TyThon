@@ -1,0 +1,18 @@
+{
+  "description": "Conditional utilities distribute over unions through a naked parameter.",
+  "tags": [
+    "generics"
+  ],
+  "source": [
+    "type Text(T) = T if T extends str else never",
+    "value: Text(\"Ada\" | int) = \"Ada\"",
+    "other: Text(\"Ada\" | int) = 1"
+  ],
+  "diagnostics": [
+    {
+      "line": 2,
+      "kind": "type",
+      "messageContains": "not assignable"
+    }
+  ]
+}

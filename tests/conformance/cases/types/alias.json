@@ -1,0 +1,51 @@
+{
+  "description": "Named aliases preserve their declaration spelling.",
+  "tags": [
+    "types"
+  ],
+  "source": [
+    "type Name = str",
+    "value: Name"
+  ],
+  "diagnostics": [],
+  "hover": [
+    {
+      "at": {
+        "line": 0,
+        "text": "Name"
+      },
+      "text": "type Name = str"
+    }
+  ],
+  "semantic": [
+    {
+      "at": {
+        "line": 0,
+        "text": "Name"
+      },
+      "kind": "TypeAliasDeclaration"
+    }
+  ],
+  "syntax": [
+    {
+      "at": {
+        "line": 0,
+        "text": "type"
+      },
+      "include": [
+        "storage.type.type.tython"
+      ],
+      "exclude": []
+    },
+    {
+      "at": {
+        "line": 0,
+        "text": "Name"
+      },
+      "include": [
+        "entity.name.type.alias.tython"
+      ],
+      "exclude": []
+    }
+  ]
+}

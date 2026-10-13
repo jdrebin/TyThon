@@ -1,0 +1,10 @@
+{
+  "description": "An empty structural requirement accepts None.",
+  "tags": [
+    "hierarchy"
+  ],
+  "source": [
+    "value: {} = None"
+  ],
+  "diagnostics": []
+}

@@ -1,0 +1,23 @@
+{
+  "description": "Property reads, writes, and deletes use their respective contracts.",
+  "tags": [
+    "descriptors"
+  ],
+  "source": [
+    "class Record:",
+    "    @property",
+    "    def name(self) -> str:",
+    "        return \"Ada\"",
+    "    @name.setter",
+    "    def name(self, value: int) -> None:",
+    "        pass",
+    "    @name.deleter",
+    "    def name(self) -> None:",
+    "        pass",
+    "record = Record()",
+    "record.name = 1",
+    "result: str = record.name",
+    "del record.name"
+  ],
+  "diagnostics": []
+}

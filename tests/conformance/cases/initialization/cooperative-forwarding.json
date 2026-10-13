@@ -1,0 +1,16 @@
+{
+  "description": "Cooperative initializer calls forward compatible keyword contracts.",
+  "tags": [
+    "initialization"
+  ],
+  "source": [
+    "class Parent:",
+    "    id: int",
+    "    def __init__(self, *, id: int, **kwargs):",
+    "        self.id = id",
+    "class Child(Parent):",
+    "    def __init__(self, *, id: int, **kwargs):",
+    "        super().__init__(id=id, **kwargs)"
+  ],
+  "diagnostics": []
+}

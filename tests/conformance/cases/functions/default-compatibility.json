@@ -1,0 +1,17 @@
+{
+  "description": "Default values satisfy explicit parameter annotations.",
+  "tags": [
+    "functions"
+  ],
+  "source": [
+    "def greet(name: str = 12):",
+    "    return name"
+  ],
+  "diagnostics": [
+    {
+      "line": 0,
+      "kind": "type",
+      "messageContains": "not assignable"
+    }
+  ]
+}

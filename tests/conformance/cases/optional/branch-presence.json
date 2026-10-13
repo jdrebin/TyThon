@@ -1,0 +1,20 @@
+{
+  "description": "A presence proof on only one branch does not establish presence after the join.",
+  "tags": [
+    "optional"
+  ],
+  "source": [
+    "type Row = {optional name: str}",
+    "def read(row: Row, flag: bool):",
+    "    if flag:",
+    "        row.name = \"Ada\"",
+    "    return row.name"
+  ],
+  "diagnostics": [
+    {
+      "line": 4,
+      "kind": "type",
+      "messageContains": "may be absent"
+    }
+  ]
+}

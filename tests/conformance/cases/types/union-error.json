@@ -1,0 +1,16 @@
+{
+  "description": "Unions reject values outside their members.",
+  "tags": [
+    "types"
+  ],
+  "source": [
+    "value: str | int = None"
+  ],
+  "diagnostics": [
+    {
+      "line": 0,
+      "kind": "type",
+      "messageContains": "not assignable"
+    }
+  ]
+}

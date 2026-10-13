@@ -1,0 +1,19 @@
+{
+  "description": "User descriptor protocols supply distinct read and write types.",
+  "tags": [
+    "descriptors"
+  ],
+  "source": [
+    "class Descriptor:",
+    "    def __get__(self, instance: object, owner: any) -> str:",
+    "        return \"Ada\"",
+    "    def __set__(self, instance: object, value: int) -> None:",
+    "        pass",
+    "class Record:",
+    "    name = Descriptor()",
+    "record = Record()",
+    "result: str = record.name",
+    "record.name = 1"
+  ],
+  "diagnostics": []
+}

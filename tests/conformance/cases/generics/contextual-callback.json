@@ -1,0 +1,20 @@
+{
+  "description": "Generic callback parameters receive context from other arguments.",
+  "tags": [
+    "generics"
+  ],
+  "source": [
+    "declare def apply<T, U>(value: T, fn: (item: T) -> U) -> U",
+    "result = apply(1, lambda item: item)"
+  ],
+  "diagnostics": [],
+  "hover": [
+    {
+      "at": {
+        "line": 1,
+        "text": "result"
+      },
+      "text": "(variable) result: int"
+    }
+  ]
+}

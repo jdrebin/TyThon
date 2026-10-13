@@ -1,0 +1,16 @@
+{
+  "description": "Formatting preserves and consistently spaces class syntax.",
+  "tags": [
+    "formatting"
+  ],
+  "source": [
+    "class Box:",
+    " count:int=1"
+  ],
+  "formatting": {
+    "output": [
+      "class Box:",
+      "    count: int = 1"
+    ]
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "description": "Async calls produce awaitables and await exposes their result type.",
+  "tags": [
+    "protocols"
+  ],
+  "source": [
+    "async def fetch() -> str:",
+    "    return \"Ada\"",
+    "async def read() -> str:",
+    "    return await fetch()",
+    "pending: Awaitable<str> = fetch()"
+  ],
+  "diagnostics": []
+}

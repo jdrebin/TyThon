@@ -1,0 +1,12 @@
+{
+  "description": "Declaration-only classes describe required members without executable initializers.",
+  "tags": [
+    "initialization"
+  ],
+  "source": [
+    "class Record:",
+    "    id: str"
+  ],
+  "entry": "api.d.ty",
+  "diagnostics": []
+}

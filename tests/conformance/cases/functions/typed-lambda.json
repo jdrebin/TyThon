@@ -1,0 +1,11 @@
+{
+  "description": "Typed generic lambdas infer their return type.",
+  "tags": [
+    "functions"
+  ],
+  "source": [
+    "identity = lambda<T extends str> value: T: value",
+    "result: str = identity(\"Ada\")"
+  ],
+  "diagnostics": []
+}

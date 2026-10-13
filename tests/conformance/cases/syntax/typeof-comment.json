@@ -1,0 +1,20 @@
+{
+  "description": "The word typeof retains comment coloring inside a comment.",
+  "tags": [
+    "syntax"
+  ],
+  "source": [
+    "# typeof"
+  ],
+  "syntax": [
+    {
+      "at": {
+        "line": 0,
+        "text": "typeof"
+      },
+      "exclude": [
+        "keyword.operator.expression.typeof.tython"
+      ]
+    }
+  ]
+}

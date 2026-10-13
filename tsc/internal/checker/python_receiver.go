@@ -2,10 +2,69 @@ package checker
 
 import "github.com/jdrebin/TyThon/tsc/internal/ast"
 
+func (c *Checker) isPythonReceiverReference(node *ast.Node) bool {
+	if !c.inPythonSourceFile(node) || !ast.IsIdentifier(node) {
+		return false
+	}
+	symbol := c.getResolvedSymbol(node)
+	return symbol != nil && symbol.ValueDeclaration != nil && ast.IsParameterDeclaration(symbol.ValueDeclaration) && c.isPythonReceiverParameter(symbol.ValueDeclaration)
+}
+
+// super() exposes the inherited instance surface in the enclosing method.
+// Resolve the builtin symbol so a user declaration named super stays ordinary.
+func (c *Checker) pythonSuperBase(node *ast.Node) *Type {
+	if !c.inPythonSourceFile(node) || !ast.IsCallExpression(node) || !ast.IsIdentifier(node.Expression()) || node.Expression().Text() != "super" || len(node.Arguments()) != 0 || c.getResolvedSymbol(node.Expression()) != c.globals["super"] {
+		return nil
+	}
+	method := ast.FindAncestor(node, ast.IsFunctionLike)
+	if method == nil || method.Parent == nil || !ast.IsClassLike(method.Parent) || len(method.Parameters()) == 0 || !c.isPythonReceiverParameter(method.Parameters()[0]) {
+		return nil
+	}
+	owner := c.getDeclaredTypeOfSymbol(c.getSymbolOfDeclaration(method.Parent))
+	bases := c.getBaseTypes(owner)
+	if len(bases) == 0 {
+		return c.emptyObjectType
+	}
+	return bases[0]
+}
+
+// Python exposes __init__ as a method as well as using it for construction.
+// Its call result is None; the construct signature still returns the instance.
+func (c *Checker) pythonInitializerProperty(t *Type) *ast.Symbol {
+	if t.symbol == nil || t.symbol.Flags&ast.SymbolFlagsClass == 0 {
+		return nil
+	}
+	owner := c.getDeclaredTypeOfSymbol(t.symbol)
+	declaration := t.symbol.ValueDeclaration
+	if declaration == nil || !ast.IsClassLike(declaration) {
+		return nil
+	}
+	constructor := ast.FindConstructorDeclaration(declaration)
+	if constructor == nil {
+		for _, base := range c.getBaseTypes(owner) {
+			if property := c.pythonInitializerProperty(base); property != nil {
+				return property
+			}
+		}
+		return nil
+	}
+	signature := c.cloneSignature(c.getSignatureFromDeclaration(constructor))
+	signature.flags &^= SignatureFlagsConstruct
+	signature.resolvedReturnType = c.nullType
+	if predicate := c.getTypePredicateOfSignature(signature); predicate == nil {
+		signature.resolvedTypePredicate = c.newTypePredicate(TypePredicateKindAssertsThis, "", -1, owner)
+	}
+	property := c.newSymbol(ast.SymbolFlagsMethod, "__init__")
+	property.ValueDeclaration = constructor
+	property.Declarations = []*ast.Node{constructor}
+	c.valueSymbolLinks.Get(property).resolvedType = c.newAnonymousType(nil, nil, []*Signature{signature}, nil, nil)
+	return property
+}
+
 // The receiver of a Python method is its first parameter, whatever it is called.
-// TypeScript models the receiver as the `this` parameter, typed by the polymorphic
-// `this` type of the class; an unannotated first parameter of an instance method
-// gets that type. Calls through an instance drop it (BoundPythonCallable).
+// Signatures store its declaring class as the native thisParameter. Receiver
+// reads inside methods use the polymorphic this type; instance calls bind the
+// receiver through BoundPythonCallable.
 
 // pythonReceiverType returns the type of an unannotated receiver parameter, or nil
 // when the declaration is not one.
@@ -46,6 +105,9 @@ func (c *Checker) pythonReceiverType(declaration *ast.Node) *Type {
 // or value.
 func (c *Checker) pythonInterfaceBaseType(baseTypeNode *ast.Node) *Type {
 	expression := baseTypeNode.Expression()
+	if expression != nil && ast.IsAsExpression(expression) {
+		return c.getTypeFromTypeNode(expression.Type())
+	}
 	if expression == nil || !ast.IsEntityNameExpression(expression) {
 		return nil
 	}

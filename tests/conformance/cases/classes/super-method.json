@@ -1,0 +1,15 @@
+{
+  "description": "Super resolves ordinary methods through the base surface.",
+  "tags": [
+    "classes"
+  ],
+  "source": [
+    "class Base:",
+    "    def read(self) -> str:",
+    "        return \"Ada\"",
+    "class Child(Base):",
+    "    def read(self) -> str:",
+    "        return super().read()"
+  ],
+  "diagnostics": []
+}

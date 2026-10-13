@@ -1,0 +1,13 @@
+{
+  "description": "An is-None terminating branch narrows a generic value to Some.",
+  "tags": [
+    "hierarchy"
+  ],
+  "source": [
+    "def require_some<T>(value: T) -> T & Some:",
+    "    if value is None:",
+    "        raise ValueError()",
+    "    return value"
+  ],
+  "diagnostics": []
+}

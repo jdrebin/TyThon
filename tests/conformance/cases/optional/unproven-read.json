@@ -1,0 +1,18 @@
+{
+  "description": "Reading an optional member requires a presence proof.",
+  "tags": [
+    "optional"
+  ],
+  "source": [
+    "type User = { optional \"name\": str | None, optional label: str }",
+    "def read(user: User):",
+    "    return user.label"
+  ],
+  "diagnostics": [
+    {
+      "line": 2,
+      "kind": "type",
+      "messageContains": "may be absent"
+    }
+  ]
+}

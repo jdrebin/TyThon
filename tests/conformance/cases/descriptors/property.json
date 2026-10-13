@@ -1,0 +1,23 @@
+{
+  "description": "Property reads expose the getter return type.",
+  "tags": [
+    "descriptors"
+  ],
+  "source": [
+    "class Record:",
+    "    @property",
+    "    def name(self) -> str:",
+    "        return \"Ada\"",
+    "result = Record().name"
+  ],
+  "diagnostics": [],
+  "hover": [
+    {
+      "at": {
+        "line": 4,
+        "text": "result"
+      },
+      "text": "(variable) result: str"
+    }
+  ]
+}

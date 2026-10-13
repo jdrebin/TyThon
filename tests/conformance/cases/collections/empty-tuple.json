@@ -1,0 +1,34 @@
+{
+  "description": "An empty tuple remains a Python tuple.",
+  "tags": [
+    "collections"
+  ],
+  "source": [
+    "value = ()"
+  ],
+  "diagnostics": [],
+  "hover": [
+    {
+      "at": {
+        "line": 0,
+        "text": "value"
+      },
+      "text": "(variable) value: ()"
+    }
+  ],
+  "completions": [
+    {
+      "expression": "value.",
+      "kind": "attribute",
+      "include": [
+        "count",
+        "index"
+      ],
+      "exclude": [
+        "append",
+        "length",
+        "0"
+      ]
+    }
+  ]
+}
