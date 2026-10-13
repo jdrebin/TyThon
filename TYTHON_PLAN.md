@@ -76,10 +76,10 @@ Black adaptations run only in an isolated one-request formatter process; this is
 not a public Black plugin or a new Python layout engine. Source and formatting
 rules remain in `tools/black-formatter/` (historical directory name).
 
-The pre-existing release license audit still references an upstream Git object
-lost during history reset. That gate has not been bypassed: release provenance
-must be repaired before producing a verified distribution. A working development
-launch and relocated formatter tests are not a claim of a release-ready VSIX.
+The release license audit uses a pinned upstream Git object restored into the
+separate ignored provenance cache after the history reset. The audit now passes;
+no upstream commits were added to project history and no checks were bypassed.
+See the current artifact verification below for platform-specific validation.
 
 ## Goal
 
@@ -388,8 +388,12 @@ for that hands-on check.
 Current update validation: all 17 positive lessons check, build, and run with the
 native compiler; the four deliberate diagnostics remain isolated. Demo-generation,
 erasure, targeted control-flow conformance, and launch-policy checks pass locally,
-as does the extension build. Full artifact packaging and live WSL verification
-have not been rerun for this update. `TestAssignedContainersUseTheirProtocols`
+as does the extension build. All five 0.1.3 VSIX/wheel pairs now package, with
+archive and metadata verification for every target. The macOS ARM64 artifacts
+also pass extracted editor/helper checks and fresh offline wheel installation,
+including CLI builds and execution of the generated playground. Other targets
+were not executed here; live WSL and interactive editor checks remain outstanding.
+Nothing was published. `TestAssignedContainersUseTheirProtocols`
 now verifies prefix filtering: `pair.__` offers matching dunders and `pair.co`
 offers `count`. `TestDemoSurfaces` has moved from the historical frontend adapter
 to the native editor program. This exposed and fixed tuple alias hovers rendering
@@ -1253,6 +1257,11 @@ Every change to the key model must prove:
   and playground. Use setuptools and explicit native-platform wheel metadata,
   including `manylinux_2_17` for the statically linked Linux compiler.
   No user Go/Node/build step.
+- Preserve the Go runtime license for standard and Homebrew `libexec` layouts,
+  including symlinked license files. Check required notices in every extracted
+  VSIX and wheel payload even when target binaries cannot run on the build host.
+  Packaged Python resolution must match the selected interpreter's module path,
+  accommodating both single-file modules and package initializers.
 - Verify offline installation in a fresh temporary venv outside the checkout,
   compiler/library identity, CLI errors, imports and executable emitted Python.
   Promote the pair only after tests; include installation instructions, hashes,

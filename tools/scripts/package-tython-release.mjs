@@ -9,6 +9,7 @@ import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 import AdmZip from "adm-zip";
 import { canRun, targetByName } from "./targets.mjs";
+import { checkGoToolchainNotices } from "./go-toolchain-notices.mjs";
 
 const root = fileURLToPath(new URL("../..", import.meta.url));
 const { values } = parseArgs({ options: { vsix: { type: "string" } } });
@@ -70,6 +71,7 @@ for (const entry of archive.getEntries()) {
 }
 assert.equal(sha(await readFile(path.join(payload, target.compilerFile))), info.compilerSHA256);
 assert.equal(sha(await readFile(path.join(payload, "library/builtins.d.ty"))), info.librarySHA256);
+await checkGoToolchainNotices(path.join(payload, "licenses/go-toolchain"));
 await writeFile(path.join(payload, "build-info.json"), JSON.stringify({
     version: info.version, buildID: info.buildID, target: info.target,
     sourceCommit: info.sourceCommit, sourceDirty: info.sourceDirty,

@@ -12,6 +12,7 @@ import { parseArgs } from "node:util";
 import { createVSIX } from "@vscode/vsce";
 import AdmZip from "adm-zip";
 import { canRun, targetByName, hostTargetName } from "../../../tools/scripts/targets.mjs";
+import { checkGoToolchainNotices, copyGoToolchainNotices } from "../../../tools/scripts/go-toolchain-notices.mjs";
 
 const { values } = parseArgs({ options: { target: { type: "string" }, "skip-checks": { type: "boolean", default: false } } });
 const target = targetByName(values.target ?? hostTargetName());
@@ -107,12 +108,7 @@ notices.push("Pinned Black 26.5.1 is shipped as pure Python in formatter/vendor 
 const goToolchain = JSON.parse(run("go", ["env", "-json", "GOROOT", "GOVERSION"], path.join(root, "tsc"), true, goHost));
 // The linked Go runtime is not a go.mod dependency. Retain its license and
 // patent files, including the toolchain's vendored component notices.
-for (const entry of await readdir(goToolchain.GOROOT, { recursive: true, withFileTypes: true })) {
-    if (entry.isFile() && /^(licen[sc]e|notice|copying|patents)([.-]|$)/i.test(entry.name)) {
-        const source = path.join(entry.parentPath, entry.name);
-        await copy(source, path.join("licenses/go-toolchain", path.relative(goToolchain.GOROOT, source)));
-    }
-}
+await copyGoToolchainNotices(goToolchain.GOROOT, path.join(stage, "licenses/go-toolchain"));
 dependencies.push({ ecosystem: "toolchain", name: "Go", version: goToolchain.GOVERSION });
 notices.push(`Go runtime/toolchain ${goToolchain.GOVERSION}: licenses/go-toolchain/ (toolchain notices retained conservatively, including components not necessarily linked).`, "");
 notices.push("The adapted VS Code hover provider is MIT-licensed; see licenses/tython-components/LICENSE.vscode.txt. The copied Pyright protocol's MIT license is also retained there. See LICENSING.md for the source provenance and change-notice policy.", "");
@@ -201,6 +197,7 @@ for (const entry of zip.getEntries()) {
 }
 zip.extractAllTo(extracted, false, true);
 const installed = path.join(extracted, "extension");
+await checkGoToolchainNotices(path.join(installed, "licenses/go-toolchain"));
 assert.equal(await sha(path.join(installed, info.compilerFile)), info.compilerSHA256);
 assert.equal(await sha(path.join(installed, "bin", target.oracle)), info.formatterSHA256);
 assert.equal(await sha(path.join(installed, "dist/extension.bundle.js")), info.extensionSHA256);

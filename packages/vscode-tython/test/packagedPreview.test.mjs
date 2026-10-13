@@ -1,7 +1,7 @@
 // Test the extracted distribution, not built/local or the repository's library.
 import assert from "node:assert/strict";
 import { spawn, execFile } from "node:child_process";
-import { cp, mkdtemp, readFile, readdir, access } from "node:fs/promises";
+import { cp, mkdtemp, readFile, readdir, realpath, access } from "node:fs/promises";
 import { constants } from "node:fs";
 import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
@@ -140,6 +140,9 @@ assert.match(conversion.text, /declare def greet\(name: str\) -> str/);
 const { resolvePythonStub } = await compiled("../src/pythonTypeServer.ts");
 const stub = await resolvePythonStub({ extensionPath: installed, root: workspace, interpreter: python, linuxContainment: true, log: message => console.log(message) },
     path.join(workspace, "catalog.py"), "pathlib", new AbortController().signal);
-assert.match(stub, /pathlib\.py$/);
+// pathlib can be a module or a package, depending on the Python version.
+// Compare with the selected interpreter's actual module instead of its layout.
+const { stdout: pathlibOrigin } = await promisify(execFile)(python, ["-c", "import importlib.util; print(importlib.util.find_spec('pathlib').origin)"]);
+assert.equal(await realpath(fileURLToPath(stub)), await realpath(pathlibOrigin.trim()));
 assert.doesNotMatch(stub, /typeshed|pyright-typeserver/);
 console.log("Extracted VSIX passed: contained native LSP, matching library, examples, diagnostics, hover, completion, definitions, semantic tokens, edits, Python helper and bundled Pyright.");

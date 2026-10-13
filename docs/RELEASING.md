@@ -89,6 +89,11 @@ changed. Normal releases should omit this option to rebuild everything.
 - Jedi/Ruff remain optional and are not installed with the extension. Their
   unavailable-tools warning is separate from memory policy; see the
   [environment setup and troubleshooting](../packages/vscode-tython/README.md#optional-python-tooling).
+- Packaging retains Go's main license from either `GOROOT` or the containing
+  Homebrew package when Go uses a `libexec` layout. Required Go notices are
+  checked in every extracted VSIX and wheel payload, including cross-compiled
+  targets. The Python resolver test compares against the selected interpreter's
+  actual `pathlib` location, supporting both module and package layouts.
 
 Current checkout validation is not a release certification. The demo integration,
 targeted erasure/conformance checks, launch-policy tests, and extension build
@@ -97,11 +102,14 @@ the demo hover regression now exercises the native editor program and covers
 the tuple-printing fix. CI and release/package checks include `internal/pyprogram`
 so these regressions remain part of the required gates. The full Go CLI, Python
 frontend, native editor program, checker, LSP, and conformance suites pass locally
-without excluding either regression. The local license check needs
-the pinned provenance cache (`npm run licenses:prepare`, then
-`npm run licenses:check`). Full VSIX/wheel packaging and an interactive extension
-smoke test remain outstanding; platform-policy tests on macOS do not establish
-live WSL containment. Update these notes with the release results before promotion.
+without excluding either regression. The provenance cache is now prepared and
+the local license check passes. Version 0.1.3 now packages all five VSIX/wheel
+pairs successfully. The extracted macOS ARM64 VSIX passes its editor, formatter,
+and optional Python-helper checks; its wheel passes a fresh offline install,
+CLI checks/builds, and execution of the generated playground. Other targets pass
+archive, license, metadata, checksum, and content-parity checks but were not
+executed on this host. Artifacts are under `built/release/`; nothing was published.
+An interactive extension smoke test and live WSL verification remain outstanding.
 
 ## Publishing
 
