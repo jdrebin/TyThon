@@ -16,6 +16,7 @@ func (p *PythonProgram) SemanticIdentifiers(fileName, source string) []SemanticH
 		}
 		if declared, ok := byRange[info.Range]; ok {
 			info.Readonly = info.Readonly || declared.Readonly
+			info.Optional = info.Optional || declared.Optional
 			info.Async = info.Async || declared.Async
 		}
 		byRange[info.Range] = info

@@ -32,7 +32,6 @@ type RegistryDictionary = {(K): Registry[K] for K in RegistryItemKeys}
 
 type RegistryClassShape = {version: int, retries: int}
 
-
 # Hover each key: a naked dictionary retains a closed, per-key item shape and
 # also has the ordinary Python dictionary surface.
 snapshot = {

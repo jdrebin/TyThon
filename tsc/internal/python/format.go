@@ -153,15 +153,19 @@ func formatType(c *checker.Checker, t *checker.Type, state *typeFormatState) str
 	}
 	state.visiting[t] = true
 	defer delete(state.visiting, t)
-	if signatures := c.GetSignaturesOfType(t, checker.SignatureKindCall); len(signatures) != 0 {
+	signatures := c.GetSignaturesOfType(t, checker.SignatureKindCall)
+	if formatted, ok := formatPythonObject(c, t, state); ok && (len(signatures) == 0 || strings.HasPrefix(formatted, "{")) {
+		if len(signatures) != 0 {
+			return "{ " + formatObjectCallSignatures(c, signatures, state) + ", " + strings.TrimPrefix(formatted, "{ ")
+		}
+		return formatted
+	}
+	if len(signatures) != 0 {
 		formatted := make([]string, len(signatures))
 		for index, signature := range signatures {
 			formatted[index] = formatCallable(c, signature, state)
 		}
 		return strings.Join(formatted, "\n")
-	}
-	if formatted, ok := formatPythonObject(c, t, state); ok {
-		return formatted
 	}
 	text := c.TypeToString(t)
 	if t.Flags()&checker.TypeFlagsBigIntLiteral != 0 {
@@ -293,6 +297,35 @@ func FormatSignatureParameter(c *checker.Checker, signature *checker.Signature, 
 	return result.String()
 }
 
+func formatObjectCallSignatures(c *checker.Checker, signatures []*checker.Signature, state *typeFormatState) string {
+	parts := make([]string, len(signatures))
+	for index, signature := range signatures {
+		parts[index] = "def" + formatCallable(c, signature, state)
+	}
+	return strings.Join(parts, ", ")
+}
+
+func sortPythonMembers(parts []string) {
+	sort.Slice(parts, func(i, j int) bool {
+		return pythonMemberSortKey(parts[i]) < pythonMemberSortKey(parts[j])
+	})
+}
+
+func pythonMemberSortKey(text string) string {
+	for {
+		switch {
+		case strings.HasPrefix(text, "readonly "):
+			text = strings.TrimPrefix(text, "readonly ")
+		case strings.HasPrefix(text, "optional "):
+			text = strings.TrimPrefix(text, "optional ")
+		case strings.HasPrefix(text, "def "):
+			text = strings.TrimPrefix(text, "def ")
+		default:
+			return text
+		}
+	}
+}
+
 func formatPythonObject(c *checker.Checker, t *checker.Type, state *typeFormatState) (string, bool) {
 	attributes := make(map[string]bool)
 	// Protocol members stay hidden from structural output, but container-family
@@ -346,7 +379,7 @@ func formatPythonObject(c *checker.Checker, t *checker.Type, state *typeFormatSt
 			}
 			parts = append(parts, prefix+key+": "+formatType(c, info.ValueType(), state))
 		}
-		sort.Strings(parts)
+		sortPythonMembers(parts)
 		return "{ " + strings.Join(parts, ", ") + " }", true
 	}
 	if c.IsPythonMappingType(t) && len(infos) != 0 {
@@ -382,7 +415,7 @@ func formatPythonObject(c *checker.Checker, t *checker.Type, state *typeFormatSt
 			}
 			parts = append(parts, prefix+property.Name+": "+formatType(c, c.PythonMemberValueType(property), state))
 		}
-		sort.Strings(parts)
+		sortPythonMembers(parts)
 		return "{ " + strings.Join(parts, ", ") + " }", true
 	}
 	if sequenceKind == checker.PythonSequenceNone && !isSequenceIndexShape(c, infos) && (len(infos) == 0 || !attributes["__iter__"] || !attributes["__contains__"]) {
@@ -504,7 +537,7 @@ func formatPythonMappingShape(c *checker.Checker, t *checker.Type, infos []*chec
 		}
 		parts = append(parts, prefix+key+": "+formatType(c, info.ValueType(), state))
 	}
-	sort.Strings(attributeParts)
+	sortPythonMembers(attributeParts)
 	parts = append(parts, attributeParts...)
 	return "{ " + strings.Join(parts, ", ") + " }"
 }

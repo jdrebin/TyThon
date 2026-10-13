@@ -37,6 +37,7 @@ type SemanticHover struct {
 	ObjectProtocol *checker.Type
 	TypeParameters []string
 	Readonly       bool
+	Optional       bool
 	Async          bool
 	DefinitionFile string
 	Definition     TextRange
@@ -73,17 +74,26 @@ func formatQuickInfo(c *checker.Checker, info SemanticHover, verbosity *checker.
 		if info.Readonly {
 			prefix += "readonly "
 		}
+		if info.Optional {
+			prefix += "optional "
+		}
 		return prefix + info.Name + ": " + typeText
 	case QuickInfoItem:
 		prefix := "(item) "
 		if info.Readonly {
 			prefix += "readonly "
 		}
+		if info.Optional {
+			prefix += "optional "
+		}
 		return prefix + info.Name + ": " + typeText
 	case QuickInfoFunction, QuickInfoMethod:
 		prefix := ""
+		if info.Optional {
+			prefix += "optional "
+		}
 		if info.Async {
-			prefix = "async "
+			prefix += "async "
 		}
 		return formatNamedCallable(c, info.Type, prefix+"def "+info.Name, info.ObjectProtocol, verbosity)
 	case QuickInfoClass:

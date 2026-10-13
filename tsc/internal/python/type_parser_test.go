@@ -182,6 +182,14 @@ func TestMappingShapeMethodDeclaration(t *testing.T) {
 	if !method.IsAttribute() || !method.IsMethod() || method.AttributeName != "greet" || !callableOK || len(callable.Parameters) != 1 {
 		t.Fatalf("method = %#v", method)
 	}
+	call := parseTypeForTest(t, `{def() -> int, def<T>(value: T) -> T}`).(*MappingTypeExpr)
+	if len(call.Members) != 2 || call.Members[0].IsAttribute() || !call.Members[0].IsMethod() || call.Members[1].AttributeName != "" {
+		t.Fatalf("call signatures = %#v", call.Members)
+	}
+	generic, ok := call.Members[1].Value.(*CallableTypeExpr)
+	if !ok || len(generic.TypeParameters) != 1 || generic.TypeParameters[0].Name != "T" {
+		t.Fatalf("generic call signature = %#v", call.Members[1].Value)
+	}
 }
 
 func TestConditionalTypeUsesPythonOrdering(t *testing.T) {

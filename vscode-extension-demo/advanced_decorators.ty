@@ -372,7 +372,7 @@ projected_name: ProfileName = "hello"
 
 
 # 25. As with TS accessors, structural views use only the read type.
-def rename_through_view(value: { name: str }):
+def rename_through_view(value: {name: str}):
     value.name = "new name"
 
 

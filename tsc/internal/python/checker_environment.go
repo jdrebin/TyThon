@@ -1057,7 +1057,17 @@ func (e *CheckerTypeEnvironment) resolveCheckerMappingImmediate(expression *Mapp
 	defer func() { e.checkIndexConstraints(result, expression.Range()) }()
 	attributes := make([]checker.ObjectFacetMember, 0, len(expression.Members))
 	items := make([]checker.ObjectFacetIndex, 0, len(expression.Members))
+	calls := make([]*checker.Type, 0)
 	for _, member := range expression.Members {
+		if member.IsMethod() && !member.IsAttribute() {
+			callable, ok := member.Value.(*CallableTypeExpr)
+			if !ok {
+				e.reportChecker(expression.Range(), "expected a call signature")
+				continue
+			}
+			calls = append(calls, e.resolveCheckerCallable(callable, scope, false, nil))
+			continue
+		}
 		if member.IsAttribute() {
 			value := e.resolveCheckerType(member.Value, scope)
 			kind := QuickInfoProperty
@@ -1065,6 +1075,9 @@ func (e *CheckerTypeEnvironment) resolveCheckerMappingImmediate(expression *Mapp
 				kind = QuickInfoMethod
 			}
 			e.recordNamedHover(member.NameLoc, value, kind, member.AttributeName, nil)
+			if member.Optional {
+				e.markHoverOptional(member.NameLoc)
+			}
 			attributes = append(attributes, checker.ObjectFacetMember{
 				Name: member.AttributeName, Type: value, Readonly: member.Readonly, Optional: member.Optional,
 			})
@@ -1087,20 +1100,43 @@ func (e *CheckerTypeEnvironment) resolveCheckerMappingImmediate(expression *Mapp
 		}
 		items = append(items, checker.ObjectFacetIndex{Key: keyType, Value: value, Readonly: member.Readonly, Optional: member.Optional})
 	}
-	attributeSurface := e.checker.NewObjectTypeFromFacets(checker.ObjectFacets{Attributes: attributes})
-	if len(items) == 0 {
-		return attributeSurface
+	var surface *checker.Type
+	switch {
+	case len(attributes) == 0 && len(items) == 0:
+		surface = nil
+	case len(items) == 0:
+		surface = e.checker.NewObjectTypeFromFacets(checker.ObjectFacets{Attributes: attributes})
+	case len(attributes) == 0:
+		// A quoted member in a type expression describes an item facet, not a
+		// concrete runtime container. Runtime dictionary literals use newMappingType;
+		// Dict(Shape) is an ordinary library alias that adds its own members. A
+		// structural type such as { "id": int } carries only its exact index surface.
+		surface = e.checker.NewObjectTypeFromFacets(checker.ObjectFacets{Items: items})
+	default:
+		attributeSurface := e.checker.NewObjectTypeFromFacets(checker.ObjectFacets{Attributes: attributes})
+		itemSurface := e.checker.NewObjectTypeFromFacets(checker.ObjectFacets{Items: items})
+		var err error
+		surface, err = e.checker.MergeObjectFacetTypes([]*checker.Type{attributeSurface, itemSurface})
+		if err != nil {
+			e.reportChecker(expression.Range(), err.Error())
+			return e.checker.GetUnknownType()
+		}
 	}
-	// A quoted member in a type expression describes an item facet, not a
-	// concrete runtime container. Runtime dictionary literals use newMappingType;
-	// Dict(Shape) is an ordinary library alias that adds its own members. A
-	// structural type such as { "id": int } carries only its exact index surface.
-	itemSurface := e.checker.NewObjectTypeFromFacets(checker.ObjectFacets{Items: items})
-	if len(attributes) == 0 {
-		return itemSurface
+	if len(calls) == 0 {
+		if surface == nil {
+			return e.checker.GetUnknownType()
+		}
+		return surface
+	}
+	parts := calls
+	if surface != nil {
+		parts = append([]*checker.Type{surface}, calls...)
+	}
+	if len(parts) == 1 {
+		return parts[0]
 	}
 	var err error
-	result, err = e.checker.MergeObjectFacetTypes([]*checker.Type{attributeSurface, itemSurface})
+	result, err = e.checker.MergeObjectFacetTypes(parts)
 	if err != nil {
 		e.reportChecker(expression.Range(), err.Error())
 		return e.checker.GetUnknownType()
@@ -1619,6 +1655,9 @@ func (e *CheckerTypeEnvironment) resolveCheckerMembers(members []ObjectMemberDec
 			}
 			t := e.resolveCheckerType(member.Type, scope)
 			e.recordNamedHover(member.NameLoc, t, QuickInfoProperty, member.Name, nil)
+			if member.Optional {
+				e.markHoverOptional(member.NameLoc)
+			}
 			if member.Static {
 				classAttrs[member.Name] = append(classAttrs[member.Name], t)
 				if !classSeen[member.Name] {
@@ -1637,10 +1676,16 @@ func (e *CheckerTypeEnvironment) resolveCheckerMembers(members []ObjectMemberDec
 				}
 			}
 		case ObjectMemberMethod:
+			if member.Optional && member.Name != "__call__" {
+				if member.Static || member.ClassMethod {
+					classOptional[member.Name] = true
+				}
+				instanceOptional[member.Name] = true
+			}
 			dropReceiver := !member.Static
 			bound := e.resolveCheckerCallable(member.Signature, scope, dropReceiver, nil)
 			unbound := e.resolveCheckerCallable(member.Signature, scope, false, nil)
-			info := SemanticHover{Range: member.NameLoc, Kind: QuickInfoMethod, Name: member.Name, Type: bound, Async: member.Async}
+			info := SemanticHover{Range: member.NameLoc, Kind: QuickInfoMethod, Name: member.Name, Type: bound, Async: member.Async, Optional: member.Optional}
 			e.hovers = append(e.hovers, info)
 			e.memberDefinitions = append(e.memberDefinitions, memberDefinition{Name: member.Name, Type: bound, File: e.definitionFile, Range: member.NameLoc})
 			if member.Async {
@@ -2049,6 +2094,16 @@ func diagnosticOverlaps(diagnostics []TypeDiagnostic, message string, ranges ...
 func (e *CheckerTypeEnvironment) recordHover(loc TextRange, t *checker.Type, text string) {
 	if loc.End > loc.Start && (t != nil || text != "") {
 		e.hovers = append(e.hovers, SemanticHover{Range: loc, Type: t, Text: text})
+	}
+}
+
+func (e *CheckerTypeEnvironment) markHoverOptional(loc TextRange) {
+	if loc.End <= loc.Start || len(e.hovers) == 0 {
+		return
+	}
+	last := &e.hovers[len(e.hovers)-1]
+	if last.Range == loc {
+		last.Optional = true
 	}
 }
 

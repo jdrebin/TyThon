@@ -148,15 +148,29 @@ func printPythonTypeNode(node *ast.Node, emit *printer.EmitContext) string {
 				if key.Kind != ast.KindLiteralType {
 					text = "(" + text + ")"
 				}
-				return text + ": " + render(node.Type())
+				prefix := ""
+				if node.QuestionToken() != nil {
+					prefix = "optional "
+				}
+				return prefix + text + ": " + render(node.Type())
 			}
+		case ast.KindCallSignature:
+			return "def" + pythonFunctionTail(node, render, join)
+		case ast.KindMethodSignature:
+			prefix := ""
+			if node.QuestionToken() != nil {
+				prefix = "optional "
+			}
+			name := ""
+			if node.Name() != nil {
+				name = render(node.Name())
+			}
+			if name != "" {
+				name = " " + name
+			}
+			return prefix + "def" + name + pythonFunctionTail(node, render, join)
 		case ast.KindFunctionType:
-			parameters := join(node.Parameters(), ", ")
-			generics := ""
-			if len(node.TypeParameters()) != 0 {
-				generics = "<" + join(node.TypeParameters(), ", ") + ">"
-			}
-			return generics + "(" + parameters + ") -> " + render(node.Type())
+			return pythonFunctionTail(node, render, join)
 		case ast.KindParameter:
 			return render(node.Name()) + ": " + render(node.Type())
 		case ast.KindTypeParameter:
@@ -179,6 +193,15 @@ func printPythonTypeNode(node *ast.Node, emit *printer.EmitContext) string {
 		return replaceCheckerTypeWords(writer.String())
 	}
 	return render(node)
+}
+
+func pythonFunctionTail(node *ast.Node, render func(*ast.Node) string, join func([]*ast.Node, string) string) string {
+	parameters := join(node.Parameters(), ", ")
+	generics := ""
+	if len(node.TypeParameters()) != 0 {
+		generics = "<" + join(node.TypeParameters(), ", ") + ">"
+	}
+	return generics + "(" + parameters + ") -> " + render(node.Type())
 }
 
 // A tuple pattern is built as an object literal: numeric slots, an int index

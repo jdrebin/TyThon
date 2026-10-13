@@ -411,15 +411,20 @@ func (p *typeParser) parseMapping() TypeExpr {
 		member := MappingMember{Readonly: readonly, Optional: optional}
 		var attributeToken typeToken
 		if _, ok := p.consumeIdentifier("def"); ok {
-			name := p.expect(tokenIdentifier, "expected method name after 'def'")
+			// `{ def(): Ret }` is a call signature of the object. A name makes
+			// it a method: `{ def greet(): Ret }`.
 			var typeParameters []TypeParameterExpr
-			if p.at(tokenLessThan) {
+			if !p.at(tokenLessThan) && !p.at(tokenLeftParen) {
+				name := p.expect(tokenIdentifier, "expected method name after 'def'")
+				if p.at(tokenLessThan) {
+					typeParameters = p.parseTypeParameters()
+				}
+				member.AttributeName = name.text
+				member.NameLoc = tokenRange(name)
+			} else if p.at(tokenLessThan) {
 				typeParameters = p.parseTypeParameters()
 			}
-			callable := p.parseCallable(typeParameters)
-			member.AttributeName = name.text
-			member.NameLoc = tokenRange(name)
-			member.Value = callable
+			member.Value = p.parseCallable(typeParameters)
 			member.Method = true
 		} else if _, ok := p.consume(tokenLeftBracket); ok {
 			p.errorAtCurrent("computed item keys use '(K): V'")
