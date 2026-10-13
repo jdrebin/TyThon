@@ -177,6 +177,8 @@ interface ReadonlyListProtocol<T>:
     def __iter__(self) -> Iterator<T>
     def __contains__(self, value: any) -> bool
     def __len__(self) -> int
+    def count(self, value: T) -> int
+    def index(self, value: T, start: int = ..., stop: int = ...) -> int
     def __add__(self, other: []T) -> []T
     def __radd__(self, other: []T) -> []T
     def __mul__(self, count: int) -> []T
@@ -184,7 +186,14 @@ interface ReadonlyListProtocol<T>:
 
 interface ListProtocol<T>(ReadonlyListProtocol<T>):
     def append(self, value: T) -> None
+    def extend(self, values: []T) -> None
+    def insert(self, index: int, value: T) -> None
+    def remove(self, value: T) -> None
     def pop(self, index: int = ...) -> T
+    def clear(self) -> None
+    def reverse(self) -> None
+    def sort(self) -> None
+    def copy(self) -> []T
     def __iadd__(self, other: []T) -> []T
     def __imul__(self, count: int) -> []T
 
@@ -192,6 +201,8 @@ interface TupleProtocol<T>:
     def __iter__(self) -> Iterator<T>
     def __contains__(self, value: any) -> bool
     def __len__(self) -> int
+    def count(self, value: T) -> int
+    def index(self, value: T, start: int = ..., stop: int = ...) -> int
     def __add__(self, other: ()T) -> ()T
     def __radd__(self, other: ()T) -> ()T
     def __mul__(self, count: int) -> ()T

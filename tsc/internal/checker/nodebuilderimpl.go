@@ -633,6 +633,27 @@ func (b *NodeBuilderImpl) symbolToEntityNameNode(symbol *ast.Symbol) *ast.Entity
 	return identifier
 }
 
+func (b *NodeBuilderImpl) pythonTupleOperator(tupleTypeNode *ast.Node, t *Type) *ast.Node {
+	node := b.f.NewTypeOperatorNode(ast.KindReadonlyKeyword, tupleTypeNode)
+	if t.objectFlags&ObjectFlagsPythonTuple != 0 {
+		b.e.AddEmitFlags(node, printer.EFPythonTuple)
+	}
+	return node
+}
+
+func (b *NodeBuilderImpl) pythonTypeAlias(symbol *ast.Symbol) bool {
+	if symbol == nil || symbol.Flags&ast.SymbolFlagsTypeAlias == 0 {
+		return false
+	}
+	for _, decl := range symbol.Declarations {
+		file := ast.GetSourceFileOfNode(decl)
+		if file != nil && file.LanguageVariant == core.LanguageVariantPython {
+			return true
+		}
+	}
+	return false
+}
+
 func (b *NodeBuilderImpl) symbolToTypeNode(symbol *ast.Symbol, mask ast.SymbolFlags, typeArguments *ast.NodeList) *ast.TypeNode {
 	chain := b.lookupSymbolChain(symbol, mask, (b.ctx.flags&nodebuilder.FlagsUseAliasDefinedOutsideCurrentScope == 0)) // If we're using aliases outside the current scope, dont bother with the module
 	if len(chain) == 0 {
@@ -718,6 +739,10 @@ func (b *NodeBuilderImpl) symbolToTypeNode(symbol *ast.Symbol, mask ast.SymbolFl
 	if ast.IsEntityName(entityName) {
 		if isTypeOf {
 			return b.f.NewTypeQueryNode(entityName, nil)
+		}
+		// `type Dict(Shape) = ...` is a type call. Interfaces stay `Name<...>`.
+		if typeArguments != nil && len(typeArguments.Nodes) != 0 && b.pythonTypeAlias(symbol) {
+			return b.f.NewTypeCallTypeNode(b.f.NewTypeReferenceNode(entityName, nil), typeArguments)
 		}
 		return b.f.NewTypeReferenceNode(entityName, typeArguments)
 	}
@@ -3115,7 +3140,7 @@ func (b *NodeBuilderImpl) typeReferenceToTypeNode(t *Type) *ast.TypeNode {
 				tupleTypeNode := b.f.NewTupleTypeNode(tupleConstituentNodes)
 				b.e.SetEmitFlags(tupleTypeNode, printer.EFSingleLine)
 				if t.Target().AsTupleType().readonly {
-					return b.f.NewTypeOperatorNode(ast.KindReadonlyKeyword, tupleTypeNode)
+					return b.pythonTupleOperator(tupleTypeNode, t)
 				} else {
 					return tupleTypeNode
 				}
@@ -3125,7 +3150,7 @@ func (b *NodeBuilderImpl) typeReferenceToTypeNode(t *Type) *ast.TypeNode {
 			tupleTypeNode := b.f.NewTupleTypeNode(b.f.NewNodeList([]*ast.TypeNode{}))
 			b.e.SetEmitFlags(tupleTypeNode, printer.EFSingleLine)
 			if t.Target().AsTupleType().readonly {
-				return b.f.NewTypeOperatorNode(ast.KindReadonlyKeyword, tupleTypeNode)
+				return b.pythonTupleOperator(tupleTypeNode, t)
 			} else {
 				return tupleTypeNode
 			}

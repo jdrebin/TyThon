@@ -18,7 +18,10 @@ func TestAssignedContainersUseTheirProtocols(t *testing.T) {
 		"values = [1]\n" +
 		"values.append(2)\n" +
 		"pair = (1, \"a\")\n" +
-		"head: int = pair[0]\n"
+		"head: int = pair[0]\n" +
+		"numbers = [1, 2, 3] as const\n" +
+		"immutable = (0, *numbers)\n" +
+		"tokok = [x for x in range(2)]\n"
 	session := Open(t.Context(), []python.SourceInput{{FileName: "/t.ty", Text: source}})
 	defer session.Close()
 	for _, diagnostic := range session.Diagnostics() {
@@ -32,14 +35,29 @@ func TestAssignedContainersUseTheirProtocols(t *testing.T) {
 		}
 		return text
 	}
-	if got := hover("data"); !strings.Contains(got, "Dict<") {
+	if got := hover("data"); !strings.Contains(got, "Dict(") || strings.Contains(got, "Dict<") {
 		t.Fatalf("dict assignment: %s", got)
 	}
-	if got := hover("empty"); !strings.Contains(got, "Dict<") {
+	if got := hover("empty"); !strings.Contains(got, "Dict(") || strings.Contains(got, "Dict<") {
 		t.Fatalf("empty dict assignment: %s", got)
 	}
 	if got := hover("append"); !strings.Contains(got, "append") {
 		t.Fatalf("list append: %s", got)
+	}
+	if got := hover("pair"); strings.Contains(got, "readonly") || !strings.Contains(got, "(1, \"a\")") {
+		t.Fatalf("tuple: %s", got)
+	}
+	if got := hover("immutable"); strings.Contains(got, "readonly") || !strings.Contains(got, "(0,") || strings.Contains(got, "(int,") {
+		t.Fatalf("immutable tuple: %s", got)
+	}
+	if got := hover("items"); !strings.Contains(got, "[]") || strings.Contains(got, "readonly") {
+		t.Fatalf("list: %s", got)
+	}
+	if got := hover("numbers"); !strings.Contains(got, "readonly") || strings.HasPrefix(strings.TrimPrefix(got, "(variable) numbers: "), "(") {
+		t.Fatalf("readonly list: %s", got)
+	}
+	if got := hover("tokok"); !strings.Contains(got, "[]int") {
+		t.Fatalf("comprehension: %s", got)
 	}
 
 	labels := func(suffix string, attribute bool) []string {
@@ -89,12 +107,30 @@ func TestAssignedContainersUseTheirProtocols(t *testing.T) {
 	}
 	items := labels("items.", true)
 	assertHas(items, "append")
+	assertHas(items, "count")
+	assertMissing(items, "__len__")
 	assertMissing(items, "0")
 	pairDot := labels("pair.", true)
+	assertHas(pairDot, "count")
+	assertMissing(pairDot, "__len__")
 	assertMissing(pairDot, "0")
 	assertMissing(pairDot, "1")
 	assertMissing(pairDot, "length")
 	assertMissing(pairDot, "append")
+	pairDunder := labels("pair.__", true)
+	assertHas(pairDunder, "__len__")
+	countAt, lenAt := -1, -1
+	for i, label := range pairDunder {
+		if label == "count" {
+			countAt = i
+		}
+		if label == "__len__" {
+			lenAt = i
+		}
+	}
+	if countAt < 0 || lenAt < 0 || countAt > lenAt {
+		t.Fatalf("dunders should sort last: %v", pairDunder)
+	}
 	pairIndex := labels("pair[", false)
 	assertHas(pairIndex, "0")
 	assertHas(pairIndex, "1")

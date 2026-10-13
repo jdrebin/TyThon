@@ -3950,6 +3950,11 @@ func (r *Relater) structuredTypeRelatedToWorker(source *Type, target *Type, repo
 		// to X. Failing both of those we want to check if the aggregation of A and B's members structurally
 		// relates to X. Thus, we include intersection types on the source side here.
 		if source.flags&(TypeFlagsObject|TypeFlagsIntersection) != 0 && target.flags&TypeFlagsObject != 0 {
+			// A list/tuple instance is assignable exactly when its native array or
+			// tuple is. Protocol methods are not a second relation.
+			if related, ok := r.pythonSequenceInstanceRelatedTo(source, target, reportErrors); ok {
+				return related
+			}
 			// Report structural errors only if we haven't reported any errors yet
 			reportStructuralErrors := reportErrors && r.errorChain == saveErrorState.errorChain && !sourceIsPrimitive
 			bothPythonSequences := false
@@ -4029,6 +4034,19 @@ func (r *Relater) structuredTypeRelatedToWorker(source *Type, target *Type, repo
 		}
 	}
 	return TernaryFalse
+}
+
+// pythonSequenceInstanceRelatedTo compares the native array/tuple when either
+// operand is a list or tuple instance and the other side is also a sequence.
+// Both operands being raw arrays stays on the ordinary relation so this does
+// not recurse. A list assigned to Object stays a structural object relation.
+func (r *Relater) pythonSequenceInstanceRelatedTo(source *Type, target *Type, reportErrors bool) (Ternary, bool) {
+	sourceNative, _ := r.c.getPythonSequenceMetadata(source)
+	targetNative, _ := r.c.getPythonSequenceMetadata(target)
+	if sourceNative == nil || targetNative == nil || sourceNative == source && targetNative == target {
+		return TernaryFalse, false
+	}
+	return r.isRelatedToEx(sourceNative, targetNative, RecursionFlagsBoth, reportErrors, nil /*headMessage*/, IntersectionStateNone), true
 }
 
 func (r *Relater) pythonSequenceTypesRelatedTo(source *Type, target *Type, reportErrors bool, intersectionState IntersectionState) Ternary {

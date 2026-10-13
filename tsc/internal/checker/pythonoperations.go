@@ -5,6 +5,7 @@ import (
 	"strconv"
 
 	"github.com/jdrebin/TyThon/tsc/internal/ast"
+	"github.com/jdrebin/TyThon/tsc/internal/core"
 )
 
 // SetPythonNotImplementedType registers the declaration-backed sentinel used
@@ -615,9 +616,70 @@ func (c *Checker) GetPythonAsyncIterationType(iterable *Type) (*Type, []ObjectCa
 	return c.unknownType, []ObjectCallDiagnostic{{Argument: -1, Message: "__anext__ result is not awaitable"}}
 }
 
+func (c *Checker) isPythonTupleTypeNode(node *ast.Node) bool {
+	if node == nil || node.Kind != ast.KindTupleType || !c.isReadonlyTypeOperator(node.Parent) {
+		return false
+	}
+	file := ast.GetSourceFileOfNode(node)
+	return file != nil && file.LanguageVariant == core.LanguageVariantPython
+}
+
+// markPythonTuple clones a tuple reference so `()` does not share identity with
+// a readonly list of the same elements.
+func (c *Checker) markPythonTuple(t *Type) *Type {
+	if t == nil || t.objectFlags&ObjectFlagsPythonTuple != 0 || t.objectFlags&ObjectFlagsReference == 0 || !isTupleType(t) {
+		return t
+	}
+	clone := c.cloneTypeReference(t)
+	clone.objectFlags |= ObjectFlagsPythonTuple
+	return clone
+}
+
+func (c *Checker) inPythonSourceFile(node *ast.Node) bool {
+	file := ast.GetSourceFileOfNode(node)
+	// pyparser marks the language variant and does not set ScriptKind.
+	return file != nil && file.LanguageVariant == core.LanguageVariantPython && !file.IsDeclarationFile
+}
+
+// pythonSequenceInstance is the list or tuple object: the native array/tuple
+// stays the indexing and assignability backing, and ListProtocol / TupleProtocol
+// are real members. Declaration files keep the raw array so protocol bodies
+// that mention `[]T` do not recurse into themselves.
+func (c *Checker) pythonSequenceInstance(t *Type) *Type {
+	native, kind := c.getPythonSequenceMetadata(t)
+	if native == nil || kind == PythonSequenceNone {
+		return t
+	}
+	if t.flags&TypeFlagsObject != 0 && t.AsStructuredType().pythonSequenceType != nil && len(c.getPythonProtocolProperties(t)) != 0 {
+		return t
+	}
+	shape := c.newPythonSequenceSurface(native, kind)
+	name := "ListProtocol"
+	if kind == PythonSequenceTuple {
+		name = "TupleProtocol"
+	}
+	protocol := c.getGlobalType(name, 1, false /*reportErrors*/)
+	if protocol == c.emptyGenericType {
+		return shape
+	}
+	element := c.pythonSequenceElementType(native)
+	// `a = []` stays never[] so it still assigns to every []T. unknown is only
+	// the protocol argument, so append accepts a value without widening the list.
+	if element.flags&TypeFlagsNever != 0 {
+		element = c.unknownType
+	}
+	surface := c.createTypeReference(protocol, []*Type{element})
+	result, err := c.MergeObjectFacetTypes([]*Type{shape, surface})
+	if err != nil || result == nil {
+		return shape
+	}
+	c.MarkPythonProtocolProperties(result, surface)
+	return result
+}
+
 // pythonProjectedProperty is a container-protocol member that is not stored on
-// the value. Dict assignments become the Dict alias; list and tuple values stay
-// array and tuple types and read ListProtocol / TupleProtocol from here.
+// the value. Sequence instances already carry their protocol; this remains the
+// lookup for a mapping literal and for a sequence that was not wrapped.
 func (c *Checker) pythonProjectedProperty(t *Type, name string) *ast.Symbol {
 	if prop := c.pythonMappingMethod(t, name); prop != nil {
 		return prop
@@ -639,8 +701,11 @@ func (c *Checker) pythonSequenceProtocol(t *Type) *Type {
 		return nil
 	}
 	name := "ListProtocol"
-	if kind == PythonSequenceTuple {
+	switch {
+	case kind == PythonSequenceTuple:
 		name = "TupleProtocol"
+	case c.IsReadonlyPythonSequence(t):
+		name = "ReadonlyListProtocol"
 	}
 	protocol := c.getGlobalType(name, 1, false /*reportErrors*/)
 	if protocol == c.emptyGenericType {

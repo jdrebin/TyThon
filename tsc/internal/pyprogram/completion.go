@@ -21,11 +21,15 @@ func (s *Session) AttributeCompletions(fileName string, query python.AttributeCo
 	seen := map[string]bool{}
 	var entries []python.CompletionEntry
 	add := func(name string, property *ast.Symbol, bind bool) {
-		if s.checker.IsPythonPrivateAttributeName(name) || !includeCompletionName(name, query.Prefix) {
+		if s.checker.IsPythonPrivateAttributeName(name) {
 			return
 		}
 		// `value.0` is not Python. Tuple slots are item indexes.
 		if numericPropertyName(name) || tuple && name == "length" {
+			return
+		}
+		// Dunders stay hidden until the prefix is `_`, then they sort last.
+		if !includeCompletionName(name, query.Prefix) {
 			return
 		}
 		if seen[name] || !hasPrefix(name, query.Prefix) {
@@ -498,10 +502,19 @@ func sortCompletionLabels(entries []python.CompletionEntry) {
 	for i := 1; i < len(entries); i++ {
 		entry := entries[i]
 		j := i
-		for j > 0 && strings.ToLower(entries[j-1].Label) > strings.ToLower(entry.Label) {
+		for j > 0 && completionLabelLess(entry.Label, entries[j-1].Label) {
 			entries[j] = entries[j-1]
 			j--
 		}
 		entries[j] = entry
 	}
+}
+
+func completionLabelLess(left string, right string) bool {
+	leftDunder := strings.HasPrefix(left, "__")
+	rightDunder := strings.HasPrefix(right, "__")
+	if leftDunder != rightDunder {
+		return rightDunder
+	}
+	return strings.ToLower(left) < strings.ToLower(right)
 }

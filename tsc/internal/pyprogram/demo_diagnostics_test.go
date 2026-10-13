@@ -27,7 +27,7 @@ var acceptedDemoDiagnostics = []string{
 	`vscode-extension-demo/frontier_bytes_overload.ty:13: Parameter 'value' implicitly has an 'any' type.`,
 
 	// Omit(User(int), *) strips every attribute, so this assignment is rejected.
-	`vscode-extension-demo/completion.ty:57: Type 'Omit<User<bigint>, *<string>>' is not assignable to type 'User<bigint>'.`,
+	`vscode-extension-demo/completion.ty:57: Type 'Omit(User(bigint), *<string>)' is not assignable to type 'User(bigint)'.`,
 
 	// diagnostic_gallery.ty and type_error.ty mark these lines as expected errors.
 	`vscode-extension-demo/diagnostic_gallery.ty:10: Argument of type 'string' is not assignable to parameter of type 'bigint'.`,
@@ -48,8 +48,6 @@ var acceptedDemoDiagnostics = []string{
 	// value_hierarchy.ty rejects these on purpose.
 	`vscode-extension-demo/value_hierarchy.ty:6: Type 'null' is not assignable to type '{}'.`,
 	`vscode-extension-demo/value_hierarchy.ty:7: Conversion of type 'boolean' to type 'bigint' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.`,
-	`vscode-extension-demo/value_hierarchy.ty:10: Type 'bigint[]' is not assignable to type 'Object'.`,
-	`vscode-extension-demo/value_hierarchy.ty:11: Type 'readonly [bigint, string]' is not assignable to type 'Object'.`,
 
 	// expected_errors.ty: the bad object, the missing key, the bad default, and
 	// the bad annotation.

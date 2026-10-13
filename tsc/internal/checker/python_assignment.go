@@ -109,6 +109,9 @@ func (c *Checker) pythonTargetType(target *ast.Node, sourceType *Type, name stri
 		// sourceType is already the rest collection. Do not iterate it again.
 		return c.pythonTargetType(target.Expression(), sourceType, name)
 	case ast.KindTupleExpression, ast.KindArrayLiteralExpression:
+		if native, _ := c.getPythonSequenceMetadata(sourceType); native != nil && native != sourceType {
+			sourceType = native
+		}
 		elements := target.ElementList().Nodes
 		for i, element := range elements {
 			var elementType *Type

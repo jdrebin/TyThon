@@ -658,6 +658,9 @@ const (
 	ObjectFlagsIsNeverIntersectionComputed = 1 << 25 // IsNeverLike flag has been computed
 	ObjectFlagsIsNeverIntersection         = 1 << 26 // Intersection reduces to never
 	ObjectFlagsIsConstrainedTypeVariable   = 1 << 27 // T & C, where T's constraint and C are primitives, object, or {}
+	// A Python `(A, B)` / `()T` tuple. Distinct from a readonly array and from
+	// an `as const` list, which stay `readonly []`.
+	ObjectFlagsPythonTuple = 1 << 31
 )
 
 // TypeAlias

@@ -13,11 +13,103 @@ func (c *Checker) checkTupleExpression(node *ast.Node, checkMode CheckMode) *Typ
 	// A tuple value is a readonly sequence. A mutable tuple is a fixed list, so
 	// leaving the literal mutable made `(1, "a")` pick up list methods and the
 	// numeric element properties of a TypeScript tuple.
-	if ast.IsAssignmentTarget(node) || !isTupleType(t) || t.TargetTupleType().readonly {
+	if !ast.IsAssignmentTarget(node) && isTupleType(t) && !t.TargetTupleType().readonly {
+		infos := append([]TupleElementInfo(nil), t.TargetTupleType().elementInfos...)
+		t = c.createArrayLiteralType(c.createTupleTypeEx(c.getElementTypes(t), infos, true /*readonly*/))
+	}
+	if ast.IsAssignmentTarget(node) {
 		return t
 	}
-	infos := append([]TupleElementInfo(nil), t.TargetTupleType().elementInfos...)
-	return c.createArrayLiteralType(c.createTupleTypeEx(c.getElementTypes(t), infos, true /*readonly*/))
+	// `(A, B)` is a tuple. `[A, B] as const` stays a readonly list.
+	return c.markPythonTuple(t)
+}
+
+func (c *Checker) checkComprehensionExpression(node *ast.Node, checkMode CheckMode) *Type {
+	data := node.AsComprehensionExpression()
+	c.checkComprehensionClauses(data.Body)
+	elementNode := comprehensionElement(data.Body)
+	if elementNode == nil {
+		return c.anyType
+	}
+	if ast.IsDictEntry(elementNode) {
+		entry := elementNode.AsDictEntry()
+		key := c.getWidenedType(c.checkExpression(entry.Key))
+		value := c.getWidenedType(c.checkExpressionForMutableLocation(entry.Value, checkMode))
+		return c.MarkPythonFreshLiteral(c.NewObjectTypeFromFacets(ObjectFacets{Items: []ObjectFacetIndex{{Key: key, Value: value}}, PythonMapping: true}), nil)
+	}
+	element := c.getWidenedType(c.getBaseTypeOfLiteralType(c.checkExpression(elementNode)))
+	switch data.Open {
+	case ast.KindOpenBracketToken:
+		return c.createArrayType(element)
+	case ast.KindOpenParenToken:
+		iterator := c.getGlobalType("Iterator", 1, false /*reportErrors*/)
+		if iterator == c.emptyGenericType {
+			return element
+		}
+		return c.createTypeReference(iterator, []*Type{element})
+	case ast.KindOpenBraceToken:
+		setType := c.getGlobalType("set", 1, false /*reportErrors*/)
+		if setType == c.emptyGenericType {
+			return element
+		}
+		return c.createTypeReference(setType, []*Type{element})
+	default:
+		return element
+	}
+}
+
+func (c *Checker) checkComprehensionClauses(body *ast.Node) {
+	if body == nil {
+		return
+	}
+	switch body.Kind {
+	case ast.KindForOfStatement, ast.KindForInStatement:
+		data := body.AsForInOrOfStatement()
+		iterable := c.checkExpression(data.Expression)
+		var element *Type
+		var iterationDiagnostics []ObjectCallDiagnostic
+		if data.AwaitModifier != nil {
+			element, iterationDiagnostics = c.GetPythonAsyncIterationType(iterable)
+		} else {
+			element, iterationDiagnostics = c.GetPythonIterationType(iterable)
+		}
+		for _, diagnostic := range iterationDiagnostics {
+			c.error(data.Expression, diagnostics.NewAdHocMessage(diagnostic.Message))
+		}
+		if element == nil {
+			element = c.anyType
+		}
+		if ast.IsVariableDeclarationList(data.Initializer) && len(data.Initializer.AsVariableDeclarationList().Declarations.Nodes) == 1 {
+			declaration := data.Initializer.AsVariableDeclarationList().Declarations.Nodes[0]
+			if symbol := c.getSymbolOfDeclaration(declaration); symbol != nil {
+				c.valueSymbolLinks.Get(symbol).resolvedType = c.getWidenedType(element)
+			}
+		}
+		c.checkComprehensionClauses(data.Statement)
+	case ast.KindIfStatement:
+		c.checkExpression(body.AsIfStatement().Expression)
+		c.checkComprehensionClauses(body.AsIfStatement().ThenStatement)
+	case ast.KindExpressionStatement:
+		if !ast.IsDictEntry(body.AsExpressionStatement().Expression) {
+			c.checkExpression(body.AsExpressionStatement().Expression)
+		}
+	}
+}
+
+func comprehensionElement(body *ast.Node) *ast.Node {
+	for body != nil {
+		switch body.Kind {
+		case ast.KindForOfStatement, ast.KindForInStatement:
+			body = body.AsForInOrOfStatement().Statement
+		case ast.KindIfStatement:
+			body = body.AsIfStatement().ThenStatement
+		case ast.KindExpressionStatement:
+			return body.AsExpressionStatement().Expression
+		default:
+			return nil
+		}
+	}
+	return nil
 }
 
 func (c *Checker) checkSetExpression(node *ast.Node, checkMode CheckMode) *Type {

@@ -13,7 +13,7 @@ package pyparser
 //	(A)                      ParenthesizedType (kept: `(K)` marks an item key in mappings)
 //	(A, B)                   TypeOperator(readonly, TupleType)         tuple
 //	[A, B]                   TupleType                                 fixed-length list
-//	() T                     TypeOperator(readonly, ArrayType)         homogeneous tuple
+//	() T                     TypeOperator(readonly, TupleType rest)    homogeneous tuple
 //	[] T                     ArrayType                                 homogeneous list
 //	*(A, B) / *[A, B]        RestType (inside a tuple/list)
 //	None / True / False      LiteralType(null / true / false)
@@ -434,10 +434,12 @@ func (p *Parser) parseTupleOrParenthesizedType() *ast.Node {
 	if p.token == ast.KindCloseParenToken {
 		p.nextToken()
 		if p.isStartOfType() {
-			// `() T`: homogeneous tuple.
+			// `() T` is a homogeneous tuple, not a readonly array.
 			element := p.parseTypeOperatorOrHigher()
-			array := p.finishNode(p.factory.NewArrayTypeNode(element), pos)
-			return p.finishNode(p.factory.NewTypeOperatorNode(ast.KindReadonlyKeyword, array), pos)
+			array := p.finishNode(p.factory.NewArrayTypeNode(element), element.Pos())
+			rest := p.finishNode(p.factory.NewRestTypeNode(array), pos)
+			tuple := p.finishNode(p.factory.NewTupleTypeNode(p.newNodeList(core.NewTextRange(pos, rest.End()), []*ast.Node{rest})), pos)
+			return p.finishNode(p.factory.NewTypeOperatorNode(ast.KindReadonlyKeyword, tuple), pos)
 		}
 		tuple := p.finishNode(p.factory.NewTupleTypeNode(p.newNodeList(core.NewTextRange(pos, pos), nil)), pos)
 		return p.finishNode(p.factory.NewTypeOperatorNode(ast.KindReadonlyKeyword, tuple), pos)

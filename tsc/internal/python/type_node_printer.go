@@ -74,6 +74,14 @@ func printPythonTypeNode(node *ast.Node, emit *printer.EmitContext) string {
 			if operator.Operator == ast.KindKeyOfKeyword {
 				return "keyof " + atomic(operator.Type)
 			}
+			if operator.Operator == ast.KindReadonlyKeyword {
+				if emit != nil && emit.EmitFlags(node)&printer.EFPythonTuple != 0 {
+					return printPythonTuple(operator.Type, render)
+				}
+				if operator.Type != nil && operator.Type.Kind == ast.KindArrayType {
+					return "readonly []" + atomic(operator.Type.AsArrayTypeNode().ElementType)
+				}
+			}
 		case ast.KindIndexedAccessType:
 			access := node.AsIndexedAccessTypeNode()
 			return atomic(access.ObjectType) + "[" + render(access.IndexType) + "]"
@@ -202,6 +210,33 @@ func pythonFunctionTail(node *ast.Node, render func(*ast.Node) string, join func
 		generics = "<" + join(node.TypeParameters(), ", ") + ">"
 	}
 	return generics + "(" + parameters + ") -> " + render(node.Type())
+}
+
+// printPythonTuple prints `(A, B)`, `(A,)`, `()`, or `()T`. A readonly array is
+// not this form.
+func printPythonTuple(node *ast.Node, render func(*ast.Node) string) string {
+	if node == nil || node.Kind != ast.KindTupleType {
+		return "()"
+	}
+	elements := node.AsTupleTypeNode().Elements.Nodes
+	if len(elements) == 0 {
+		return "()"
+	}
+	if len(elements) == 1 {
+		text := render(elements[0])
+		if rest, ok := strings.CutPrefix(text, "*[]"); ok {
+			return "()" + rest
+		}
+		if rest, ok := strings.CutPrefix(text, "*"); ok {
+			return "()" + rest
+		}
+		return "(" + text + ",)"
+	}
+	parts := make([]string, len(elements))
+	for i, element := range elements {
+		parts[i] = render(element)
+	}
+	return "(" + strings.Join(parts, ", ") + ")"
 }
 
 // A tuple pattern is built as an object literal: numeric slots, an int index

@@ -7920,6 +7920,8 @@ func (c *Checker) checkExpressionWorker(node *ast.Node, checkMode CheckMode) *Ty
 		return c.checkSetExpression(node, checkMode)
 	case ast.KindDictExpression:
 		return c.checkDictExpression(node, checkMode)
+	case ast.KindComprehensionExpression:
+		return c.checkComprehensionExpression(node, checkMode)
 	case ast.KindKeywordArgument:
 		return c.checkExpressionEx(node.AsKeywordArgument().Expression, checkMode)
 	case ast.KindObjectLiteralExpression:
@@ -8177,6 +8179,11 @@ func (c *Checker) checkArrayLiteral(node *ast.Node, checkMode CheckMode) *Type {
 	inDestructuringPattern := ast.IsAssignmentTarget(node)
 	inConstContext := c.isConstContext(node)
 	contextualType := c.getApparentTypeOfContextualType(node, ContextFlagsNone)
+	if contextualType != nil {
+		if native, _ := c.getPythonSequenceMetadata(contextualType); native != nil && native != contextualType {
+			contextualType = native
+		}
+	}
 	inTupleContext := isSpreadIntoCallOrNew(node) || contextualType != nil && someType(contextualType, func(t *Type) bool {
 		return c.isTupleLikeType(t) || c.isGenericMappedType(t) && t.AsMappedType().nameType == nil && c.getHomomorphicTypeVariable(core.OrElse(t.AsMappedType().target, t)) != nil
 	})
@@ -8185,6 +8192,9 @@ func (c *Checker) checkArrayLiteral(node *ast.Node, checkMode CheckMode) *Type {
 		switch {
 		case ast.IsSpreadElement(e):
 			spreadType := c.checkExpressionEx(e.Expression(), checkMode)
+			if native, _ := c.getPythonSequenceMetadata(spreadType); native != nil && native != spreadType {
+				spreadType = native
+			}
 			switch {
 			case c.isArrayLikeType(spreadType):
 				elementTypes[i] = spreadType
@@ -12886,6 +12896,11 @@ func (c *Checker) checkObjectLiteralDestructuringPropertyAssignment(node *ast.No
 }
 
 func (c *Checker) checkArrayLiteralAssignment(node *ast.Node, sourceType *Type, checkMode CheckMode) *Type {
+	// A list/tuple instance's methods live beside the native array. Destructuring
+	// still follows the array or tuple elements.
+	if native, _ := c.getPythonSequenceMetadata(sourceType); native != nil && native != sourceType {
+		sourceType = native
+	}
 	elements := node.Elements()
 	// This elementType will be used if the specific property corresponding to this index is not
 	// present (aka the tuple element property). This call also checks that the parentType is in
@@ -13879,6 +13894,11 @@ func (c *Checker) hasDefaultValue(node *ast.Node) bool {
 }
 
 func (c *Checker) isConstContext(node *ast.Node) bool {
+	// A tuple value is immutable, so its elements stay literals. `(0, *numbers)`
+	// is not `as const`, but index 0 is still the literal 0.
+	if ast.IsTupleExpression(node) && !ast.IsAssignmentTarget(node) {
+		return true
+	}
 	parent := node.Parent
 	return ast.IsConstAssertion(parent) ||
 		c.isInlineImportAttributes(node) ||
@@ -24924,6 +24944,9 @@ func (c *Checker) getTypeFromArrayOrTupleTypeNode(node *ast.Node) *Type {
 			} else {
 				links.resolvedType = c.createTypeReferenceEx(target, elementTypes, ObjectFlagsFromTypeNode)
 			}
+		}
+		if c.isPythonTupleTypeNode(node) {
+			links.resolvedType = c.markPythonTuple(links.resolvedType)
 		}
 	}
 	return links.resolvedType

@@ -622,6 +622,9 @@ func (c *Checker) ConcatenatePythonSequenceTypes(left *Type, right *Type) *Type 
 }
 
 func (c *Checker) getPythonSequenceMetadata(t *Type) (*Type, PythonSequenceKind) {
+	// Read this before reduction. Reduction can return the shared tuple target,
+	// which does not carry the per-reference Python tuple mark.
+	pythonTuple := t != nil && t.objectFlags&ObjectFlagsPythonTuple != 0
 	t = c.getReducedApparentType(t)
 	if t.flags&TypeFlagsObject != 0 {
 		structured := c.resolveStructuredTypeMembers(t)
@@ -636,16 +639,13 @@ func (c *Checker) getPythonSequenceMetadata(t *Type) (*Type, PythonSequenceKind)
 			}
 		}
 	}
-	// `[]T` / `[A, B]` / `()T` / `(A, B)` resolve to native Array/Tuple types.
-	// Python indexes them with int (bigint), not JS number; do not coerce.
+	// Three sequences: `[]` and `readonly []` are arrays, `()` is a tuple.
+	// An `as const` list is a readonly tuple in the checker and still a list.
 	if c.isArrayType(t) {
-		if c.isReadonlyArrayType(t) {
-			return t, PythonSequenceTuple
-		}
 		return t, PythonSequenceList
 	}
 	if isTupleType(t) {
-		if t.TargetTupleType().readonly {
+		if pythonTuple || t.objectFlags&ObjectFlagsPythonTuple != 0 {
 			return t, PythonSequenceTuple
 		}
 		return t, PythonSequenceList
