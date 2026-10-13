@@ -105,15 +105,24 @@ swap allowance. The bootstrap verifies the actual cgroup files before executing
 the compiler and fails closed if containment cannot be established. No global
 WSL configuration or other extension is changed.
 
+The user reported that containment stopped intermittent WSL-wide instability,
+also observed while using TS Go. Retain this protection after fixing individual
+allocation bugs; that observed benefit does not establish a shared crash cause.
+Scope containment and its default soft target to Linux/WSL instead of imposing
+the same target on macOS and Windows.
+
 - On cgroup v2, RAM and swap have independent hard caps.
 - On this WSL host's cgroup v1, the enforced limits are 4 GiB RAM and 4.5 GiB
   combined RAM+swap; 512 MiB is not an independent swap cap on that controller.
 - Service cleanup targets only the generated unit; window shutdown stops that
   group. Unexpected exits do not trigger an automatic crash/restart loop.
 - `pythonTypeScript.server.*` settings expose the limits and optional native
-  profiling directory. Explicitly disabling Linux containment removes hard
-  protection and produces a warning. Other platforms currently have only the
-  soft target and warning, not equivalent hard containment.
+  profiling directory. Linux/WSL containment stays enabled by default; disabling
+  it explicitly removes hard protection. The Go target defaults to `0`
+  (automatic): 3 GiB under containment, otherwise the runtime default or inherited
+  `GOMEMLIMIT`. Explicit targets apply on all platforms. Hard-limit validation
+  applies only when Linux containment is active. macOS and Windows launch
+  directly; routine memory configuration is logged without a startup warning.
 - `tython: Save Heap Profile` invokes the existing server profiling API.
   Startup CPU/allocation profiles use the existing `--pprofDir` implementation;
   those profiles require graceful shutdown to be finalized.
@@ -172,6 +181,9 @@ diagnostics/hover/heap-profile smoke test (`test/containedLsp.test.mjs`).
 - Type syntax is erased. Erasure never inserts or replaces runtime behavior.
 - A `.ty` implementation emits ordinary `.py` while preserving Python code.
 - A `.d.ty` file has no runtime output.
+- Bare-annotation erasure must preserve `try:`, `else:`, and `finally:` headers.
+  The runnable playground exposed this regression; erasure tests and the
+  `runtime/try-suites` conformance case cover both output and execution.
 
 ## Governing compatibility rule
 
@@ -319,15 +331,17 @@ Standard-library declarations:
 
 ### Hands-on preview distribution
 
-- Use `packages/vscode-tython/preview` for a small, maintained
-  consumer workspace: exact shapes and dictionary methods, optional keys,
-  mapped/conditional utilities, generics and callbacks, classes and declaration
-  imports. Put intentional diagnostics in a separate `negative` directory.
-  Check both clean examples and expected errors with the actual checker.
+- Use `packages/vscode-tython/preview` as the canonical consumer playground.
+  Its 17 numbered, runnable lessons cover the public feature families: shapes,
+  type transformations, attribute/item separation, functions, collections,
+  narrowing, classes/descriptors, decorators, protocols, async/generators,
+  control flow, assertions, imports, validation contracts, and editor features.
+  Keep the detailed feature map in its README and intentional diagnostics in
+  `negative/`. This is not exhaustive Python-library or checker-edge coverage.
 - Keep the canonical library authoring launch, add **Launch tython preview**, and
   retain the original demo workspace. The local launch configuration is in the
   repository's existing ignored `.vscode/launch.json`.
-- Package a Linux x64/WSL VSIX with `@vscode/vsce`, the freshly built matching
+- Package platform-specific VSIX artifacts with `@vscode/vsce`, the freshly built matching
   native compiler, canonical source library, JS bundle, Python helper scripts,
   grammar, and vendored Pyright resolver. Never fall back to an unrelated `tsgo`
   found on PATH. Installed and development compiler selection are explicit.
@@ -335,6 +349,15 @@ Standard-library declarations:
   packaged workspace to an exclusively created directory chosen by the user.
   It never overwrites an existing workspace. Optional Jedi/Ruff environments
   remain user-controlled; installing the VSIX does not install Python packages.
+- The wheel's `tython demo [directory]` copies the same files offline, defaulting
+  to `tython-demo`. Refuse every existing destination, including empty directories
+  and symlinks. Generation never installs dependencies or executes the examples.
+  Stage examples from the verified VSIX and exclude generated outputs/caches.
+- `python tour.py --check` checks positive lessons; `python tour.py` builds and
+  executes them. The runner explicitly supplies local `.py` dependencies to
+  `dist/`; ordinary Python modules are not automatically bundled by the compiler.
+  Cover generation/no-overwrite and the executable tour in `test_demo.py` and CI;
+  installed-wheel tests verify VSIX parity and run the generated tour.
 - `npm run -w tython preview:package` runs the Python frontend,
   checker and LSP Go suites, extension checks, and real Python-provider tests.
   It stages an explicit file allowlist, retains upstream/dependency licenses,
@@ -349,8 +372,9 @@ Standard-library declarations:
   Code smoke testing remains distinct from automated LSP/package verification.
 - Document limitations instead of hiding them: exact-to-open-map compatibility,
   incomplete builtin/view signatures and annotation conversion, deferred hover
-  formatting migration, and no whole-file `.ty` formatting. This is an
-  installable feedback preview, not complete Python standard-library coverage.
+  formatting migration, and incomplete typed formatter coverage (selection
+  formatting remains deferred). This is an installable feedback preview,
+  not complete Python standard-library coverage.
 
 Verification (2026-09-15): the Linux x64 artifact with payload build ID
 `6a2d2b6e64107176` passed all gates above. Native type navigation and Jedi's
@@ -360,7 +384,28 @@ Pyright both ran under verified cgroup v1 containment. The package was not
 installed into the user's VS Code or published, and an interactive VS Code
 session was not driven by the automated tests. The local F5 launch is ready
 for that hands-on check.
-  This setup does not yet provide the complete Python standard-library catalog.
+
+Current update validation: all 17 positive lessons check, build, and run with the
+native compiler; the four deliberate diagnostics remain isolated. Demo-generation,
+erasure, targeted control-flow conformance, and launch-policy checks pass locally,
+as does the extension build. Full artifact packaging and live WSL verification
+have not been rerun for this update. `TestAssignedContainersUseTheirProtocols`
+now verifies prefix filtering: `pair.__` offers matching dunders and `pair.co`
+offers `count`. `TestDemoSurfaces` has moved from the historical frontend adapter
+to the native editor program. This exposed and fixed tuple alias hovers rendering
+as readonly lists: the type-node printer now recognizes source tuple nodes as
+well as generated tuple metadata. Regressions cover empty, single, nested,
+homogeneous, and variadic tuples while retaining readonly-list identity.
+CI and release/package gates now include the full `internal/pyprogram` suite.
+The full Go CLI, Python frontend, native editor program, checker, LSP, and
+conformance suites pass locally without excluding these regressions.
+See [release checks](docs/RELEASING.md#upcoming-update-notes) for the
+remaining promotion gates; the dated verification above describes an older build.
+
+### Remaining standard-library work
+
+This setup does not yet provide the complete Python standard-library catalog.
+
 - A leading `# @no-default-lib` in a declaration file checks that file at the
   existing library bootstrap boundary instead of injecting an embedded copy
   into itself. Intrinsic identities remain compiler-defined; library source
@@ -1192,19 +1237,22 @@ Every change to the key model must prove:
 
 ## Local installable alpha artifacts
 
-- Build a matching Linux x64/WSL VSIX and `tython-lang` wheel with
-  `npm run release:package`; publish nothing automatically.
+- Build matching platform VSIX artifacts and `tython-lang` wheels with
+  `npm run release`; use `npm run release:package` for the host target only.
+  Publish nothing automatically.
 - The wheel's `tython check` / `tython build` commands delegate directly to the
   existing native compiler. No alternate checker, emitter, or runtime is added.
   Build writes a separate `dist/` tree by default, with `--out-dir` and
   `--root-dir` controls. Use TS's existing output-path mapper. Keep module
   grouping strict: source `.py` and `.ty` remain competing implementations.
-  Preserve package layout/initializers and copy discovered local Python modules;
+  Preserve typed package layout/initializers; supply ordinary Python runtime
+  dependencies separately, as the playground's `tour.py` does;
   do not rewrite imports, inject a runtime, or automatically bundle assets.
   Protect source files and reject output aliases through symlinks/hard links.
-- Stage the wheel from the verified VSIX's exact binary and canonical library.
-  Use setuptools and an explicit `py3-none-linux_x86_64` tag, not a universal
-  pure-Python or unverified manylinux claim. No user Go/Node/build step.
+- Stage the wheel from the verified VSIX's exact binary, canonical library,
+  and playground. Use setuptools and explicit native-platform wheel metadata,
+  including `manylinux_2_17` for the statically linked Linux compiler.
+  No user Go/Node/build step.
 - Verify offline installation in a fresh temporary venv outside the checkout,
   compiler/library identity, CLI errors, imports and executable emitted Python.
   Promote the pair only after tests; include installation instructions, hashes,
@@ -1213,7 +1261,9 @@ Every change to the key model must prove:
   ignored Git object cache after the history reset; do not restore upstream
   commits into this repository or skip audit checks.
 - VSIX owns the bundled formatter; Jedi/Ruff remain optional environment tools.
-  Other targets, public package publication, and CLI formatting are deferred.
+  Targets include Linux x64/arm64, macOS x64/arm64, and Windows x64. Packaging
+  cross-compiles all targets; execution checks require the corresponding OS.
+  CLI formatting remains deferred; publication is a separate maintainer action.
 
 The first wheel verification exposed the conflict between sibling `.py`
 emission and source discovery. The user's decision (2026-09-16) is to use a

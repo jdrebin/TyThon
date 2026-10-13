@@ -119,18 +119,16 @@ func TestAssignedContainersUseTheirProtocols(t *testing.T) {
 	assertMissing(pairDot, "append")
 	pairDunder := labels("pair.__", true)
 	assertHas(pairDunder, "__len__")
-	countAt, lenAt := -1, -1
-	for i, label := range pairDunder {
-		if label == "count" {
-			countAt = i
-		}
-		if label == "__len__" {
-			lenAt = i
+	assertMissing(pairDunder, "count")
+	for _, label := range pairDunder {
+		if !strings.HasPrefix(label, "__") {
+			t.Fatalf("nonmatching completion for pair.__: %s", label)
 		}
 	}
-	if countAt < 0 || lenAt < 0 || countAt > lenAt {
-		t.Fatalf("dunders should sort last: %v", pairDunder)
-	}
+	pairCount := labels("pair.co", true)
+	assertHas(pairCount, "count")
+	assertMissing(pairCount, "index")
+	assertMissing(pairCount, "__len__")
 	pairIndex := labels("pair[", false)
 	assertHas(pairIndex, "0")
 	assertHas(pairIndex, "1")

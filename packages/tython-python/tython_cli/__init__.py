@@ -7,6 +7,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+from .demo import create_demo
+
 
 def main():
     package = Path(__file__).resolve().parent
@@ -20,6 +22,16 @@ def main():
         version=f"tython {info['version']} ({info['buildID']})",
     )
     commands = parser.add_subparsers(dest="command", required=True)
+    demo = commands.add_parser(
+        "demo",
+        help="Create a playground covering tython's language and editor features.",
+    )
+    demo.add_argument(
+        "directory",
+        nargs="?",
+        default="tython-demo",
+        help="New directory to create (default: tython-demo); must not already exist",
+    )
     for name, help_text in [
         ("check", "Type-check files without writing output."),
         (
@@ -42,6 +54,15 @@ def main():
             "files", nargs="+", metavar="FILE", help=".ty or .d.ty input file"
         )
     args = parser.parse_args()
+    if args.command == "demo":
+        try:
+            destination = create_demo(package / "preview", Path(args.directory))
+        except OSError as error:
+            parser.exit(2, f"tython: could not create demo: {error}\n")
+        print(f"Created tython demo at {destination}")
+        print("Open that folder in your editor and start with README.md.")
+        print("From that folder, run: python tour.py")
+        return
     executable = package / ("bin/tython.exe" if os.name == "nt" else "bin/tython")
     # Absolute paths also prevent a filename beginning with '-' from being
     # interpreted as a compiler flag. Keep cwd intact for import resolution.

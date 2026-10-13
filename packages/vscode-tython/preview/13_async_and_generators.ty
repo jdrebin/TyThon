@@ -1,0 +1,40 @@
+from asyncio import run
+
+
+async def fetch_name() -> str:
+    return "Ada"
+
+
+async def names() -> AsyncIterator<str>:
+    yield await fetch_name()
+    yield "Grace"
+
+
+class Session:
+    async def __aenter__(self) -> str:
+        return "Visitors"
+
+    async def __aexit__(self, error_type: any, error: any, traceback: any) -> bool:
+        return False
+
+
+async def collect() -> []str:
+    async with Session() as label:
+        collected = [name async for name in names()]
+        async for name in names():
+            print(label, name)
+        return collected
+
+
+# Generator parameters are Yield, Send, Return (in that order).
+def exchange() -> Generator<int, str, bool>:
+    received = yield 1
+    yield from [2, 3]
+    return received == "done"
+
+
+stream = exchange()
+first = next(stream)
+second = stream.send("done")
+print(first, second, run(collect()))
+# Hover collect(): its call returns an awaitable, its awaited value is []str.

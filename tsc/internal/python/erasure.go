@@ -462,7 +462,10 @@ func eraseVariableAnnotations(source string, removed []bool, diagnostics *[]Eras
 					}
 				}
 			} else if colon := findTopLevel(line, ':'); colon >= 0 {
-				if _, named := annotatedDeclarationName(line[:colon]); named {
+				name, named := annotatedDeclarationName(line[:colon])
+				// These suite headers also look like an identifier followed by a
+				// colon, but are runtime control flow, not bare annotations.
+				if named && name != "try" && name != "else" && name != "finally" {
 					// A bare Python annotation statement has no runtime value after
 					// static erasure; erase its name as well instead of turning it into
 					// an accidental expression statement.

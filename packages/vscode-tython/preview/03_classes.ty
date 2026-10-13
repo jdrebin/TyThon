@@ -14,3 +14,10 @@ greeter = Greeter("Hello ")
 message = greeter("Kate")
 method = greeter.greet
 again = method("John")
+
+# An unnamed def in an interface describes a callable value.
+interface GreetingFunction:
+    def(name: str) -> str
+
+callable_greeting: GreetingFunction = greeter
+print(message, again, callable_greeting("Ada"))

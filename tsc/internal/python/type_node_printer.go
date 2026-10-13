@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/jdrebin/TyThon/tsc/internal/ast"
+	"github.com/jdrebin/TyThon/tsc/internal/core"
 	"github.com/jdrebin/TyThon/tsc/internal/printer"
 )
 
@@ -77,6 +78,14 @@ func printPythonTypeNode(node *ast.Node, emit *printer.EmitContext) string {
 			if operator.Operator == ast.KindReadonlyKeyword {
 				if emit != nil && emit.EmitFlags(node)&printer.EFPythonTuple != 0 {
 					return printPythonTuple(operator.Type, render)
+				}
+				// Source tuple syntax lowers to a readonly tuple node. Unlike
+				// node-builder output, it has no emit flag; its source language
+				// identifies the tuple. Synthesized readonly lists stay lists.
+				if operator.Type != nil && operator.Type.Kind == ast.KindTupleType {
+					if file := ast.GetSourceFileOfNode(node); file != nil && file.LanguageVariant == core.LanguageVariantPython {
+						return printPythonTuple(operator.Type, render)
+					}
 				}
 				if operator.Type != nil && operator.Type.Kind == ast.KindArrayType {
 					return "readonly []" + atomic(operator.Type.AsArrayTypeNode().ElementType)

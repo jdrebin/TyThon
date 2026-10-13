@@ -13,7 +13,24 @@
     "    else:",
     "        return \"ready\"",
     "    finally:",
-    "        flag = False"
+    "        flag = False",
+    "print(read(False), read(True))"
   ],
-  "diagnostics": []
+  "diagnostics": [],
+  "transpile": {
+    "output": [
+      "def read(flag      )       :",
+      "    try:",
+      "        if flag:",
+      "            raise ValueError(\"missing\")",
+      "    except ValueError as error:",
+      "        return \"missing\"",
+      "    else:",
+      "        return \"ready\"",
+      "    finally:",
+      "        flag = False",
+      "print(read(False), read(True))"
+    ],
+    "stdout": "ready missing\n"
+  }
 }

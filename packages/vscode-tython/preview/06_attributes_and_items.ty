@@ -1,0 +1,33 @@
+# A real object can have both .label and ["label"], with different types.
+class Shelf:
+    label: str = "Fiction"
+
+    def __getitem__(self, key: str) -> int:
+        return 12
+
+
+type Surface = {label: str, "label": int}
+type AttributeKeys = Extract(keyof Surface, *)
+type ItemKeysOnly = Exclude(keyof Surface, *)
+type AttributeLabel = Surface[*<"label">]
+type SameAttribute = Surface.label
+type ItemLabel = Surface["label"]
+
+# A dunder implementation alone does not declare its structural item surface.
+# This explicit view promises the item contract implemented above.
+shelf = Shelf() as Shelf & Surface
+attribute: AttributeLabel = shelf.label
+item: ItemLabel = shelf["label"]
+print(attribute, item)
+
+# Open and patterned contracts promise access, not a concrete container.
+type Counters = {(str): int}
+type BinaryLabels = {(bytes): str}
+type AnyAttributes = {*: str}
+type Getters = {(*<f"get_{str}">): () -> str}
+
+# Dict adds dictionary operations to a structural item contract.
+def count_at(counts: Dict(Counters), key: str) -> int:
+    return counts[key]
+
+# Try shelf["missing"] or assigning a string to shelf["label"].

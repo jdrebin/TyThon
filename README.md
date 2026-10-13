@@ -91,8 +91,20 @@ files are not read, checked, or copied into the output. Supply Python runtime
 dependencies separately; data files and dynamically loaded modules are not bundled.
 For a package entry point, run `python -m package.module` from the output root.
 Relative data-file paths still depend on the working directory. Use `check`
-when you only want diagnostics. To explore without writing your own
-sample, run **tython: Open Preview Examples** in VS Code.
+when you only want diagnostics. To start with a playground of 17 independent
+lessons covering the language and editor features:
+
+```sh
+tython demo my-playground
+cd my-playground
+python tour.py
+```
+
+`tython demo` defaults to a new `tython-demo` folder and refuses existing
+destinations. It copies files offline without running code or installing anything.
+`python tour.py --check` checks all positive lessons; the default tour builds and
+runs them. The same files are available through **tython: Open Preview Examples**
+in VS Code. See the [playground feature map](packages/vscode-tython/preview/README.md).
 
 **Do not `pip install tython`**: that PyPI name belongs to an unrelated project.
 Our distribution is named `tython-lang`. There is no GitHub Release. Maintainers
@@ -102,8 +114,8 @@ See [release packaging](docs/RELEASING.md).
 ### From source
 
 Use the Node/npm versions specified in [package.json](package.json), Go 1.26,
-and VS Code. The supported preview environment is Linux x64/WSL with working
-systemd/cgroup support; the language server uses memory containment.
+and VS Code. Linux/WSL requires working systemd/cgroup support for the default
+language-server containment. macOS and Windows launch the server directly.
 
 ```sh
 git clone https://github.com/jdrebin/TyThon.git
@@ -121,7 +133,7 @@ In the new Extension Development Host window:
 1. Trust the example workspace so the extension can start.
 2. Open `01_shapes.ty` and hover over variables and types.
 3. Try completing a dictionary key inside quotes, or change a value to the wrong type.
-4. Continue through `02_types.ty`, `03_classes.ty`, and `04_imports.ty`.
+4. Continue through the numbered lessons or use their README's feature map.
 
 The examples include intentional errors in a separate `negative/` folder.
 You can experiment with the introductory example above in a new `.ty` file;

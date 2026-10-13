@@ -1,0 +1,36 @@
+# The implementations really validate; the .d.ty file teaches the checker how.
+from guards import is_text, require_text
+
+
+def display(value: str | int) -> str:
+    if is_text(value):
+        return value.upper()
+    return "Not text"
+
+
+def shout(value: str | int) -> str:
+    require_text(value)
+    return value.upper()
+
+
+def assert_present(value: str | None) -> str:
+    assert value is not None
+    return value
+
+
+# Closures keep Python scope rules after types are erased.
+def make_counter():
+    count: int = 0
+
+    def increment() -> int:
+        nonlocal count
+        count += 1
+        return count
+
+    return increment
+
+
+counter = make_counter()
+print(display("Ada"), display(42), shout("hello"), assert_present("here"), counter(), counter())
+# Go to guards.d.ty to inspect the predicates and assertions, then guards.py
+# to inspect their runtime implementation. Try shout(42): it raises in Python.

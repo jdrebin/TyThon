@@ -1,0 +1,56 @@
+# Properties, inherited methods, and descriptors describe a thermostat.
+interface Named:
+    name: str
+
+
+interface Labeled(Named):
+    label: str
+
+
+class Device:
+    name: str
+
+    def __init__(self, name: str) -> asserts self is {name: str}:
+        self.name = name
+
+    def display(self) -> str:
+        return self.name
+
+
+class Thermostat(Device):
+    def __init__(self, name: str, temperature: int):
+        super().__init__(name)
+        self._temperature = temperature
+
+    @property
+    def temperature(self) -> int:
+        return self._temperature
+
+    @temperature.setter
+    def temperature(self, value: int) -> None:
+        self._temperature = value
+
+    @classmethod
+    def create(cls, name: str) -> Thermostat:
+        return cls(name, 20)
+
+    @staticmethod
+    def comfortable(value: int) -> bool:
+        return 18 <= value <= 24
+
+
+class UnitLabel:
+    def __get__(self, instance: object, owner: any) -> str:
+        return "Celsius"
+
+
+class Display:
+    unit = UnitLabel()
+
+
+thermostat = Thermostat.create("Office")
+thermostat.temperature = 22
+bound_display = thermostat.display
+named: Named = thermostat
+print(bound_display(), thermostat.temperature, Display().unit, Thermostat.comfortable(22))
+# Try a string temperature or remove the required name assignment in Device.

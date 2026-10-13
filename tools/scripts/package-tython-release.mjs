@@ -56,12 +56,13 @@ for (const name of ["pyproject.toml", "setup.py", "README.md", "tython_cli"]) {
     });
 }
 const payload = path.join(stage, "tython_cli");
-// Copy from the VSIX, not built/local: guarantees identical compiler and library.
+// Copy from the VSIX: guarantees identical compiler, library, and demo sources.
 for (const entry of archive.getEntries()) {
     const name = entry.entryName.replace(/^extension\//, "");
     assert(!name.startsWith("/") && !name.split("/").includes(".."), "Unsafe archive path");
     const include = [target.compilerFile, "library/builtins.d.ty", "LICENSE.txt", "NOTICE.txt", "LICENSING.md"].includes(name)
-        || name.startsWith("licenses/go/") || name.startsWith("licenses/go-toolchain/") || name.startsWith("licenses/fswatch/");
+        || name.startsWith("licenses/go/") || name.startsWith("licenses/go-toolchain/") || name.startsWith("licenses/fswatch/")
+        || name.startsWith("preview/");
     if (!include || entry.isDirectory) continue;
     const destination = path.join(payload, name);
     await mkdir(path.dirname(destination), { recursive: true });

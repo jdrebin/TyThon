@@ -1,0 +1,35 @@
+# Decorators really run in Python. Their result becomes the public binding.
+def preserve<T>(value: T) -> T:
+    return value
+
+
+def increment_result(fn: (value: int) -> int) -> (value: int) -> int:
+    def wrapped(value: int) -> int:
+        return fn(value) + 1
+    return wrapped
+
+
+@preserve
+@increment_result
+def square(value: int) -> int:
+    return value * value
+
+
+def registered_as(name: str):
+    def decorate(fn: () -> int) -> str:
+        return name
+    return decorate
+
+
+@registered_as("answer")
+def answer() -> int:
+    return 42
+
+
+@preserve
+def identity<T>(value: T) -> T:
+    return value
+
+
+print(square(4), answer, identity("ready"))
+# Hover answer: it is a str now. Calling answer() is a type error.

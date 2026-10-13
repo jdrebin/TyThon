@@ -1,0 +1,38 @@
+# An absent preference is different from a present value of None.
+type Preferences = {optional "nickname": str, "theme": str | None}
+type Named = {optional nickname: str}
+
+
+def display(preferences: Dict(Preferences)) -> str:
+    if "nickname" in preferences:
+        return preferences["nickname"]
+    return "Anonymous"
+
+
+def attribute_name(value: Named) -> str:
+    if hasattr(value, "nickname"):
+        return value.nickname
+    return "Anonymous"
+
+
+def theme_name(value: str | None) -> str:
+    if value is None:
+        return "system"
+    return value
+
+
+preferences: Dict(Preferences) = {"nickname": "Ada", "theme": None}
+del preferences["nickname"]
+before = display(preferences)
+preferences["nickname"] = "Ada"
+after: str = preferences["nickname"]
+del preferences["nickname"]
+
+# The caller promises presence; ! inserts no runtime check and keeps None.
+def trusted_nickname(value: Dict(Preferences)) -> str:
+    return value["nickname"]!
+
+
+known: Dict(Preferences) = {"nickname": "Grace", "theme": "dark"}
+print(before, after, display(preferences), trusted_nickname(known), theme_name(None))
+# Remove the membership test in display to see the optional-access diagnostic.

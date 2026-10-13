@@ -5,8 +5,13 @@ Open the repository root in VS Code. In **Run and Debug**, select
 the compiler and extension without `hereby`, then opens
 `python-typescript-demo.code-workspace` in an Extension Development Host.
 The launch reuses the compiler and formatter when current, otherwise rebuilds
-them, then builds the small extension bundle. The formatter includes its own
-Python runtime; the first preparation installs pinned build dependencies.
+them, then builds the small extension bundle. The formatter ships pinned Black
+and runs it with your Python interpreter; the first preparation installs pinned
+build dependencies.
+
+For the runnable consumer playground, use `tython demo my-playground` or
+**tython: Open Preview Examples**. Its [feature map](../packages/vscode-tython/preview/README.md)
+covers the numbered lessons; this directory remains the development feature lab.
 
 To test formatting, open `formatting.ty` and run **Format Document**
 (`Shift+Alt+F`). It is deliberately unformatted. If another formatter is selected,
@@ -108,8 +113,8 @@ npm run demo:prepare --workspace packages/vscode-tython
 Restart the extension development host, then open `python_tools.ty` for library
 docs, import completions, fallback definitions, Ruff warnings/quick fixes, and
 Format Document. Open `python_tools_typed.ty` for linting beside type syntax and
-safe Format Selection on a complete top-level, untyped Python statement.
-Full-document formatting of typed syntax is not supported yet.
+typed **Format Document** through the bundled formatter. Selection formatting
+is not registered yet. Formatting does not require Jedi or Ruff.
 
 The Python extension's selected interpreter controls library discovery when it
 is available. Override with `pythonTypeScript.tools.interpreterPath`; use

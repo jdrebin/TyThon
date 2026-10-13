@@ -28,6 +28,7 @@ let shuttingDown = false;
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
     shuttingDown = false;
+    stopContainedServer = undefined;
     const output = vscode.window.createOutputChannel("TyThon");
     context.subscriptions.push(output);
     registerDunderMask(context);
@@ -54,27 +55,33 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     };
 
     const config = vscode.workspace.getConfiguration("pythonTypeScript");
-    const launch = createServerLaunch(compilerPath(), context.extensionPath,
-        vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? context.extensionPath, {
-            memoryMiB: config.get<number>("server.memoryLimitMiB", 4096),
-            swapMiB: config.get<number>("server.swapLimitMiB", 512),
-            goMemoryMiB: config.get<number>("server.goMemoryLimitMiB", 3072),
-            linuxContainment: config.get<boolean>("server.linuxContainment", true),
-            profileDirectory: config.get<string>("server.profileDirectory", ""),
-        });
+    let launch: ReturnType<typeof createServerLaunch>;
+    try {
+        launch = createServerLaunch(compilerPath(), context.extensionPath,
+            vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? context.extensionPath, {
+                memoryMiB: config.get<number>("server.memoryLimitMiB", 4096),
+                swapMiB: config.get<number>("server.swapLimitMiB", 512),
+                goMemoryMiB: config.get<number>("server.goMemoryLimitMiB", 0),
+                linuxContainment: config.get<boolean>("server.linuxContainment", true),
+                profileDirectory: config.get<string>("server.profileDirectory", ""),
+            });
+    } catch (error) {
+        output.appendLine(`Could not configure tython language server: ${String(error)}`);
+        void vscode.window.showErrorMessage(`Could not configure tython language server: ${error instanceof Error ? error.message : String(error)}`);
+        return;
+    }
     if (launch.unit) {
         stopContainedServer = async () => {
             try { await promisify(execFile)("systemctl", [...launch.managerArgs, "stop", launch.unit!], { timeout: 8000 }); }
             catch (error) { output.appendLine(`Containment cleanup: ${String(error)}`); }
         };
-    } else {
-        void vscode.window.showWarningMessage("tython is running with only a soft memory limit; there is no hard OS memory containment.");
     }
+    output.appendLine(`Server memory: ${launch.softLimit ? `Go target ${launch.softLimit}` : "Go runtime defaults / inherited GOMEMLIMIT"}; ${launch.unit ? "Linux containment enabled" : "no OS containment"}.`);
     const serverOptions: ServerOptions = {
         command: launch.command,
         args: launch.args,
         transport: TransportKind.stdio,
-        options: { cwd: vscode.workspace.workspaceFolders?.[0]?.uri.fsPath, env: { ...process.env, GOMEMLIMIT: launch.softLimit } },
+        options: { cwd: vscode.workspace.workspaceFolders?.[0]?.uri.fsPath, env: { ...process.env, ...launch.env } },
     };
     const documentSelector = [
         { language: "tython", scheme: "file", pattern: "**/*.ty" },
@@ -196,7 +203,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     catch (error) {
         output.appendLine(`Could not start tython language server: ${String(error)}`);
         await stopContainedServer?.();
-        void vscode.window.showErrorMessage("tython could not start safely. Check the language-server output. On Linux, a working systemd memory controller is required; the extension will not silently launch without containment.");
+        void vscode.window.showErrorMessage(launch.unit
+            ? "tython could not start. Check the language-server output. Linux containment requires a working systemd memory controller; the extension will not silently launch without it."
+            : "tython could not start. Check the TyThon output channels for details.");
     }
 }
 

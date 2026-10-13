@@ -1,7 +1,7 @@
 // Test the extracted distribution, not built/local or the repository's library.
 import assert from "node:assert/strict";
 import { spawn, execFile } from "node:child_process";
-import { cp, mkdtemp, readFile, access } from "node:fs/promises";
+import { cp, mkdtemp, readFile, readdir, access } from "node:fs/promises";
 import { constants } from "node:fs";
 import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
@@ -89,7 +89,7 @@ try {
     assert.deepEqual((await request("textDocument/diagnostic", { textDocument: { uri: plainPython } })).items, [], "Packaged server must not check .py documents");
     await notify("textDocument/didClose", { textDocument: { uri: literalUri } });
     await notify("textDocument/didClose", { textDocument: { uri: plainPython } });
-    for (const name of ["01_shapes.ty", "02_types.ty", "03_classes.ty", "04_imports.ty"]) {
+    for (const name of (await readdir(workspace)).filter(name => /^\d\d_.*\.ty$/.test(name)).sort()) {
         const uri = await open(name, await readFile(path.join(workspace, name), "utf8"));
         const result = await request("textDocument/diagnostic", { textDocument: { uri } });
         assert.deepEqual(result.items, [], `${name}: ${JSON.stringify(result.items)}`);

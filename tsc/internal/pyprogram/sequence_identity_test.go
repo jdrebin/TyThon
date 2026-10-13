@@ -91,6 +91,43 @@ tail_pair: Tail((int, str))
 	}
 }
 
+func TestSequenceAliasHover(t *testing.T) {
+	t.Parallel()
+	source := `type Empty = ()
+type Single = (int,)
+type Pair = (int, str)
+type Homogeneous = ()int
+type Nested = (int, (str,))
+type Variadic = (int, *()str)
+type Mutable = [int, str]
+type Mixed = ([int, str], ()str)
+frozen = [1, "a"] as const
+`
+	session := Open(t.Context(), []python.SourceInput{{FileName: "/aliases.ty", Text: source}})
+	defer session.Close()
+	if diagnostics := session.Diagnostics(); len(diagnostics) != 0 {
+		t.Fatal(diagnostics)
+	}
+	for _, test := range []struct{ name, want string }{
+		{"Empty", "type Empty = ()"},
+		{"Single", "type Single = (int,)"},
+		{"Pair", "type Pair = (int, str)"},
+		{"Homogeneous", "type Homogeneous = ()int"},
+		{"Nested", "type Nested = (int, (str,))"},
+		{"Variadic", "type Variadic = (int, *()str)"},
+		{"Mutable", "type Mutable = [int, str]"},
+		{"Mixed", "type Mixed = ([int, str], ()str)"},
+		{"frozen", `(variable) frozen: readonly [1, "a"]`},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			got, _, ok := session.Hover("/aliases.ty", strings.Index(source, test.name), nil)
+			if !ok || got != test.want {
+				t.Fatalf("hover = %q, found=%v, want %q", got, ok, test.want)
+			}
+		})
+	}
+}
+
 func TestTupleAndReadonlyListAssignments(t *testing.T) {
 	t.Parallel()
 	for _, test := range []struct {

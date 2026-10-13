@@ -1,0 +1,21 @@
+# Try completion inside a literal, after a dot, and within a quoted key.
+type Mode = "read" | "write" | "append"
+
+
+def open_document(name: str, *, mode: Mode = "read") -> str:
+    return f"{name} ({mode})"
+
+
+mode: Mode = "read"
+document = {"title": "Notes", "content": "Hello"}
+title = document["title"].upper()
+description = open_document(title, mode="write")
+
+# Deliberately cramped: run Format Document, then undo to try again.
+type Point={"x":int,"y":int}
+origin:Point={"x":0,"y":0}
+print(description,origin)
+
+# Hover document, open_document, or origin. Rename a local symbol, navigate to
+# its definition, and invoke signature help inside open_document(...).
+# Change origin["x"] to a string to see a diagnostic, then undo the edit.

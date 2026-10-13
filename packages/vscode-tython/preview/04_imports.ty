@@ -3,3 +3,13 @@ from catalog import load_user
 
 loaded = load_user(12)
 name = loaded["name"]
+
+# Typed packages emit their implementations, including relative imports.
+from workshop.models import describe
+from workshop.models import type Badge
+import catalog as python_catalog
+
+badge: Badge = {"label": name}
+same_badge: Badge = badge
+print(describe(same_badge))
+print(python_catalog.load_user(7)["name"])

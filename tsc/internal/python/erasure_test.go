@@ -5,6 +5,33 @@ import (
 	"testing"
 )
 
+func TestTypedPythonErasurePreservesControlFlowSuites(t *testing.T) {
+	source := `for value in []:
+    pass
+else:
+    pass
+while False:
+    pass
+else:
+    pass
+try:  # a header is not an annotation
+    raise ValueError("example")
+except ValueError as error:
+    print(error)
+else:
+    pass
+finally:
+    pass
+`
+	emitted, diagnostics := EraseTypedPython(source)
+	if len(diagnostics) != 0 {
+		t.Fatalf("erasure diagnostics: %v", diagnostics)
+	}
+	if emitted != source {
+		t.Fatalf("runtime control flow changed:\n%s", emitted)
+	}
+}
+
 func TestTypedPythonErasureKeepsOnlyRuntimePython(t *testing.T) {
 	source := `type Many(T) = []T
 

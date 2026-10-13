@@ -13,7 +13,7 @@ One fixture can assert multiple surfaces.
 
 | Surface | Fixtures | Assertions |
 | --- | ---: | --- |
-| Transpilation | 18 | Exact emitted Python, preserved line count, Python syntax validation; ten also execute and check stdout |
+| Transpilation | 19 | Exact emitted Python, preserved line count, Python syntax validation; eleven also execute and check stdout |
 | Formatting | 29 | Exact output or rejection, idempotence, correct editor edit, no edit for already formatted text |
 | Hover | 37 | Exact text, verbosity expansion, and a valid source range containing the queried position |
 | Completions | 30 | Required/forbidden or exact labels, no duplicates, valid UTF-8 replacement ranges |
@@ -236,6 +236,6 @@ All **430 conformance scenarios** and the **17 local integration suites** pass
 with `npm run test:plan`. Feature expectations remain active in the default
 command and CI without skips or expected-failure baselines. See
 [the recorded verification](PLAN_COVERAGE.md#verification) for environment limits
-and the two pre-existing failures outside this runner: a completion-prefix
-expectation and hover rendering in the older frontend. A green plan run does
-not mean every repository test passes.
+and the corrected completion/hover regressions. CI and release/package gates
+also run the full native editor-program suite (`internal/pyprogram`); a green
+plan run alone does not mean every release gate passes.

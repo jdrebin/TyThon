@@ -1,0 +1,7 @@
+type Badge = {readonly "label": str}
+
+from . import package_name
+
+
+def describe(badge: Badge) -> str:
+    return package_name + " visitor: " + badge["label"]

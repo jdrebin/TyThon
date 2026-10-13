@@ -1,0 +1,30 @@
+# A settings schema can also describe its patch and change callbacks.
+# Hover the derived types. Add a setting and watch those types change.
+type Settings = {"theme": str, "volume": int, "enabled": bool}
+type Patch(T) = {optional (K): T[K] for K in keyof T}
+type Required(T) = {-optional (K): T[K] for K in keyof T}
+type Select(T, Keys) = {(K): T[K] for K in keyof T if K extends Keys}
+type Handlers(T) = {
+    (f"{K}_changed"): (value: T[K]) -> None
+    for K in Extract(keyof T, str)
+}
+type ThemeHandler = Handlers(Settings)["theme_changed"]
+type PublicSettings = Select(Settings, "theme" | "enabled")
+type CompleteSettings = Required(Patch(Settings))
+
+# Conditional distribution, inference, recursion, and template literal types.
+type Present(T) = never if T extends None else T
+interface Box<T>:
+    value: T
+type Unbox(T) = U if T extends Box<infer U> else never
+type Text = Unbox(Box<str>)
+type SettingName = "theme" | "volume"
+type EventName = f"{SettingName}_changed"
+type Node = {"label": str, "children": []Node}
+
+settings: CompleteSettings = {"theme": "dark", "volume": 5, "enabled": True}
+patch: Patch(Settings) = {"volume": 8}
+tree: Node = {"label": "root", "children": [{"label": "leaf", "children": []}]}
+event: EventName = "theme_changed"
+present: Present(str | None) = "ready"
+print(event, settings["theme"], tree["label"], present)

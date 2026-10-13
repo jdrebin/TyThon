@@ -23,3 +23,5 @@ pair = ("John", "Kate") as ()str
 # For an open map, put the index signature in the shape.
 def read_count(counts: Dict({(str): int}), key: str):
     return counts[key]
+
+print(name, maybe_name, names, pair)

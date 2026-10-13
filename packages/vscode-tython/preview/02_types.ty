@@ -14,15 +14,13 @@ number = identity(12)
 text = identity("Kate")
 
 
-class G:
-    number = '5454'
-
-
 def apply<T>(value: T, transform: (value: T) -> str) -> str:
-
     return transform(value)
 
 
 greeting = apply("Kate", lambda value: "Hello " + value)
 fixed = {"mode": "ready", "retries": 3} as const
 checked = {"id": 12} satisfies {"id": int}
+
+# Try changing the callback to return an int, or the checked id to a string.
+print(greeting, fixed["mode"], checked["id"])

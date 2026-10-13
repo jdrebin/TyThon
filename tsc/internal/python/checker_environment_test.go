@@ -61,6 +61,11 @@ func TestPreviewModulesTypeCheckEndToEnd(t *testing.T) {
 			t.Fatal(err)
 		}
 		implementation, err := os.ReadFile(implementationPath)
+		// Standard-library contracts (such as asyncio.d.ty) have no local
+		// implementation. Their declaration binding is tested separately.
+		if os.IsNotExist(err) {
+			continue
+		}
 		if err != nil {
 			t.Fatal(err)
 		}

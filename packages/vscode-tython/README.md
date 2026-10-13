@@ -18,6 +18,11 @@ language server expects working systemd/cgroup containment.
 4. Open `01_shapes.ty`. Try hover, quoted-key completion, diagnostics, and
    navigation in the numbered examples.
 
+The playground contains 17 independent lessons and a feature map. CLI users can
+create the same files with `tython demo my-playground` after installing
+`tython-lang`. Run `python tour.py` in the generated folder to check, build, and
+execute the positive lessons, or `python tour.py --check` to check only.
+
 The matching compiler and library are bundled. You do **not** need Go, Node,
 this repository, or another compiler installation to use native `.ty` features.
 Use **Developer: Reload Window** after installing an updated VSIX.
@@ -61,6 +66,19 @@ if you only want the native typed-language features. **Import Python Declaration
 starts the bundled Pyright server and resolves the module in your environment.
 Typeshed is not shipped. Pyright is not a second checker for `.ty` files.
 
+The startup warning **Python editor tools are unavailable** means the helper
+interpreter cannot load Jedi and Ruff. It can recur on each launch until you
+configure that environment or disable optional tooling. Selecting a project
+interpreter alone does not install these tools. Native checking and formatting
+remain available independently.
+
+For repository development, run `npm run -w tython tools:prepare` and reload the
+Extension Development Host. This creates the pinned helper environment under
+`built/local/python-tools`, which development launches detect automatically.
+`demo:prepare` builds the compiler, formatter, and extension; it does not prepare
+Jedi/Ruff. An installed extension needs `pythonTypeScript.tools.pythonPath`
+configured explicitly when using a dedicated helper environment.
+
 ## File icons
 
 The extension logo is `icon.png`, the transparent 128×128 mark. That is what the
@@ -102,6 +120,11 @@ also stops the native helper. Unsaved source is used, and stale edits are discar
 - Library-defined `Exclude(...)` / `Extract(...)`, mapped and conditional types.
 - Generic functions, contextual callbacks, assertions and `satisfies`.
 - Classes, bound methods, callable instances and ordinary declaration imports.
+- Optional presence, readonly members, recursive types, and type predicates.
+- Python call rules, overloads, collections, inheritance, decorators and descriptors.
+- Operators, iteration, async code, generators, context managers and exceptions.
+- Typed package emission and Python dependencies with declaration contracts.
+- Editor completion, signature help, diagnostics, navigation and formatting labs.
 - Source-backed library authoring with the repository's standard-library launch.
 
 ## Known limitations
@@ -120,9 +143,24 @@ also stops the native helper. Unsaved source is used, and stale edits are discar
 - Type erasure is not runtime validation, and decorators do not gain inferred
   transformations. No automatic tracking of arbitrary runtime monkey-patching.
 
-Containment failures stop startup. The extension does not silently remove its
-memory limit or repeatedly restart a crashed server. Check **TypeScript for
-Python Language Server** in Output for startup/diagnostic failures.
+Linux/WSL containment remains enabled by default: 4 GiB RAM, 512 MiB swap
+(combined with RAM on cgroup v1), and a 3 GiB Go memory target. Containment
+failures stop startup; the extension does not silently remove this protection
+or repeatedly restart a crashed server.
+
+On macOS and Windows, the server launches directly without a forced memory
+target. `pythonTypeScript.server.goMemoryLimitMiB` defaults to `0` (automatic):
+it selects the 3 GiB target when Linux containment is enabled, otherwise leaves
+Go's runtime defaults or an inherited `GOMEMLIMIT` intact. An explicit value of
+at least 128 MiB applies on any platform. The hard RAM and swap settings apply
+only when Linux containment is enabled; only then must the Go target be lower
+than the hard cap. Reload after changing these settings.
+
+When upgrading, a previously saved explicit value (such as `3072`) remains in
+effect. Reset this setting or set it to `0` to use the platform default.
+
+Routine memory configuration is recorded in **TyThon** Output without a startup
+notification. Check **TyThon** and **TyThon Language Server** Output for failures.
 
 ## Feedback
 

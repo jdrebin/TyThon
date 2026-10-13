@@ -44,7 +44,7 @@ npm(["run", "build"]);
 if (!values["skip-checks"]) {
     npm(["run", "licenses:check"], root);
     if (runnable) npm(["run", "formatter:prepare"]);
-    run("go", ["test", "-p", "1", "./cmd/tsc", "./internal/python", "./internal/checker", "./internal/lsp", "-count=1", "-timeout=120s"], path.join(root, "tsc"), false, goHost);
+    run("go", ["test", "-p", "1", "./cmd/tsc", "./internal/python", "./internal/pyprogram", "./internal/checker", "./internal/lsp", "-count=1", "-timeout=120s"], path.join(root, "tsc"), false, goHost);
     for (const script of ["test", "tools:test"]) npm(["run", script]);
 }
 
@@ -56,7 +56,9 @@ await mkdir(stage);
 const copy = async (source, relative) => {
     const target = path.join(stage, relative);
     await mkdir(path.dirname(target), { recursive: true });
-    await cp(source, target, { recursive: true, dereference: true });
+    await cp(source, target, { recursive: true, dereference: true,
+        filter: file => relative !== "preview" || !path.relative(source, file).split(path.sep).some(part => part === "dist" || part === "__pycache__" || part.endsWith(".pyc")),
+    });
 };
 // Explicit allowlist: no workspace settings, caches, credentials, or user code.
 for (const relative of ["README.md", "language-configuration.json", "icon.png", "icons", "syntaxes", "preview", "dist/extension.bundle.js", "dist/extension.bundle.js.map",

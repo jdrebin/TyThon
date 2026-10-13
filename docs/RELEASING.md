@@ -2,7 +2,7 @@
 
 The release consists of a VSIX and a platform-specific Python wheel. Building
 does **not** publish to any service or install into your VS Code. Both artifacts
-contain the exact same compiler and canonical library; the wheel is staged from
+contain the exact same compiler, canonical library, and playground; the wheel is staged from
 the verified VSIX, not from an independently rebuilt binary.
 
 The CLI emits into a separate `dist/` tree by default (`--out-dir` overrides
@@ -12,9 +12,11 @@ checks/builds.
 **CLI dispatch note:** the native compiler binary expects Python mode explicitly
 (`tython --python …` from the wheel, or a leading `.ty`/`.d.ty` path). Flags such
 as `--emit` before the file list are not yet accepted on the bare binary entry
-point; use the wheel's `tython build` wrapper or pass `--python` first. Directory mapping reuses TypeScript's output-path implementation;
-Python erasure stays in the existing frontend. Discovered local `.py` modules
-and package initializers are copied unchanged. No runtime/import rewriting or
+point; use the wheel's `tython build` wrapper or pass `--python` first.
+Directory mapping reuses TypeScript's output-path implementation;
+Python erasure stays in the existing frontend. Typed imports and `.ty` package
+initializers are emitted; ordinary `.py` dependencies are not copied. The demo's
+`tour.py` explicitly copies its two local Python dependencies. No runtime/import rewriting or
 automatic asset bundling is added. Never distribute failed `.package-*` staging.
 
 ## Build
@@ -65,11 +67,41 @@ also be built against an explicitly selected, previously verified local VSIX:
 npm run release:package -- --vsix /absolute/path/to/verified.vsix
 ```
 
-Release
-
 This requires its `.sha256` and `.build-info.json` sidecars. It deliberately
-uses that artifact's compiler/library/version, even if checkout code has since
+uses that artifact's compiler/library/playground/version, even if checkout code has since
 changed. Normal releases should omit this option to rebuild everything.
+
+## Upcoming update notes
+
+- `tython demo [directory]` creates the same playground as the extension's
+  **Open Preview Examples** command. The 17 numbered lessons cover the public
+  feature families; `python tour.py --check` checks them and `python tour.py`
+  builds and runs them. Generation is offline and refuses existing destinations.
+- Erasure preserves `try:`, `else:`, and `finally:` suite headers, fixing
+  invalid emitted Python from these control-flow forms.
+- Tuple alias hovers preserve Python tuple syntax, including nested and variadic
+  tuples, instead of displaying the underlying readonly list representation.
+- Linux/WSL keeps its existing fail-closed containment and default limits.
+  macOS/Windows no longer receive an extension-imposed Go memory target by
+  default. Routine memory policy goes to Output instead of a startup warning.
+  The automatic setting is now `pythonTypeScript.server.goMemoryLimitMiB: 0`;
+  saved explicit values remain effective until reset.
+- Jedi/Ruff remain optional and are not installed with the extension. Their
+  unavailable-tools warning is separate from memory policy; see the
+  [environment setup and troubleshooting](../packages/vscode-tython/README.md#optional-python-tooling).
+
+Current checkout validation is not a release certification. The demo integration,
+targeted erasure/conformance checks, launch-policy tests, and extension build
+passed locally. The stale completion-prefix expectation has been corrected;
+the demo hover regression now exercises the native editor program and covers
+the tuple-printing fix. CI and release/package checks include `internal/pyprogram`
+so these regressions remain part of the required gates. The full Go CLI, Python
+frontend, native editor program, checker, LSP, and conformance suites pass locally
+without excluding either regression. The local license check needs
+the pinned provenance cache (`npm run licenses:prepare`, then
+`npm run licenses:check`). Full VSIX/wheel packaging and an interactive extension
+smoke test remain outstanding; platform-policy tests on macOS do not establish
+live WSL containment. Update these notes with the release results before promotion.
 
 ## Publishing
 
@@ -109,6 +141,11 @@ export TWINE_PASSWORD='pypi-...'
   ordinary Python modules with declarations, package initializers and relative
   imports under an explicit source/output root, filenames
   with spaces/leading dashes, and no output writes after failed checks.
+- Shared playground: identical VSIX/wheel files, offline `tython demo` generation,
+  refusal to overwrite existing projects, and checking/building/running every lesson.
+- Server launch policy: automatic and explicit memory settings, unchanged Linux
+  containment, and direct macOS/Windows launches. In an interactive host, check
+  that routine memory policy is logged and optional-tool setup behaves as documented.
 - Compiler/library hashes match across the installed wheel and VSIX.
 
 An interactive VS Code host test remains a separate manual check. Linux wheels

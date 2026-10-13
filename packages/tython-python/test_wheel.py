@@ -35,8 +35,22 @@ def main():
     wheel, vsix = map(lambda p: Path(p).resolve(), sys.argv[1:])
     with zipfile.ZipFile(vsix) as archive:
         editor = json.loads(archive.read("extension/build-info.json"))
+        demo_files = {
+            name.removeprefix("extension/"): archive.read(name)
+            for name in archive.namelist()
+            if name.startswith("extension/preview/") and not name.endswith("/")
+        }
+        assert "preview/tour.py" in demo_files
     with zipfile.ZipFile(wheel) as archive:
         names = archive.namelist()
+        wheel_demo = {
+            name.removeprefix("tython_cli/"): archive.read(name)
+            for name in names
+            if name.startswith("tython_cli/preview/")
+        }
+        assert (
+            wheel_demo == demo_files
+        ), "CLI and extension must ship identical playgrounds"
         metadata = next(n for n in names if n.endswith(".dist-info/WHEEL"))
         assert "Root-Is-Purelib: false" in archive.read(metadata).decode()
         tags = {
@@ -127,6 +141,16 @@ def main():
         assert editor["version"] in run(
             [str(python), "-m", "tython_cli", "--version"], cwd=root, env=env
         )
+        run([cli, "demo", "my playground"], cwd=root, env=env)
+        demo = root / "my playground"
+        for name, data in demo_files.items():
+            assert (demo / name.removeprefix("preview/")).read_bytes() == data
+        run([cli, "demo", "my playground"], cwd=root, env=env, expected=2)
+        run([str(python), str(demo / "tour.py"), "--check"], cwd=root, env=env)
+        assert not (demo / "dist").exists()
+        tour = run([str(python), str(demo / "tour.py")], cwd=root, env=env)
+        for lesson in demo.glob("[0-9][0-9]_*.ty"):
+            assert f"--- {lesson.name} ---" in tour
         location = run(
             [str(python), "-c", "import tython_cli; print(tython_cli.__file__)"],
             cwd=root,

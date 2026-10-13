@@ -45,6 +45,16 @@ npm run -w tython test
 npm run -w tython tools:test
 ```
 
+The shared playground lives in `packages/vscode-tython/preview/`. Wheel packaging
+copies it from the VSIX so CLI and editor users get identical examples. After
+changing it, verify generation, non-overwrite behavior, and every runnable lesson:
+
+```sh
+go build -o built/local/tsc ./tsc/cmd/tsc
+TYTHON_TEST_COMPILER="$PWD/built/local/tsc" python3 packages/tython-python/test_demo.py
+go test ./tsc/internal/pyprogram -run '^TestNativeDemoDiagnostics$' -count=1
+```
+
 Prepare the optional Python tools with `npm run -w tython tools:prepare` first.
 The full packaging gate additionally verifies an extracted VSIX on Linux with
 systemd containment. GitHub-hosted CI checks do not claim that installation test.

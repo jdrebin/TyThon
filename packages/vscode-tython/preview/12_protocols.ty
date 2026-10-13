@@ -1,0 +1,53 @@
+# Operators are checked through Python's dunder methods.
+class Distance:
+    def __init__(self, meters: int):
+        self.meters = meters
+
+    def __add__(self, other: Distance) -> Distance:
+        return Distance(self.meters + other.meters)
+
+    def __radd__(self, other: int) -> Distance:
+        return Distance(other + self.meters)
+
+    def __iadd__(self, other: Distance) -> Distance:
+        self.meters += other.meters
+        return self
+
+
+class Countdown:
+    def __init__(self, remaining: int):
+        self.remaining = remaining
+
+    def __iter__(self) -> Countdown:
+        return self
+
+    def __next__(self) -> int:
+        if self.remaining == 0:
+            raise StopIteration()
+        self.remaining -= 1
+        return self.remaining
+
+
+class Scoreboard:
+    def __init__(self):
+        self.score = 0
+
+    def __contains__(self, name: str) -> bool:
+        return name == "Ada"
+
+    def __getitem__(self, name: str) -> int:
+        return self.score
+
+    def __setitem__(self, name: str, value: int) -> None:
+        self.score = value
+
+
+distance = Distance(3) + Distance(4)
+distance += Distance(1)
+reflected = 2 + distance
+# Explicit item contracts complement the runtime dunder methods.
+board = Scoreboard() as Scoreboard & {(str): int}
+board["Ada"] = 42
+for remaining in Countdown(3):
+    print(remaining)
+print(distance.meters, reflected.meters, "Ada" in board, board["Ada"])

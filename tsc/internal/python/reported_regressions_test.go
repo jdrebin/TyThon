@@ -1,8 +1,6 @@
 package python
 
 import (
-	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 
@@ -390,73 +388,6 @@ func TestDuplicateBaseConflictIsReportedOnce(t *testing.T) {
 	}
 	if count != 1 {
 		t.Fatalf("conflict reports = %d, all = %v", count, program.Diagnostics)
-	}
-}
-
-func TestDemoSurfaces(t *testing.T) {
-	root := filepath.Join("..", "..", "..", "vscode-extension-demo")
-	for _, name := range []string{"core_operators.ty", "working.ty"} {
-		text, err := os.ReadFile(filepath.Join(root, name))
-		if err != nil {
-			t.Fatal(err)
-		}
-		_, runtimeErrors := ParseRuntimeFile(name, string(text))
-		_, declErrors := ParseTypedSourceDeclarations(name, string(text))
-		_, erasureErrors := EraseTypedPython(string(text))
-		t.Logf("%s runtime=%v decl=%v erasure=%v", name, runtimeErrors, declErrors, erasureErrors)
-	}
-	text, err := os.ReadFile(filepath.Join(root, "core_operators.ty"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	program := BuildProgram(newPythonChecker(t), []SourceInput{{FileName: "core_operators.ty", Text: string(text)}})
-	source := string(text)
-	info, c, ok := program.QuickInfoAt("core_operators.ty", strings.Index(source, "FirstString"))
-	if !ok {
-		t.Fatalf("FirstString hover missing diagnostics=%v", program.Diagnostics)
-	}
-	hover := FormatQuickInfo(c, info)
-	if strings.Contains(hover, "__add__") || !strings.Contains(hover, "*()") {
-		t.Fatalf("FirstString hover = %s", hover)
-	}
-	moduleFile := filepath.Join(root, "advanced_modules.ty")
-	declarationFile := filepath.Join(root, "sample_package", "models.d.ty")
-	modules, err := os.ReadFile(moduleFile)
-	if err != nil {
-		t.Fatal(err)
-	}
-	declaration, err := os.ReadFile(declarationFile)
-	if err != nil {
-		t.Fatal(err)
-	}
-	program = BuildProgram(newPythonChecker(t), []SourceInput{
-		{FileName: declarationFile, Text: string(declaration)},
-		{FileName: moduleFile, Text: string(modules)},
-	})
-	modSource := string(modules)
-	for _, word := range []string{"sample_package", "models", "load_user", "User"} {
-		info, c, ok = program.QuickInfoAt(moduleFile, strings.Index(modSource, word))
-		if !ok {
-			t.Fatalf("import %s missing diagnostics=%v", word, program.Diagnostics)
-		}
-		hover := FormatQuickInfo(c, info)
-		if strings.Contains(hover, "AttributeError") || strings.Contains(hover, "BaseException") {
-			t.Fatalf("import %s includes builtins: %s", word, hover)
-		}
-		t.Logf("import %s = %s", word, hover)
-	}
-	classes, err := os.ReadFile(filepath.Join(root, "advanced_classes.ty"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	program = BuildProgram(newPythonChecker(t), []SourceInput{{FileName: "advanced_classes.ty", Text: string(classes)}})
-	classSource := string(classes)
-	info, c, ok = program.QuickInfoAt("advanced_classes.ty", strings.Index(classSource, "return self.name")+12)
-	if ok {
-		t.Logf("name hover = %s kind=%d", FormatQuickInfo(c, info), info.Kind)
-	}
-	for _, diagnostic := range program.Diagnostics {
-		t.Logf("class diag %s @ %v", diagnostic.Message, diagnostic.Range)
 	}
 }
 

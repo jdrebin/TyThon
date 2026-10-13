@@ -131,21 +131,21 @@
                     "default": 4096,
                     "minimum": 256,
                     "maximum": 65536,
-                    "description": "Linux server hard RAM limit in MiB. Reload the window after changing."
+                    "description": "Hard RAM limit in MiB when Linux/WSL containment is enabled. Ignored on other platforms or when containment is disabled. Reload required."
                 },
                 "pythonTypeScript.server.swapLimitMiB": {
                     "type": "integer",
                     "default": 512,
                     "minimum": 0,
                     "maximum": 65536,
-                    "description": "Linux swap allowance in MiB. On cgroup v1 this adds to the combined RAM+swap ceiling, not a separate swap ceiling."
+                    "description": "Swap allowance when Linux/WSL containment is enabled; ignored otherwise. On cgroup v1 this adds to the combined RAM+swap ceiling, not a separate swap ceiling. Reload required."
                 },
                 "pythonTypeScript.server.goMemoryLimitMiB": {
                     "type": "integer",
-                    "default": 3072,
-                    "minimum": 128,
+                    "default": 0,
+                    "minimum": 0,
                     "maximum": 65535,
-                    "description": "Go soft memory target. Must be below the hard RAM limit; this alone cannot prevent an OOM."
+                    "description": "Go soft memory target in MiB. 0 uses 3072 MiB under Linux/WSL containment, otherwise Go runtime defaults (or inherited GOMEMLIMIT). An explicit value must be at least 128 MiB and, when contained, below the hard RAM limit. This is not a hard cap. Reload required."
                 },
                 "pythonTypeScript.server.linuxContainment": {
                     "type": "boolean",

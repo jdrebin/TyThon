@@ -31,4 +31,4 @@ packages = ["tython_cli"]
 include-package-data = false
 
 [tool.setuptools.package-data]
-tython_cli = ["bin/*", "library/*", "licenses/**/*", "*.json", "*.txt", "*.md"]
+tython_cli = ["bin/*", "library/*", "licenses/**/*", "preview/**/*", "*.json", "*.txt", "*.md"]

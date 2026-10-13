@@ -1,0 +1,49 @@
+# A small message API demonstrates Python call rules plus generic inference.
+def message<T, U extends {}>(
+    value: T, /, label: str = "message", *, enabled: bool = True, **metadata: U
+) -> T:
+    return value
+
+
+def first<T>(value: T, /, *rest: []T) -> T:
+    return value
+
+
+def transform<T, U>(value: T, callback: (value: T) -> U) -> U:
+    return callback(value)
+
+
+@overload
+def echo(value: str) -> str: ...
+
+
+@overload
+def echo(value: bytes) -> bytes: ...
+
+
+def echo(value: str | bytes):
+    return value
+
+
+def keep<const T>(value: T) -> T:
+    return value
+
+
+class Box<T extends Some = str>:
+    value: T
+
+    def __init__(self, value: T):
+        self.value = value
+
+
+greeting = message("hello", label="welcome", enabled=True, recipient="Ada")
+number = first<int>(1, 2, 3)
+length = transform(greeting, lambda text: len(text))
+typed_lambda = lambda value: int: value * 2
+generic_lambda = lambda<T> value: T: value
+same_text = generic_lambda<str>("hi")
+fixed = keep({"mode": "ready"})
+box = Box(42)
+explicit_box = Box<str>("hello")
+print(echo(greeting), echo(b"hello"), length, typed_lambda(number), same_text)
+# Trigger signature help inside message(...); try passing value by keyword.

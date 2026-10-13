@@ -105,10 +105,12 @@ Verified against this working tree on 2026-10-13:
 - **286 fixture scenarios + 144 primitive assignment scenarios = 430 total; all pass.**
 - All 17 local integration suites pass through `npm run test:plan`.
 - The checker unit tests, parser tests, and native demo diagnostic checks pass.
-- Two pre-existing tests outside the plan runner still fail:
-  `pyprogram/TestAssignedContainersUseTheirProtocols` expects `count` under a
-  `__` completion prefix, and the older frontend's `python/TestDemoSurfaces`
-  exposes protocol members in the `FirstString` hover.
+- The stale `TestAssignedContainersUseTheirProtocols` expectation now checks
+  prefix filtering instead of expecting `count` after `__`. `TestDemoSurfaces`
+  now tests the native editor program, retaining tuple and import hover checks
+  and covering the source-tuple printing fix. Targeted regressions pass.
+- After these fixes, the full Go CLI, Python frontend, native editor program,
+  checker, LSP, and conformance suites pass without excluding the regressions.
 - Jedi/Ruff integration, real Linux containment, and an extracted VSIX were
   not run in this environment. The declaration-importer suite was previously
   verified with `TYPED_PYTHON_TEST_PYTHON=python3`; real Pyright resolution was

@@ -1,0 +1,51 @@
+# Small independent searches and parsers demonstrate Python control flow.
+def find_name(names: []str) -> str:
+    for name in names:
+        if name:
+            break
+    else:
+        return "Anonymous"
+    return name
+
+
+def read_row(row: {"name": str, "score": int}) -> str:
+    match row:
+        case {"name": name, "score": score}:
+            return f"{name}: {score}"
+    return "empty"
+
+
+def fail(message: str) -> never:
+    raise ValueError(message)
+
+
+def require_name(value: str | None) -> str:
+    if value is None:
+        fail("missing name")
+    return value
+
+
+class Greeting:
+    def __enter__(self) -> str:
+        return "Welcome"
+
+    def __exit__(self, error_type: any, error: any, traceback: any) -> bool:
+        return False
+
+
+def parse_score(text: str) -> int:
+    try:
+        result = int(text)
+    except ValueError as error:
+        raise ValueError("invalid score") from error
+    else:
+        return result
+    finally:
+        print("Parsing finished")
+
+
+with Greeting() as greeting:
+    if (name := require_name("Ada")):
+        print(greeting, name)
+names: []str = ["", "Grace"]
+print(find_name(names), read_row({"name": "Ada", "score": parse_score("42")}))

@@ -1,0 +1,22 @@
+# Scores exercise fixed, homogeneous, and variadic lists and tuples.
+type ScoreRow = (str, *()int)
+type ScoreList = [str, *[]int]
+
+pair: (str, int) = ("Ada", 3)
+name, score = pair
+fixed: [str, int] = ["Grace", 5]
+scores: []int = [3, 5, 8]
+row: ScoreRow = (name, *scores)
+mutable_row: ScoreList = [name, *scores]
+first_name, *rest = row
+immutable: ()int = (3, 5, 8)
+
+names: []str = ["Ada", "Grace", "Linus"]
+lengths = [len(value) for value in names if value]
+length_map = {mapped_name: len(mapped_name) for mapped_name in names}
+unique_lengths: set<int> = {len(unique_name) for unique_name in names}
+lazy_lengths: Iterator<int> = (len(lazy_name) for lazy_name in names)
+base = {"Ada": 3}
+merged = {**base, "Grace": 5}
+print(pair, fixed, row, mutable_row, lengths, merged)
+# Try swapping the name and score in pair. Lists and tuples stay distinct.

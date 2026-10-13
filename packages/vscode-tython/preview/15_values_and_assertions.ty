@@ -1,0 +1,38 @@
+# Some includes falsey values but excludes None; Object means structured values.
+zero: Some = 0
+disabled: Some = False
+empty: Some = ""
+anything: object = None
+empty_contract: {} = None
+structured: Object = {"id": 1}
+binary: bytes = b"hello"
+imaginary: complex = complex(0.0, 2.0)
+ratio: float = 1.5
+
+
+class Label(str):
+    id = 1
+
+
+interface Identified(Object):
+    id: int
+
+
+type IdentifiedText = str & Identified
+label: IdentifiedText = Label()
+
+
+def require_some<T>(value: T) -> T & Some:
+    if value is None:
+        raise ValueError("missing value")
+    return value
+
+
+# These are static promises; no conversion or runtime freezing takes place.
+fixed = {"mode": "ready", "retries": 3} as const
+checked = {"id": 12} satisfies {"id": int}
+type ReadonlyName = {readonly "name": str}
+readonly_name: ReadonlyName = {"name": "Ada"}
+asserted = 42 as int
+print(label, label.id, require_some(0), binary, imaginary, ratio, fixed["mode"])
+# Try None as a Some value, or assign to readonly_name["name"].

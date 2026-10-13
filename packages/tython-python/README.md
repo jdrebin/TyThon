@@ -21,6 +21,22 @@ python dist/app.py
 `python -m tython_cli` is also
 available if your environment's scripts directory is not on PATH.
 
+Create an editable playground covering the language and editor features:
+
+```sh
+tython demo my-playground
+cd my-playground
+python tour.py --check
+python tour.py
+```
+
+The optional directory defaults to `tython-demo` and must not already exist.
+Generation works offline without running code or installing dependencies.
+The 17 independent lessons, feature map, and intentional-error folder are the
+same examples shipped by the extension's **Open Preview Examples** command.
+`tour.py` checks, builds into `dist/`, explicitly copies the local Python
+dependencies, and runs the positive lessons. Python 3.10+ and this CLI suffice.
+
 `check` writes no output files. `build` checks first, then preserves the source
 layout under `dist/`, including typed imports. Ordinary `.py` files are not
 read, checked, or copied; supply those runtime dependencies separately.
@@ -41,7 +57,7 @@ the pinned Black shipped in that extension with your Python 3.10+. The VSIX
 and CLI are independently usable; both contain the same compiler and library.
 Optional Jedi/Ruff editor integrations remain separate.
 
-Only `check`, `build`, and `--version` are exposed by this CLI. The language
+The CLI exposes `demo`, `check`, `build`, and `--version`. The language
 and library coverage are still incomplete. See the
 [project guide](https://github.com/jdrebin/TyThon) for syntax and current
 limitations. The unrelated PyPI project named `tython` is not this package.
