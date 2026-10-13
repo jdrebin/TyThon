@@ -2,7 +2,7 @@
     "x-tython-notice": "Modified for tython: Python type-system adaptation and independent project integration.",
     "name": "tython-workspace",
     "private": true,
-    "version": "0.1.2",
+    "version": "0.1.3",
     "license": "Apache-2.0",
     "repository": { "type": "git", "url": "https://github.com/jdrebin/TyThon.git" },
     "homepage": "https://github.com/jdrebin/TyThon#readme",
