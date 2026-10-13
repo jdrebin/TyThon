@@ -38,7 +38,7 @@ func TestCollectPythonInputsRejectsPythonFiles(t *testing.T) {
 }
 
 func TestPythonEmitSeparateTreeAndRepeatBuild(t *testing.T) {
-	directory := t.TempDir()
+	directory := pythonEmitTempDir(t)
 	t.Chdir(directory)
 	files := map[string]string{
 		"app.ty":          "from pkg.helper import greet\nprint(greet(\"Ada\"))\n",
@@ -88,7 +88,7 @@ func TestPythonEmitSeparateTreeAndRepeatBuild(t *testing.T) {
 }
 
 func TestPythonEmitRejectsUnsafeTargets(t *testing.T) {
-	directory := t.TempDir()
+	directory := pythonEmitTempDir(t)
 	t.Chdir(directory)
 	if err := os.WriteFile("app.ty", []byte("value: int = 1\n"), 0o644); err != nil {
 		t.Fatal(err)
@@ -124,7 +124,7 @@ func TestPythonEmitRejectsUnsafeTargets(t *testing.T) {
 }
 
 func TestPythonEmitInfersCommonSourceRoot(t *testing.T) {
-	directory := t.TempDir()
+	directory := pythonEmitTempDir(t)
 	t.Chdir(directory)
 	for name, content := range map[string]string{
 		"src/main.ty":         "from helper import value\nprint(value)\n",
@@ -159,4 +159,16 @@ func TestPythonEmitInfersCommonSourceRoot(t *testing.T) {
 	if _, err := os.Stat("explicit/src/main.py"); err != nil {
 		t.Fatal(err)
 	}
+}
+
+func pythonEmitTempDir(t *testing.T) string {
+	t.Helper()
+	// macOS's default temp directory has a /var -> /private/var ancestor.
+	// Start fixtures at the real path so output safety checks exercise the
+	// test's own links, rather than rejecting the system temp alias first.
+	directory, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	return directory
 }
