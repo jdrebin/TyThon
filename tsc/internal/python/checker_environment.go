@@ -1644,6 +1644,8 @@ func (e *CheckerTypeEnvironment) resolveCheckerMembers(members []ObjectMemberDec
 	instanceCalls := make([]*checker.Type, 0)
 	for _, member := range members {
 		switch member.Kind {
+		case ObjectMemberCall:
+			instanceCalls = append(instanceCalls, e.resolveCheckerCallable(member.Signature, scope, false, nil))
 		case ObjectMemberAttribute:
 			if member.Name == "__class__" {
 				break

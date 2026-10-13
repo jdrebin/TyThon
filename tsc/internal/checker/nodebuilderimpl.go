@@ -3103,7 +3103,7 @@ func (b *NodeBuilderImpl) typeReferenceToTypeNode(t *Type) *ast.TypeNode {
 		if t.Target() == b.ch.globalArrayType {
 			return arrayType
 		} else {
-			return b.f.NewTypeOperatorNode(ast.KindReadonlyKeyword, arrayType)
+			return b.pythonTupleOperator(arrayType, t)
 		}
 	} else if t.Target().objectFlags&ObjectFlagsTuple != 0 {
 		typeArguments = core.SameMapIndex(typeArguments, func(arg *Type, i int) *Type {

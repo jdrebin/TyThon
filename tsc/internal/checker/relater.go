@@ -178,6 +178,9 @@ func (c *Checker) isTypeRelatedTo(source *Type, target *Type, relation *Relation
 	if source == target {
 		return true
 	}
+	if c.pythonSequenceKindsDiffer(source, target) {
+		return false
+	}
 	if relation != c.identityRelation {
 		if relation == c.comparableRelation && target.flags&TypeFlagsNever == 0 && c.isSimpleTypeRelatedTo(target, source, relation, nil) || c.isSimpleTypeRelatedTo(source, target, relation, nil) {
 			return true
@@ -2687,6 +2690,12 @@ func (r *Relater) isRelatedToEx(originalSource *Type, originalTarget *Type, recu
 	// side) or the type variable (on the target side).
 	source := r.c.getNormalizedType(originalSource, false /*writing*/)
 	target := r.c.getNormalizedType(originalTarget, true /*writing*/)
+	if r.c.pythonSequenceKindsDiffer(source, target) {
+		if reportErrors {
+			r.reportError(diagnostics.NewAdHocMessage("Tuple and list types are not assignable to each other."))
+		}
+		return TernaryFalse
+	}
 	if source == target {
 		return TernaryTrue
 	}

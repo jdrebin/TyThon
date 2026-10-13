@@ -511,6 +511,23 @@ in a declaration describes an omittable argument, not a new missing-value type.
 Rest annotations describe the packs, for example `(*args: []int) -> int` or
 `(**kwargs: Dict({ (str): str })) -> None`.
 
+An unnamed `def` inside an interface declares a call signature for the object
+itself, equivalent to `(param: number): number` in a TypeScript interface.
+Its parameters are the call arguments; there is no implicit `self` parameter.
+The same syntax works in object types: `{ def(param: int) -> int }`.
+
+<!-- ty-example: interface-call-signature -->
+```python
+interface User:
+    def(param: int) -> int
+
+def increment(param: int) -> int:
+    return param + 1
+
+user: User = increment
+result: int = user(1)
+```
+
 `@overload` and `declare def` can describe alternative call signatures; there is
 still one runtime implementation. They do not generate multiple dispatch.
 

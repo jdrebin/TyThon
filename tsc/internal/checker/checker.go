@@ -127,6 +127,7 @@ const (
 	CachedTypeKindAwaitedType
 	CachedTypeKindEvolvingArrayType
 	CachedTypeKindArrayLiteralType
+	CachedTypeKindPythonTuple
 	CachedTypeKindPermissiveInstantiation
 	CachedTypeKindRestrictiveInstantiation
 	CachedTypeKindRestrictiveTypeParameter
@@ -2761,7 +2762,7 @@ func (c *Checker) checkParameter(node *ast.Node) {
 	// Only check rest parameter type if it's not a binding pattern. Since binding patterns are
 	// not allowed in a rest parameter, we already have an error from checkGrammarParameterList.
 	if hasDotDotDotToken(node) && node.AsParameterDeclaration().DotDotDotToken.Kind != ast.KindAsteriskAsteriskToken &&
-		!ast.IsBindingPattern(node.Name()) && !c.isTypeAssignableTo(c.getReducedType(c.getTypeOfSymbol(node.Symbol())), c.anyReadonlyArrayType) {
+		!ast.IsBindingPattern(node.Name()) && !c.isArrayLikeType(c.getReducedType(c.getTypeOfSymbol(node.Symbol()))) {
 		c.error(node, diagnostics.A_rest_parameter_must_be_of_an_array_type)
 	}
 }
@@ -17596,7 +17597,11 @@ func (c *Checker) getInferredTypeParameterConstraint(t *Type, omitTypeReferences
 				case ast.IsParameterDeclaration(parent) && parent.AsParameterDeclaration().DotDotDotToken != nil ||
 					ast.IsRestTypeNode(parent) ||
 					ast.IsNamedTupleMember(parent) && parent.AsNamedTupleMember().DotDotDotToken != nil:
-					inferences = append(inferences, c.createArrayType(c.unknownType))
+					constraint := c.createArrayType(c.unknownType)
+					if c.isPythonTupleTypeNode(parent.Parent) {
+						constraint = c.markPythonTuple(c.createArrayTypeEx(c.unknownType, true /*readonly*/))
+					}
+					inferences = append(inferences, constraint)
 				case ast.IsTemplateLiteralTypeSpan(parent):
 					inferences = append(inferences, c.stringType)
 				case ast.IsTypeParameterDeclaration(parent) && ast.IsMappedTypeNode(parent.Parent):
@@ -17911,6 +17916,7 @@ func (b *keyBuilder) writeGenericTypeReferences(source *Type, target *Type, igno
 	var writeTypeReference func(*Type, int)
 	writeTypeReference = func(ref *Type, depth int) {
 		b.writeType(ref.Target())
+		b.writeUint32(uint32(ref.objectFlags & ObjectFlagsPythonTuple))
 		for _, t := range ref.AsTypeReference().resolvedTypeArguments {
 			if t.flags&TypeFlagsTypeParameter != 0 {
 				if ignoreConstraints || t.checker.getConstraintOfTypeParameter(t) == nil {
@@ -18854,7 +18860,7 @@ func (c *Checker) getWidenedTypeWithContext(t *Type, context *WideningContext) *
 		case t.flags&TypeFlagsIntersection != 0:
 			result = c.getIntersectionType(core.SameMap(t.Types(), c.getWidenedType))
 		case c.isArrayOrTupleType(t):
-			result = c.createTypeReference(t.Target(), core.SameMap(c.getTypeArguments(t), c.getWidenedType))
+			result = c.preservePythonTuple(t, c.createTypeReference(t.Target(), core.SameMap(c.getTypeArguments(t), c.getWidenedType)))
 		}
 		if result != nil && context == nil {
 			c.cachedTypes[CachedTypeKey{kind: CachedTypeKindWidened, typeId: t.id}] = result
@@ -20118,7 +20124,7 @@ func (c *Checker) getTypeWithThisArgument(t *Type, thisArgument *Type, needAppar
 			if thisArgument == nil {
 				thisArgument = target.AsInterfaceType().thisType
 			}
-			return c.createTypeReference(target, core.Concatenate(typeArguments, []*Type{thisArgument}))
+			return c.preservePythonTuple(t, c.createTypeReference(target, core.Concatenate(typeArguments, []*Type{thisArgument})))
 		}
 		return t
 	} else if t.flags&TypeFlagsIntersection != 0 {
@@ -22945,7 +22951,7 @@ func (c *Checker) instantiateTypeWorker(t *Type, m *TypeMapper, alias *TypeAlias
 				if core.Same(newTypeArguments, resolvedTypeArguments) {
 					return t
 				}
-				return c.createNormalizedTypeReference(t.Target(), newTypeArguments)
+				return c.preservePythonTuple(t, c.createNormalizedTypeReference(t.Target(), newTypeArguments))
 			}
 			if objectFlags&ObjectFlagsReverseMapped != 0 {
 				return c.instantiateReverseMappedType(t, m)
@@ -23111,6 +23117,7 @@ func (c *Checker) getObjectTypeInstantiation(t *Type, m *TypeMapper, alias *Type
 		switch {
 		case target.objectFlags&ObjectFlagsReference != 0:
 			result = c.createDeferredTypeReference(t.Target(), t.AsTypeReference().node, newMapper, newAlias)
+			result = c.preservePythonTuple(t, result)
 		case target.objectFlags&ObjectFlagsMapped != 0:
 			result = c.instantiateMappedType(target, newMapper, newAlias)
 		default:
@@ -23335,7 +23342,7 @@ func (c *Checker) instantiateMappedArrayType(arrayType *Type, mappedType *Type, 
 	if c.isErrorType(elementType) {
 		return c.errorType
 	}
-	return c.createArrayTypeEx(elementType, getModifiedReadonlyState(c.isReadonlyArrayType(arrayType), getMappedTypeModifiers(mappedType)))
+	return c.preservePythonTuple(arrayType, c.createArrayTypeEx(elementType, getModifiedReadonlyState(c.isReadonlyArrayType(arrayType), getMappedTypeModifiers(mappedType))))
 }
 
 func (c *Checker) instantiateMappedTupleType(tupleType *Type, mappedType *Type, typeVariable *Type, m *TypeMapper) *Type {
@@ -23388,7 +23395,7 @@ func (c *Checker) instantiateMappedTupleType(tupleType *Type, mappedType *Type, 
 	if slices.Contains(newElementTypes, c.errorType) {
 		return c.errorType
 	}
-	return c.createTupleTypeEx(newElementTypes, newElementInfos, newReadonly)
+	return c.preservePythonTuple(tupleType, c.createTupleTypeEx(newElementTypes, newElementInfos, newReadonly))
 }
 
 func (c *Checker) instantiateMappedTypeTemplate(t *Type, key *Type, isOptional bool, m *TypeMapper) *Type {
@@ -24310,9 +24317,19 @@ func (c *Checker) getElementTypeOfArrayType(t *Type) *Type {
 }
 
 func (c *Checker) isArrayLikeType(t *Type) bool {
+	// Tuple shape is array-like even when Python container identity prevents
+	// assignment to a list. This also applies to variadic type parameters.
+	if c.isArrayOrTupleType(t) {
+		return true
+	}
+	if t.flags&TypeFlagsTypeParameter != 0 {
+		if constraint := c.getBaseConstraintOfType(t); constraint != nil && everyType(constraint, c.isArrayOrTupleType) {
+			return true
+		}
+	}
 	// A type is array-like if it is a reference to the global Array or global ReadonlyArray type,
 	// or if it is not the undefined or null type and if it is assignable to ReadonlyArray<any>
-	return c.isArrayType(t) || t.flags&TypeFlagsNullable == 0 && c.isTypeAssignableTo(t, c.anyReadonlyArrayType)
+	return t.flags&TypeFlagsNullable == 0 && c.isTypeAssignableTo(t, c.anyReadonlyArrayType)
 }
 
 func (c *Checker) isMutableArrayLikeType(t *Type) bool {
@@ -28426,7 +28443,7 @@ func (c *Checker) computeBaseConstraint(t *Type, stack []RecursionId) *Type {
 			}
 			newElements = append(newElements, newElement)
 		}
-		return c.createTupleTypeEx(newElements, elementInfos, t.TargetTupleType().readonly)
+		return c.preservePythonTuple(t, c.createTupleTypeEx(newElements, elementInfos, t.TargetTupleType().readonly))
 	}
 	return t
 }
@@ -28722,7 +28739,7 @@ func (c *Checker) getNormalizedType(t *Type, writing bool) *Type {
 			n = c.getNormalizedTupleType(t, writing)
 		case t.objectFlags&ObjectFlagsReference != 0:
 			if t.AsTypeReference().node != nil {
-				n = c.createTypeReference(t.Target(), c.getTypeArguments(t))
+				n = c.preservePythonTuple(t, c.createTypeReference(t.Target(), c.getTypeArguments(t)))
 			} else {
 				n = c.getSingleBaseForNonAugmentingSubtype(t)
 				if n == nil {
@@ -28929,7 +28946,7 @@ func (c *Checker) getNormalizedTupleType(t *Type, writing bool) *Type {
 		return t
 	})
 	if !core.Same(elements, normalizedElements) {
-		return c.createNormalizedTupleType(t.Target(), normalizedElements)
+		return c.preservePythonTuple(t, c.createNormalizedTupleType(t.Target(), normalizedElements))
 	}
 	return t
 }

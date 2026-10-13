@@ -549,6 +549,9 @@ func (c *Checker) NewPythonContextualSequenceLiteral(elements []PythonSequenceEl
 }
 
 func (c *Checker) newPythonSequenceSurface(native *Type, kind PythonSequenceKind) *Type {
+	if kind == PythonSequenceTuple {
+		native = c.markPythonTuple(native)
+	}
 	readonly := kind == PythonSequenceTuple || c.isReadonlyArrayType(native) || isTupleType(native) && native.TargetTupleType().readonly
 	items := make([]ObjectFacetIndex, 0)
 	if c.isArrayType(native) {
@@ -642,6 +645,9 @@ func (c *Checker) getPythonSequenceMetadata(t *Type) (*Type, PythonSequenceKind)
 	// Three sequences: `[]` and `readonly []` are arrays, `()` is a tuple.
 	// An `as const` list is a readonly tuple in the checker and still a list.
 	if c.isArrayType(t) {
+		if pythonTuple || t.objectFlags&ObjectFlagsPythonTuple != 0 {
+			return t, PythonSequenceTuple
+		}
 		return t, PythonSequenceList
 	}
 	if isTupleType(t) {

@@ -51,6 +51,7 @@ const (
 	ObjectMemberItem
 	ObjectMemberIndex
 	ObjectMemberMethod
+	ObjectMemberCall
 )
 
 type ObjectMemberDeclaration struct {

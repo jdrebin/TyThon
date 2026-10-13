@@ -771,8 +771,8 @@ func (c *Checker) inferFromObjectTypes(n *InferenceState, source *Type, target *
 						targetInfo := getInferenceInfoForType(n, elementTypes[startLength])
 						if targetInfo != nil && targetInfo.impliedArity >= 0 {
 							// Infer slices from source based on implied arity of T.
-							c.inferFromTypes(n, c.sliceTupleType(source, startLength, endLength+sourceArity-targetInfo.impliedArity), elementTypes[startLength])
-							c.inferFromTypes(n, c.sliceTupleType(source, startLength+targetInfo.impliedArity, endLength), elementTypes[startLength+1])
+							c.inferFromTypes(n, c.preservePythonTuple(source, c.sliceTupleType(source, startLength, endLength+sourceArity-targetInfo.impliedArity)), elementTypes[startLength])
+							c.inferFromTypes(n, c.preservePythonTuple(source, c.sliceTupleType(source, startLength+targetInfo.impliedArity, endLength)), elementTypes[startLength+1])
 						}
 					} else if elementInfos[startLength].flags&ElementFlagsVariadic != 0 && elementInfos[startLength+1].flags&ElementFlagsRest != 0 {
 						// Middle of target is [...T, ...rest] and source is tuple type
@@ -781,7 +781,7 @@ func (c *Checker) inferFromObjectTypes(n *InferenceState, source *Type, target *
 							constraint := c.getBaseConstraintOfType(info.typeParameter)
 							if constraint != nil && isTupleType(constraint) && constraint.TargetTupleType().combinedFlags&ElementFlagsVariable == 0 {
 								impliedArity := constraint.TargetTupleType().fixedLength
-								c.inferFromTypes(n, c.sliceTupleType(source, startLength, sourceArity-(startLength+impliedArity)), elementTypes[startLength])
+								c.inferFromTypes(n, c.preservePythonTuple(source, c.sliceTupleType(source, startLength, sourceArity-(startLength+impliedArity))), elementTypes[startLength])
 								if restType := c.getElementTypeOfSliceOfTupleType(source, startLength+impliedArity, endLength, false, false); restType != nil {
 									c.inferFromTypes(n, restType, elementTypes[startLength+1])
 								}
@@ -801,7 +801,7 @@ func (c *Checker) inferFromObjectTypes(n *InferenceState, source *Type, target *
 									if restType := c.getElementTypeOfSliceOfTupleType(source, startLength, endLength+impliedArity, false, false); restType != nil {
 										c.inferFromTypes(n, restType, elementTypes[startLength])
 									}
-									c.inferFromTypes(n, trailingSlice, elementTypes[startLength+1])
+									c.inferFromTypes(n, c.preservePythonTuple(source, trailingSlice), elementTypes[startLength+1])
 								}
 							}
 						}
@@ -810,7 +810,7 @@ func (c *Checker) inferFromObjectTypes(n *InferenceState, source *Type, target *
 					// Middle of target is exactly one variadic element. Infer the slice between the fixed parts in the source.
 					// If target ends in optional element(s), make a lower priority a speculative inference.
 					priority := core.IfElse(elementInfos[targetArity-1].flags&ElementFlagsOptional != 0, InferencePrioritySpeculativeTuple, 0)
-					sourceSlice := c.sliceTupleType(source, startLength, endLength)
+					sourceSlice := c.preservePythonTuple(source, c.sliceTupleType(source, startLength, endLength))
 					c.inferWithPriority(n, sourceSlice, elementTypes[startLength], priority)
 				} else if middleLength == 1 && elementInfos[startLength].flags&ElementFlagsRest != 0 {
 					// Middle of target is exactly one rest element. If middle of source is not empty, infer union of middle element types.
@@ -1043,7 +1043,7 @@ func (c *Checker) createReverseMappedType(source *Type, target *Type, constraint
 		if elementType == nil {
 			return nil
 		}
-		return c.createArrayTypeEx(elementType, c.isReadonlyArrayType(source))
+		return c.preservePythonTuple(source, c.createArrayTypeEx(elementType, c.isReadonlyArrayType(source)))
 	}
 	if isTupleType(source) {
 		elementTypes := core.Map(c.getElementTypes(source), func(t *Type) *Type {
@@ -1061,7 +1061,7 @@ func (c *Checker) createReverseMappedType(source *Type, target *Type, constraint
 				return info
 			})
 		}
-		return c.createTupleTypeEx(elementTypes, elementInfos, source.TargetTupleType().readonly)
+		return c.preservePythonTuple(source, c.createTupleTypeEx(elementTypes, elementInfos, source.TargetTupleType().readonly))
 	}
 	// For all other object types we infer a new object type where the reverse mapping has been
 	// applied to the type of each property.

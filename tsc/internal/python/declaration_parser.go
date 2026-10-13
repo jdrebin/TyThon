@@ -534,7 +534,7 @@ func parseInterfaceDeclaration(header logicalLine, body []logicalLine) (*Interfa
 			errors = append(errors, TypeParseError{Range: parameter.NameLoc, Message: "const type parameters are only allowed on functions, methods, and classes"})
 		}
 	}
-	members, memberErrors := parseObjectMembers(body, true, nil)
+	members, memberErrors := parseObjectMembers(body, true, nil, true)
 	errors = append(errors, memberErrors...)
 	return &InterfaceDeclaration{
 		declarationBase: declarationBase{Loc: TextRange{Start: header.start, End: blockRangeEnd(header, body)}},
@@ -555,7 +555,7 @@ func parseClassDeclaration(header logicalLine, body []logicalLine, declarationOn
 	baseDeclarations, metaclass, baseErrors := parseClassBaseDeclarations(text, header)
 	errors = append(errors, baseErrors...)
 	initialized := make(map[string]bool)
-	members, memberErrors := parseObjectMembers(body, declarationOnly, initialized)
+	members, memberErrors := parseObjectMembers(body, declarationOnly, initialized, false)
 	errors = append(errors, memberErrors...)
 	return &ClassDeclaration{
 		declarationBase:       declarationBase{Loc: TextRange{Start: header.start, End: blockRangeEnd(header, body)}},
@@ -690,7 +690,7 @@ func parseClassBaseDeclarations(text string, line logicalLine) ([]BaseDeclaratio
 	return bases, metaclass, errors
 }
 
-func parseObjectMembers(lines []logicalLine, declarationOnly bool, initialized map[string]bool) ([]ObjectMemberDeclaration, []TypeParseError) {
+func parseObjectMembers(lines []logicalLine, declarationOnly bool, initialized map[string]bool, allowCallSignatures bool) ([]ObjectMemberDeclaration, []TypeParseError) {
 	members := []ObjectMemberDeclaration{}
 	errors := []TypeParseError{}
 	pendingOverload := false
@@ -711,6 +711,21 @@ func parseObjectMembers(lines []logicalLine, declarationOnly bool, initialized m
 		text := line.text
 		if text == "pass" || text == "..." {
 			continue
+		}
+		if signatureText, found := strings.CutPrefix(text, "def"); allowCallSignatures && found {
+			signatureText = strings.TrimSpace(signatureText)
+			if strings.HasPrefix(signatureText, "(") || strings.HasPrefix(signatureText, "<") {
+				expression, parseErrors := ParseTypeExpression(signatureText)
+				offset := logicalLineTextOffsetFrom(line, signatureText, len("def"))
+				relocateTypeExpression(expression, offset)
+				errors = append(errors, relocateErrors(parseErrors, offset)...)
+				if signature, ok := expression.(*CallableTypeExpr); ok {
+					members = append(members, ObjectMemberDeclaration{Loc: lineRange(line), Kind: ObjectMemberCall, Signature: signature, ReturnAnnotated: true})
+				} else {
+					errors = append(errors, errorForLine(line, "expected a call signature after 'def'"))
+				}
+				continue
+			}
 		}
 		if strings.HasPrefix(text, "@") {
 			switch {

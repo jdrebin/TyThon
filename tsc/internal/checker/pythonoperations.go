@@ -627,12 +627,49 @@ func (c *Checker) isPythonTupleTypeNode(node *ast.Node) bool {
 // markPythonTuple clones a tuple reference so `()` does not share identity with
 // a readonly list of the same elements.
 func (c *Checker) markPythonTuple(t *Type) *Type {
-	if t == nil || t.objectFlags&ObjectFlagsPythonTuple != 0 || t.objectFlags&ObjectFlagsReference == 0 || !isTupleType(t) {
+	if t == nil || t.objectFlags&ObjectFlagsPythonTuple != 0 || t.objectFlags&ObjectFlagsReference == 0 || !c.isArrayOrTupleType(t) {
 		return t
 	}
+	key := CachedTypeKey{kind: CachedTypeKindPythonTuple, typeId: t.id}
+	if cached := c.cachedTypes[key]; cached != nil {
+		return cached
+	}
 	clone := c.cloneTypeReference(t)
+	clone.AsTypeReference().node = t.AsTypeReference().node
+	clone.AsTypeReference().mapper = t.AsTypeReference().mapper
+	clone.alias = t.alias
 	clone.objectFlags |= ObjectFlagsPythonTuple
+	c.cachedTypes[key] = clone
 	return clone
+}
+
+// Rebuilding a native sequence must retain its Python runtime family. Readonly
+// alone describes mutability and does not distinguish a tuple from a list.
+func (c *Checker) preservePythonTuple(source, result *Type) *Type {
+	if source.objectFlags&ObjectFlagsPythonTuple != 0 {
+		return c.mapType(result, func(t *Type) *Type {
+			if isTupleType(t) && !t.TargetTupleType().readonly {
+				t = c.createTupleTypeEx(c.getElementTypes(t), t.TargetTupleType().elementInfos, true /*readonly*/)
+			} else if c.isArrayType(t) && !c.isReadonlyArrayType(t) {
+				t = c.createArrayTypeEx(c.getTypeArguments(t)[0], true /*readonly*/)
+			}
+			return c.markPythonTuple(t)
+		})
+	}
+	return result
+}
+
+func (c *Checker) pythonSequenceKindsDiffer(source, target *Type) bool {
+	if source.flags&TypeFlagsObject == 0 || target.flags&TypeFlagsObject == 0 {
+		return false
+	}
+	if (source.objectFlags|target.objectFlags)&ObjectFlagsPythonTuple == 0 &&
+		!c.mayHavePythonSequenceMetadata(source) && !c.mayHavePythonSequenceMetadata(target) {
+		return false
+	}
+	sourceNative, sourceKind := c.getPythonSequenceMetadata(source)
+	targetNative, targetKind := c.getPythonSequenceMetadata(target)
+	return sourceNative != nil && targetNative != nil && sourceKind != targetKind
 }
 
 func (c *Checker) inPythonSourceFile(node *ast.Node) bool {

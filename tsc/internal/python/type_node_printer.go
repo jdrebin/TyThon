@@ -81,6 +81,7 @@ func printPythonTypeNode(node *ast.Node, emit *printer.EmitContext) string {
 				if operator.Type != nil && operator.Type.Kind == ast.KindArrayType {
 					return "readonly []" + atomic(operator.Type.AsArrayTypeNode().ElementType)
 				}
+				return "readonly " + render(operator.Type)
 			}
 		case ast.KindIndexedAccessType:
 			access := node.AsIndexedAccessTypeNode()
@@ -212,9 +213,12 @@ func pythonFunctionTail(node *ast.Node, render func(*ast.Node) string, join func
 	return generics + "(" + parameters + ") -> " + render(node.Type())
 }
 
-// printPythonTuple prints `(A, B)`, `(A,)`, `()`, or `()T`. A readonly array is
-// not this form.
+// printPythonTuple prints `(A, B)`, `(A,)`, `()`, or `()T` for nodes marked as
+// Python tuples, including homogeneous tuples backed by native arrays.
 func printPythonTuple(node *ast.Node, render func(*ast.Node) string) string {
+	if node != nil && node.Kind == ast.KindArrayType {
+		return "()" + strings.TrimPrefix(render(node), "[]")
+	}
 	if node == nil || node.Kind != ast.KindTupleType {
 		return "()"
 	}

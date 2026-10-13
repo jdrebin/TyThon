@@ -113,10 +113,16 @@ func (p *Parser) parseTypeMemberRest(pos int, modifiers *ast.ModifierList, inCla
 	switch {
 	case p.token == ast.KindFunctionKeyword:
 		p.nextToken()
-		name := p.parseIdentifierName()
+		var name *ast.Node
+		if p.token != ast.KindOpenParenToken && p.token != ast.KindLessThanToken {
+			name = p.parseIdentifierName()
+		}
 		typeParameters := p.parseTypeParameters()
 		parameters := p.parseParameters()
 		returnType := p.parseReturnType()
+		if name == nil {
+			return p.finishNode(p.factory.NewCallSignatureDeclaration(typeParameters, parameters, returnType), pos)
+		}
 		return p.finishNode(p.factory.NewMethodSignatureDeclaration(modifiers, name, nil, typeParameters, parameters, returnType), pos)
 	case p.token == ast.KindOpenBracketToken:
 		// Legacy `[name: K]: V` index signatures are not tython syntax; recover.
