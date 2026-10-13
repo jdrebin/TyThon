@@ -16,18 +16,29 @@ func (s *Session) AttributeCompletions(fileName string, query python.AttributeCo
 		return nil
 	}
 	receiverType, typeMember := s.attributeReceiverType(receiver)
+	_, sequenceKind := s.checker.GetPythonSequenceBackingType(receiverType)
+	tuple := sequenceKind == checker.PythonSequenceTuple
 	seen := map[string]bool{}
 	var entries []python.CompletionEntry
-	for _, property := range s.checker.PropertiesForCompletion(receiverType) {
-		name := property.Name
+	add := func(name string, property *ast.Symbol, bind bool) {
 		if s.checker.IsPythonPrivateAttributeName(name) || !includeCompletionName(name, query.Prefix) {
-			continue
+			return
+		}
+		// `value.0` is not Python. Tuple slots are item indexes.
+		if numericPropertyName(name) || tuple && name == "length" {
+			return
 		}
 		if seen[name] || !hasPrefix(name, query.Prefix) {
-			continue
+			return
 		}
 		seen[name] = true
-		entries = append(entries, s.propertyEntry(name, property, query.ReplaceFrom, query.ReplaceTo, typeMember))
+		entries = append(entries, s.propertyEntry(name, property, query.ReplaceFrom, query.ReplaceTo, typeMember, bind))
+	}
+	for _, property := range s.checker.PropertiesForCompletion(receiverType) {
+		add(property.Name, property, false)
+	}
+	for _, property := range s.checker.PythonContainerProperties(receiverType) {
+		add(property.Name, property, true)
 	}
 	sortCompletionLabels(entries)
 	return entries
@@ -319,8 +330,11 @@ func (s *Session) typeNameReceiverType(node *ast.Node) *checker.Type {
 	}
 }
 
-func (s *Session) propertyEntry(name string, property *ast.Symbol, from int, to int, typeMember bool) python.CompletionEntry {
+func (s *Session) propertyEntry(name string, property *ast.Symbol, from int, to int, typeMember bool, bind bool) python.CompletionEntry {
 	t := s.checker.GetTypeOfSymbol(property)
+	if bind || property.Flags&ast.SymbolFlagsMethod != 0 {
+		t = s.checker.BoundPythonCallable(t)
+	}
 	kind := python.CompletionKindProperty
 	if typeMember {
 		kind = python.CompletionKindType
@@ -353,6 +367,18 @@ func (s *Session) itemKeyEntries(t *checker.Type, prefix string, quote byte, raw
 			Label: label, Detail: s.typeText(value), Kind: python.CompletionKindItem, InsertText: insert,
 			ReplaceFrom: from, ReplaceTo: to,
 		})
+	}
+	if quote == 0 {
+		for _, slot := range s.checker.PythonFixedItemIndexes(t) {
+			if slot.Label == "" || seen[slot.Label] || !hasPrefix(slot.Label, prefix) {
+				continue
+			}
+			seen[slot.Label] = true
+			entries = append(entries, python.CompletionEntry{
+				Label: slot.Label, Detail: s.typeText(slot.Type), Kind: python.CompletionKindItem, InsertText: slot.Label,
+				ReplaceFrom: from, ReplaceTo: to,
+			})
+		}
 	}
 	return entries
 }
@@ -440,6 +466,18 @@ func formatStringLiteral(key *checker.Type, quote byte, raw bool) (string, strin
 		insert = label
 	}
 	return label, insert
+}
+
+func numericPropertyName(name string) bool {
+	if name == "" {
+		return false
+	}
+	for _, r := range name {
+		if r < '0' || r > '9' {
+			return false
+		}
+	}
+	return true
 }
 
 func includeCompletionName(name string, prefix string) bool {

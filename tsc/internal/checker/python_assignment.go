@@ -49,6 +49,33 @@ func (c *Checker) pythonPatternCaptureType(name *ast.Node) *Type {
 	return c.errorType
 }
 
+// pythonDictType is Dict(Shape) for a runtime dictionary. The fresh literal keeps
+// its item shape so excess keys still check; the assigned name is the alias, so
+// hover, completion, and later reads see MappingProtocol.
+func (c *Checker) pythonDictType(shape *Type) *Type {
+	if shape == nil || !c.IsPythonMappingType(shape) {
+		return shape
+	}
+	if shape.alias != nil && shape.alias.symbol != nil && shape.alias.symbol.Name == "Dict" {
+		return shape
+	}
+	symbol := c.getGlobalTypeAliasSymbol("Dict", 1, false /*reportErrors*/)
+	if symbol == nil {
+		return shape
+	}
+	alias := &TypeAlias{symbol: symbol, typeArguments: []*Type{shape}}
+	// `{}` is an empty object, so `Shape & MappingProtocol<Shape>` reduces to the
+	// protocol and the Dict alias disappears. Keep both constituents.
+	if c.isEmptyObjectType(shape) {
+		protocol := c.getGlobalType("MappingProtocol", 1, false /*reportErrors*/)
+		if protocol == c.emptyGenericType {
+			return shape
+		}
+		return c.getIntersectionTypeEx([]*Type{shape, c.createTypeReference(protocol, []*Type{shape})}, IntersectionFlagsNoSupertypeReduction, alias)
+	}
+	return c.getTypeAliasInstantiation(symbol, []*Type{shape}, alias)
+}
+
 func (c *Checker) getPythonAssignmentDeclarationType(symbol *ast.Symbol) *Type {
 	for _, declaration := range symbol.Declarations {
 		if declaration.Kind != ast.KindBinaryExpression {
@@ -58,7 +85,7 @@ func (c *Checker) getPythonAssignmentDeclarationType(symbol *ast.Symbol) *Type {
 		// Only the initializer. A later `"v2"` must not widen 'v1' | 'v2' to str.
 		value := c.getWidenedLiteralType(c.checkExpressionCached(assignment.Right))
 		if t := c.pythonTargetType(assignment.Left, value, symbol.Name); t != nil {
-			return c.getWidenedType(t)
+			return c.pythonDictType(c.getWidenedType(t))
 		}
 	}
 	return c.errorType

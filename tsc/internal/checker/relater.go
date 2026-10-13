@@ -999,7 +999,7 @@ func (c *Checker) getUnmatchedPropertiesWorker(source *Type, target *Type, requi
 			if sourceProp == nil {
 				// A dict literal keeps its item shape. MappingProtocol methods
 				// are the same projection property access already uses.
-				sourceProp = c.pythonMappingMethod(source, targetProp.Name)
+				sourceProp = c.pythonProjectedProperty(source, targetProp.Name)
 			}
 			if sourceProp == nil {
 				if propsOut == nil {
@@ -4456,7 +4456,7 @@ func (r *Relater) propertiesRelatedTo(source *Type, target *Type, reportErrors b
 		if targetProp.Flags&ast.SymbolFlagsPrototype == 0 && (!numericNamesOnly || isNumericLiteralName(name) || name == "length") && (!optionalsOnly || targetProp.Flags&ast.SymbolFlagsOptional != 0) {
 			sourceProp := r.c.getPropertyOfType(source, name)
 			if sourceProp == nil {
-				sourceProp = r.c.pythonMappingMethod(source, name)
+				sourceProp = r.c.pythonProjectedProperty(source, name)
 			}
 			if sourceProp != nil && sourceProp != targetProp {
 				related := r.propertyRelatedTo(source, target, sourceProp, targetProp, r.c.getNonMissingTypeOfSymbol, reportErrors, intersectionState, r.relation == r.c.comparableRelation)

@@ -11533,7 +11533,7 @@ func (c *Checker) checkPropertyAccessExpressionOrQualifiedName(node *ast.Node, l
 			indexInfo = c.getApplicableIndexInfoForName(apparentType, right.Text())
 		}
 		if indexInfo == nil {
-			if prop := c.pythonMappingMethod(apparentType, right.Text()); prop != nil {
+			if prop := c.pythonProjectedProperty(apparentType, right.Text()); prop != nil {
 				c.symbolNodeLinks.Get(node).resolvedSymbol = prop
 				return c.BoundPythonCallable(c.getTypeOfSymbol(prop))
 			}

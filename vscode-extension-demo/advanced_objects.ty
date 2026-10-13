@@ -45,3 +45,5 @@ snapshot_keys = snapshot.keys()
 
 # Delete the key text and invoke completion inside the quotes.
 completion_from_item_surface = registry["version"]
+
+bg = {"id": 33}

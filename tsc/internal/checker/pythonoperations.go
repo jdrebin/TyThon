@@ -2,6 +2,7 @@ package checker
 
 import (
 	"fmt"
+	"strconv"
 
 	"github.com/jdrebin/TyThon/tsc/internal/ast"
 )
@@ -612,6 +613,102 @@ func (c *Checker) GetPythonAsyncIterationType(iterable *Type) (*Type, []ObjectCa
 		return awaited, nil
 	}
 	return c.unknownType, []ObjectCallDiagnostic{{Argument: -1, Message: "__anext__ result is not awaitable"}}
+}
+
+// pythonProjectedProperty is a container-protocol member that is not stored on
+// the value. Dict assignments become the Dict alias; list and tuple values stay
+// array and tuple types and read ListProtocol / TupleProtocol from here.
+func (c *Checker) pythonProjectedProperty(t *Type, name string) *ast.Symbol {
+	if prop := c.pythonMappingMethod(t, name); prop != nil {
+		return prop
+	}
+	return c.pythonSequenceMethod(t, name)
+}
+
+func (c *Checker) pythonSequenceMethod(t *Type, name string) *ast.Symbol {
+	protocol := c.pythonSequenceProtocol(t)
+	if protocol == nil || name == "" {
+		return nil
+	}
+	return c.getPropertyOfType(protocol, name)
+}
+
+func (c *Checker) pythonSequenceProtocol(t *Type) *Type {
+	native, kind := c.getPythonSequenceMetadata(t)
+	if native == nil {
+		return nil
+	}
+	name := "ListProtocol"
+	if kind == PythonSequenceTuple {
+		name = "TupleProtocol"
+	}
+	protocol := c.getGlobalType(name, 1, false /*reportErrors*/)
+	if protocol == c.emptyGenericType {
+		return nil
+	}
+	element := c.pythonSequenceElementType(native)
+	// `a = []` is never[] so it still assigns to every []T. never would make
+	// append unusable; unknown accepts a value without claiming the list widened.
+	if element.flags&TypeFlagsNever != 0 {
+		element = c.unknownType
+	}
+	return c.createTypeReference(protocol, []*Type{element})
+}
+
+func (c *Checker) pythonSequenceElementType(native *Type) *Type {
+	if c.isArrayType(native) {
+		if element := c.getElementTypeOfArrayType(native); element != nil {
+			return element
+		}
+	}
+	if isTupleType(native) {
+		elements := c.getElementTypes(native)
+		if len(elements) != 0 {
+			return c.getUnionType(elements)
+		}
+	}
+	return c.neverType
+}
+
+// PythonContainerProperties is the protocol surface completion adds on top of
+// the value's own properties. A Dict alias already has these members.
+func (c *Checker) PythonContainerProperties(t *Type) []*ast.Symbol {
+	if protocol := c.pythonSequenceProtocol(t); protocol != nil {
+		return c.getPropertiesOfType(protocol)
+	}
+	if !c.IsPythonMappingType(t) || c.getPropertyOfType(t, "keys") != nil {
+		return nil
+	}
+	mapping := c.getGlobalType("MappingProtocol", 1, false /*reportErrors*/)
+	if mapping == c.emptyGenericType {
+		return nil
+	}
+	return c.getPropertiesOfType(c.createTypeReference(mapping, []*Type{t}))
+}
+
+// PythonFixedItemIndex is one finite tuple slot. Homogeneous lists have no
+// finite indexes; those stay off bracket completion.
+type PythonFixedItemIndex struct {
+	Label string
+	Type  *Type
+}
+
+func (c *Checker) PythonFixedItemIndexes(t *Type) []PythonFixedItemIndex {
+	native, kind := c.getPythonSequenceMetadata(t)
+	if native == nil || kind != PythonSequenceTuple || !isTupleType(native) {
+		return nil
+	}
+	target := native.TargetTupleType()
+	types := c.getElementTypes(native)
+	slots := make([]PythonFixedItemIndex, 0, target.fixedLength)
+	for index := 0; index < min(target.fixedLength, len(types)); index++ {
+		slots = append(slots, PythonFixedItemIndex{Label: strconv.Itoa(index), Type: types[index]})
+	}
+	endFixed := getEndElementCount(target, ElementFlagsFixed)
+	for offset := 1; offset <= endFixed && offset <= len(types); offset++ {
+		slots = append(slots, PythonFixedItemIndex{Label: "-" + strconv.Itoa(offset), Type: types[len(types)-offset]})
+	}
+	return slots
 }
 
 // pythonMappingMethod is a MappingProtocol member of a dict literal.

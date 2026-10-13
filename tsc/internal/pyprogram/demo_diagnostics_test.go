@@ -17,7 +17,6 @@ import (
 // disappears.
 var acceptedDemoDiagnostics = []string{
 	// Required fields without initializers or constructor assignments.
-	`vscode-extension-demo/advanced_classes.ty:9: Attribute 'created_at' has no initializer and is not definitely assigned in __init__.`,
 	`vscode-extension-demo/advanced_classes.ty:56: Attribute 'marker' has no initializer and is not definitely assigned in __init__.`,
 	// Generator<Y, S, R> is still checked as TypeScript's Generator<Y, R, N>.
 	`vscode-extension-demo/advanced_async_and_generators.ty:32: Type 'boolean' is not assignable to type 'string'.`,
@@ -50,7 +49,7 @@ var acceptedDemoDiagnostics = []string{
 	`vscode-extension-demo/value_hierarchy.ty:6: Type 'null' is not assignable to type '{}'.`,
 	`vscode-extension-demo/value_hierarchy.ty:7: Conversion of type 'boolean' to type 'bigint' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.`,
 	`vscode-extension-demo/value_hierarchy.ty:10: Type 'bigint[]' is not assignable to type 'Object'.`,
-	`vscode-extension-demo/value_hierarchy.ty:11: Type '[bigint, string]' is not assignable to type 'Object'.`,
+	`vscode-extension-demo/value_hierarchy.ty:11: Type 'readonly [bigint, string]' is not assignable to type 'Object'.`,
 
 	// expected_errors.ty: the bad object, the missing key, the bad default, and
 	// the bad annotation.

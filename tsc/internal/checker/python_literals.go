@@ -9,7 +9,15 @@ import (
 // TupleExpression is a fixed sequence, not a JS array literal. Native
 // Array/Tuple already get bigint indexing via getPythonSequenceMetadata.
 func (c *Checker) checkTupleExpression(node *ast.Node, checkMode CheckMode) *Type {
-	return c.checkArrayLiteral(node, checkMode|CheckModeForceTuple)
+	t := c.checkArrayLiteral(node, checkMode|CheckModeForceTuple)
+	// A tuple value is a readonly sequence. A mutable tuple is a fixed list, so
+	// leaving the literal mutable made `(1, "a")` pick up list methods and the
+	// numeric element properties of a TypeScript tuple.
+	if ast.IsAssignmentTarget(node) || !isTupleType(t) || t.TargetTupleType().readonly {
+		return t
+	}
+	infos := append([]TupleElementInfo(nil), t.TargetTupleType().elementInfos...)
+	return c.createArrayLiteralType(c.createTupleTypeEx(c.getElementTypes(t), infos, true /*readonly*/))
 }
 
 func (c *Checker) checkSetExpression(node *ast.Node, checkMode CheckMode) *Type {
