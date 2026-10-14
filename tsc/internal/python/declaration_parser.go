@@ -245,6 +245,7 @@ func collectLogicalLines(source string) []logicalLine {
 	contentStart := 0
 	indent := 0
 	depth := 0
+	angleDepth := 0
 	var tripleQuote byte
 	for _, raw := range physical {
 		content := strings.TrimSuffix(raw, "\n")
@@ -279,7 +280,9 @@ func collectLogicalLines(source string) []logicalLine {
 			text.WriteString(trimmed)
 			nextTriple := updatePythonTripleQuote(content, tripleQuote)
 			if !insideTriple && nextTriple == 0 {
-				depth += delimiterDelta(trimmed)
+				var delta int
+				delta, angleDepth = delimiterDeltaWithAngles(trimmed, angleDepth)
+				depth += delta
 			}
 			tripleQuote = nextTriple
 		}
@@ -288,6 +291,7 @@ func collectLogicalLines(source string) []logicalLine {
 			lines = append(lines, logicalLine{text: text.String(), indent: indent, start: start, contentStart: contentStart, end: offset})
 			text.Reset()
 			depth = 0
+			angleDepth = 0
 		}
 	}
 	if text.Len() != 0 {
@@ -378,11 +382,16 @@ func stripTypeComment(line string) string {
 }
 
 func delimiterDelta(text string) int {
+	delta, _ := delimiterDeltaWithAngles(text, 0)
+	return delta
+}
+
+func delimiterDeltaWithAngles(text string, openAngles int) (int, int) {
 	delta := 0
-	openAngles := 0
 	quote := rune(0)
 	escaped := false
 	previous := rune(0)
+	previousNonspace := rune(0)
 	for _, r := range text {
 		if escaped {
 			escaped = false
@@ -410,23 +419,27 @@ func delimiterDelta(text string) int {
 		case '(', '[', '{':
 			delta++
 		case '<':
-			// Type argument lists attach directly to a name (`Box<T>`). Comparison
-			// operators are spaced (`a < b`, `lambda <T>` uses a leading keyword).
-			if isGenericTypeArgumentOpener(previous) {
+			// Type arguments attach to a name (`Box<T>`); generic callable types
+			// can begin an expression or a continuation line (`type F = <...>`).
+			// Spaced comparisons (`a < b`) do not open a type-argument group.
+			if isGenericTypeArgumentOpener(previous) || previousNonspace == 0 || strings.ContainsRune("=(:,|&", previousNonspace) {
 				delta++
 				openAngles++
 			}
 		case ')', ']', '}':
 			delta--
 		case '>':
-			if previous != '-' && openAngles > 0 && isGenericTypeArgumentOpener(previous) {
+			if previous != '-' && openAngles > 0 {
 				delta--
 				openAngles--
 			}
 		}
 		previous = r
+		if !unicode.IsSpace(r) {
+			previousNonspace = r
+		}
 	}
-	return delta
+	return delta, openAngles
 }
 
 func isGenericTypeArgumentOpener(previous rune) bool {

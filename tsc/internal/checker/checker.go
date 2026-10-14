@@ -661,6 +661,9 @@ type Checker struct {
 	pythonAttributeNameKey                      *Type
 	pythonPrivateTypeKeys                       map[string]*Type
 	pythonValueHierarchy                        *pythonValueHierarchy
+	pythonSuperInitializers                     map[*ast.Node]*pythonSuperInitializer
+	pythonSuperInitializerTypes                 map[*Type]*pythonSuperInitializerCall
+	pythonSuperInitializerCalls                 map[*ast.Node]*pythonSuperInitializerCall
 	resolvingExplicitTypeOfSymbol               collections.Set[*ast.Symbol]
 	undefinedSymbol                             *ast.Symbol
 	argumentsSymbol                             *ast.Symbol
@@ -8684,6 +8687,9 @@ func (c *Checker) resolveCallExpression(node *ast.Node, candidatesOutArray *[]*S
 	}
 	var callChainFlags SignatureFlags
 	funcType := c.checkExpression(node.Expression())
+	if call := c.pythonSuperInitializerCall(funcType); call != nil {
+		return c.resolvePythonSuperInitializer(node, call, candidatesOutArray, checkMode)
+	}
 	if isCallChain(node) {
 		nonOptionalType := c.getOptionalExpressionType(funcType, node.Expression())
 		switch {
@@ -11504,6 +11510,11 @@ func (c *Checker) checkPropertyAccessChain(node *ast.Node, checkMode CheckMode) 
 }
 
 func (c *Checker) checkPropertyAccessExpressionOrQualifiedName(node *ast.Node, left *ast.Node, leftType *Type, right *ast.Node, checkMode CheckMode, writeOnly bool) *Type {
+	if right.Text() == "__init__" && c.pythonSuperBase(left) != nil {
+		if callable := c.pythonSuperInitializerType(node); callable != nil {
+			return c.getFlowTypeOfReferenceEx(node, callable, callable, nil, nil)
+		}
+	}
 	parentSymbol := c.getResolvedSymbolOrNil(left)
 	assignmentKind := getAssignmentTargetKind(node)
 	widenedType := leftType
@@ -12783,8 +12794,8 @@ func (c *Checker) checkBinaryLikeExpression(left *ast.Node, operatorToken *ast.N
 				c.error(errorNode, diagnostics.This_condition_will_always_return_0_since_JavaScript_compares_objects_by_reference_not_value, core.IfElse(eqType, "false", "true"))
 			}
 			c.checkNaNEquality(errorNode, operator, left, right)
-			c.reportOperatorErrorUnless(leftType, operator, rightType, errorNode, func(left *Type, right *Type) bool {
-				return c.isTypeEqualityComparableTo(left, right) || c.isTypeEqualityComparableTo(right, left)
+			c.reportOperatorErrorUnless(leftType, operator, rightType, errorNode, func(l *Type, r *Type) bool {
+				return c.isPythonSuperInitializerComparison(leftType, left, rightType, right) || c.isTypeEqualityComparableTo(l, r) || c.isTypeEqualityComparableTo(r, l)
 			})
 		}
 		return c.booleanType

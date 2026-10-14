@@ -35,6 +35,13 @@ token.TY_LANGLE = 180
 token.TY_ANNOTATION_COLON = 181
 token.tok_name[180] = "TY_LANGLE"
 token.tok_name[181] = "TY_ANNOTATION_COLON"
+token.TY_KEY_LPAR = 185
+token.tok_name[185] = "TY_KEY_LPAR"
+MODIFIER_TOKENS = {"optional": 182, "readonly": 183, "static": 184}
+for name, kind in MODIFIER_TOKENS.items():
+    token_name = "TY_" + name.upper()
+    setattr(token, token_name, kind)
+    token.tok_name[kind] = token_name
 
 REPLACEMENTS = {
     "type_stmt:": "type_stmt: \"type\" NAME ['(' [ty_typeparams] ')'] '=' ty_test",
@@ -49,8 +56,7 @@ REPLACEMENTS = {
     "classdef:": "classdef: ('class' | \"interface\") (NAME | '*') [typeparams] ['(' [arglist] ')'] ':' suite",
     "test:": "test: ty_assertion ['if' or_test 'else' test] | lambdef",
     "trailer:": "trailer: '(' [arglist] ')' | '[' subscriptlist ']' | '.' NAME | '!' | ty_call_typeargs ['(' [arglist] ')']",
-    "small_stmt:": "small_stmt: (ty_modified_ann | type_stmt | expr_stmt | del_stmt | pass_stmt | flow_stmt |",
-    "compound_stmt:": "compound_stmt: ty_declare | if_stmt | while_stmt | for_stmt | try_stmt | with_stmt | funcdef | classdef | decorated | async_stmt | match_stmt",
+    "compound_stmt:": "compound_stmt: ty_declare | ty_modified_stmt | ty_key_stmt | if_stmt | while_stmt | for_stmt | try_stmt | with_stmt | funcdef | classdef | decorated | async_stmt | match_stmt",
 }
 
 RULES = r"""
@@ -64,11 +70,11 @@ ty_prefix: ("keyof" | "typeof") ty_prefix | "infer" NAME ["extends" ty_union] | 
 ty_primary: ty_atom ty_trailer*
 ty_trailer: TY_LANGLE ty_arglist '>' | '(' [ty_arglist] ')' | '[' ty_test ']' | '.' NAME
 ty_atom: (NAME | NUMBER | STRING+ | fstring | '.' '.' '.' | '*' [ty_primary] |
-          '(' [ty_arglist] ')' ['->' ty_test | ty_primary] |
+          ('(' | TY_KEY_LPAR) [ty_arglist] ')' ['->' ty_test | ty_primary] |
           '[' [ty_arglist] ']' [ty_primary] |
           '{' [ty_members] '}')
 ty_arglist: ty_argument (',' ty_argument)* [',']
-ty_argument: ty_test [':' ty_test] ['=' test]
+ty_argument: '/' | '**' NAME [':' ty_test] | ty_test [':' ty_test] ['=' test]
 ty_members: ty_member (ty_comp_for | (',' ty_member)* [','])
 ty_member: ["readonly"] ["optional" | '-' "optional"] ty_test ':' ty_test | 'def' [NAME] [typeparams] parameters '->' ty_test
 ty_comp_for: 'for' NAME 'in' ty_union ['if' ty_union "extends" ty_union]
@@ -76,7 +82,9 @@ ty_generic_callable: ty_callable_typeparams parameters '->' ty_test
 ty_callable_typeparams: TY_LANGLE ty_typeparams '>'
 ty_call_typeargs: TY_LANGLE ty_arglist '>'
 ty_declare: "declare" (['async'] 'def' NAME [typeparams] parameters ['->' ty_test] [':' '.' '.' '.'] | ('class' | "interface") (NAME | '*') [typeparams] ['(' [arglist] ')'] ':' suite)
-ty_modified_ann: ("static" "readonly" "optional" | "static" "readonly" | "static" "optional" | "readonly" "optional" | "optional" "readonly" | "static" | "readonly" | "optional") NAME ':' ty_test ['=' test]
+ty_modifiers: ("static" | "readonly" | "optional")+
+ty_modified_stmt: ty_modifiers (funcdef | async_stmt | ty_declare | ty_test ':' ty_test ['=' test] NEWLINE)
+ty_key_stmt: TY_KEY_LPAR ty_arglist ')' ':' ty_test NEWLINE
 """
 
 _initialize = pygram.initialize
@@ -97,8 +105,11 @@ def initialize(cache_dir=None):
                 line,
             )
         )
+    grammar_text = "\n".join(lines) + RULES
+    for name in MODIFIER_TOKENS:
+        grammar_text = grammar_text.replace('"' + name + '"', "TY_" + name.upper())
     grammar = pgen.ParserGenerator(
-        "tython-spike", io.StringIO("\n".join(lines) + RULES)
+        "tython-spike", io.StringIO(grammar_text)
     ).make_grammar()
     grammar.async_keywords = True
     grammar.version = (3, 10)
@@ -115,10 +126,6 @@ _classify = parse.Parser.classify
 def classify(self, kind, value, context):
     # Reuse Black's soft-keyword machinery, permitting our contextual type
     # keywords inside expressions as well as at statement boundaries.
-    if kind == token.NAME and value in {"optional", "readonly", "static"} and value in self.grammar.soft_keywords:
-        # One label. Offering the name as well makes the soft-keyword
-        # lookahead consume the attribute name and drop it.
-        return [self.grammar.soft_keywords[value]]
     if kind == token.NAME and value in {
         "keyof",
         "typeof",
@@ -154,15 +161,20 @@ assert (
 _parse = black.parsing.lib2to3_parse
 _tokenize = tokenize.tokenize
 _lexical_context = None
+_source_filename = "spike.ty"
+
+
+def analyze(source):
+    return _analyze(source, _source_filename)
 
 
 @lru_cache(maxsize=128)
-def analyze(source):
+def _analyze(source, file_name):
     if len(source.encode("utf8")) > 1_000_000:
         raise ValueError("Spike input exceeds 1 MB")
     result = subprocess.run(
         [str(ORACLE)],
-        input=json.dumps({"source": source}),
+        input=json.dumps({"source": source, "fileName": file_name}),
         text=True,
         capture_output=True,
         check=True,
@@ -185,6 +197,10 @@ def typed_tokens(source, *args, **kwargs):
     for kind, value, start, end, line in _tokenize(source, *args, **kwargs):
         if context is not None:
             position = offsets[start[0] - 1] + len(line[: start[1]].encode("utf8"))
+            if value in MODIFIER_TOKENS and str(position) in context["modifiers"]:
+                kind = MODIFIER_TOKENS[value]
+            if value == "(" and str(position) in context["key_parens"]:
+                kind = token.TY_KEY_LPAR
             if angle_depth and kind in {token.INDENT, token.DEDENT}:
                 continue
             if angle_depth and kind == token.NEWLINE:
@@ -212,15 +228,40 @@ tokenize.tokenize = typed_tokens
 def parse_source(source, target_versions=()):
     global _lexical_context
     _lexical_context = analyze(source)
+    source_lines = source.splitlines(keepends=True)
+    source_offsets = [0]
+    for line in source_lines:
+        source_offsets.append(source_offsets[-1] + len(line.encode("utf8")))
     try:
         tree = _parse(source, target_versions)
+        for leaf in tree.leaves():
+            if leaf.value == "(":
+                position = source_offsets[leaf.lineno - 1] + len(
+                    source_lines[leaf.lineno - 1][: leaf.column].encode("utf8")
+                )
+                if str(position) in _lexical_context["key_parens"]:
+                    leaf.ty_key_parens = True
     finally:
         _lexical_context = None
     # Tell the existing bracket layout machinery that generic delimiters form
     # a pair. Only CST token categories change; the printed values remain <>.
     for node in list(tree.pre_order()):
+        if node.type in MODIFIER_TOKENS.values():
+            node.type = token.NAME
+        if node.type == token.TY_KEY_LPAR:
+            node.type = token.LPAR
         if node.type == token.TY_ANNOTATION_COLON:
             node.type = token.COLON
+        if (
+            isinstance(node, Node)
+            and node.type == syms.ty_modified_stmt
+            and len(node.children) == 2
+        ):
+            modifiers, declaration = node.children
+            modifiers.remove()
+            declaration.remove()
+            declaration.insert_child(0, modifiers)
+            node.replace(declaration)
         if isinstance(node, Node) and node.type == syms.varargslist:
             if any(
                 isinstance(child, Node) and child.type == syms.vname
@@ -270,15 +311,41 @@ def _post_init_statements(self) -> None:
     self.visit_classdef = partial(visit, keywords={"class", "interface"}, parens=empty)
     self.visit_ty_declare = partial(visit, keywords={"declare"}, parens=empty)
     self.visit_type_stmt = partial(visit, keywords={"type"}, parens=empty)
+    self.visit_ty_key_stmt = partial(visit_typed_line, self)
+    self.visit_ty_modified_stmt = partial(visit_typed_line, self)
+
+
+def visit_typed_line(self, node):
+    yield from self.line()
+    yield from self.visit_default(node)
+    yield from self.line()
 
 
 black.linegen.LineGenerator.__post_init__ = _post_init_statements
+_optional_parens = black.linegen.maybe_make_parens_invisible_in_atom
+
+
+def preserve_key_parens(node, *args, **kwargs):
+    if any(getattr(leaf, "ty_key_parens", False) for leaf in node.leaves()):
+        return False
+    return _optional_parens(node, *args, **kwargs)
+
+
+black.linegen.maybe_make_parens_invisible_in_atom = preserve_key_parens
 _whitespace = black.lines.whitespace
 
 
 def typed_whitespace(leaf, *, complex_subscript, mode):
     parent, previous = leaf.parent, leaf.prev_sibling
     if parent is not None:
+        if (
+            parent.type == syms.ty_argument
+            and previous
+            and previous.type == token.DOUBLESTAR
+        ):
+            return ""
+        if parent.type == syms.ty_declare and leaf.type == token.LPAR:
+            return ""
         if parent.type == syms.trailer and leaf.value == "!":
             return ""
         if parent.type == syms.ty_declare and leaf.value == ".":
@@ -393,9 +460,24 @@ def stabilize_indent(source):
     return "".join(normalized) if changed else source
 
 
-def format_source(source, width=88, *, magic_trailing_comma=True):
-    mode = black.Mode(line_length=width, string_normalization=False,
-                      magic_trailing_comma=magic_trailing_comma)
+def format_source(source, width=88, *, magic_trailing_comma=True, file_name="spike.ty"):
+    # Black calls the parser again during formatting and stability validation.
+    # Keep the file kind consistent throughout this single-request process.
+    global _source_filename
+    previous = _source_filename
+    _source_filename = file_name
+    try:
+        return _format_source(source, width, magic_trailing_comma=magic_trailing_comma)
+    finally:
+        _source_filename = previous
+
+
+def _format_source(source, width, *, magic_trailing_comma):
+    mode = black.Mode(
+        line_length=width,
+        string_normalization=False,
+        magic_trailing_comma=magic_trailing_comma,
+    )
     try:
         output = black.format_str(source, mode=mode)
     except (tokenize.TokenError, IndentationError, black.parsing.InvalidInput):
@@ -407,6 +489,7 @@ def format_source(source, width=88, *, magic_trailing_comma=True):
 
 if __name__ == "__main__":
     print(format_source(sys.stdin.read()), end="")
+
 
 class User:
     def __init__(self) -> None:

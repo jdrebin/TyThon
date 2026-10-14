@@ -44,6 +44,12 @@ for (const [source, expected] of [
 }
 assert.equal(await request('declare def f(x:int)->str\n', { fileName: path.join(root, "api.d.ty") }),
     'declare def f(x: int) -> str\n');
+// Ambient annotations have no executable Python body, including multiline shapes.
+const ambient = 'object:(()->object)&{__init__:((self:object)->None)&{__get__:(instance:object,owner:any=...)->()->None}}\n';
+const declarationFile = { fileName: path.join(root, "api.d.ty") };
+const ambientOutput = await request(ambient, declarationFile);
+assert(ambientOutput.includes("\n    __init__:"));
+assert.equal(await request(ambientOutput, declarationFile), ambientOutput);
 await writeFile(path.join(root, "pyproject.toml"), '[tool.black]\nline-length = 40\n');
 const wide = await request('result = call("first value", "second value", "third value")\n');
 assert(wide.includes("\n    "), "Black discovers workspace line length");

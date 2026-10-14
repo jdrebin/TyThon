@@ -6,6 +6,7 @@ import (
 	"maps"
 	"path/filepath"
 	"sort"
+	"strings"
 	"sync"
 	"unicode/utf16"
 	"unicode/utf8"
@@ -233,7 +234,7 @@ func (s *pythonLanguageService) computeCompletion(ctx context.Context, params *l
 			query, _ := pythonfrontend.PrepareDefinitionCompletion(source, offset)
 			entries = append(entries, pythonfrontend.DefinitionCompletions(query)...)
 		}
-		if callOK {
+		if callOK && !visibleQuery.OnlyKeywords {
 			entries = append(entries, session.KeywordArgumentCompletions(fileName, callQuery)...)
 		}
 		if visibleOK {
@@ -242,7 +243,18 @@ func (s *pythonLanguageService) computeCompletion(ctx context.Context, params *l
 		}
 	}
 	items := make([]*lsproto.CompletionItem, 0, len(entries))
+	seen := map[string]bool{}
+	prefix := visibleQuery.Prefix
+	if attributeOK {
+		prefix = attributeQuery.Prefix
+	} else if typeOK {
+		prefix = typeQuery.Prefix
+	}
 	for _, entry := range entries {
+		if seen[entry.Label] {
+			continue
+		}
+		seen[entry.Label] = true
 		kind := lsproto.CompletionItemKindProperty
 		if entry.Kind == pythonfrontend.CompletionKindMethod {
 			kind = lsproto.CompletionItemKindMethod
@@ -274,7 +286,11 @@ func (s *pythonLanguageService) computeCompletion(ctx context.Context, params *l
 			if entry.Incompatible {
 				group = "13"
 			}
-			sortText = group + fmt.Sprintf("%03d", entry.Distance)
+			visibility := "0"
+			if prefix == "" && strings.HasPrefix(entry.Label, "_") {
+				visibility = "1"
+			}
+			sortText = group + visibility + fmt.Sprintf("%03d", entry.Distance)
 		}
 		if entry.Kind == pythonfrontend.CompletionKindKeywordArgument {
 			// Use the language service's existing local-declaration tier so named
@@ -287,6 +303,15 @@ func (s *pythonLanguageService) computeCompletion(ctx context.Context, params *l
 		} else if definitionOK && entry.Label == "__init__" {
 			sortText = "10"
 		}
+		if entry.Kind == pythonfrontend.CompletionKindItem {
+			sortText = "09"
+		}
+		if entry.Required {
+			sortText = "08"
+		}
+		// Include the label so ties are deterministic even in clients that don't
+		// provide their own alphabetical fallback.
+		sortText += ":" + strings.ToLower(entry.Label) + ":" + entry.Label
 		var filterText *string
 		if entry.Kind == pythonfrontend.CompletionKindItem {
 			// Quoted/escaped insertions can differ from their readable label.
@@ -310,8 +335,10 @@ func (s *pythonLanguageService) computeCompletion(ctx context.Context, params *l
 		}
 		items = append(items, item)
 	}
-	// Prefix-filtered lists must be refreshed when the user changes the prefix.
-	incomplete := stringOK && stringQuery.Prefix != "" || itemOK && itemQuery.Prefix != ""
+	// Refresh name lists as the prefix changes: a cached empty-prefix list
+	// cannot reveal hidden dunders or undo the private-name ranking penalty.
+	incomplete := attributeOK || typeOK || visibleOK || definitionOK ||
+		stringOK && stringQuery.Prefix != "" || itemOK && itemQuery.Prefix != ""
 	return lsproto.CompletionItemsOrListOrNull{List: &lsproto.CompletionList{Items: items, IsIncomplete: incomplete}}, nil
 }
 

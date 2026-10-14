@@ -8,13 +8,19 @@ import (
 	"io"
 	"os"
 	"reflect"
+	"slices"
 	"strings"
 
+	"github.com/jdrebin/TyThon/tsc/internal/ast"
+	"github.com/jdrebin/TyThon/tsc/internal/core"
+	"github.com/jdrebin/TyThon/tsc/internal/pyparser"
 	"github.com/jdrebin/TyThon/tsc/internal/python"
+	"github.com/jdrebin/TyThon/tsc/internal/scanner"
 )
 
 type request struct {
-	Source string
+	Source   string
+	FileName string
 }
 
 // The first '>' after a type-parameter list is often the '>' inside '->'.
@@ -37,9 +43,19 @@ func main() {
 	if len(input.Source) > 1_000_000 {
 		panic("formatter source exceeds 1 MB")
 	}
-	decl, declErrors := python.ParseTypedSourceDeclarations("spike.ty", input.Source)
-	runtime, runtimeErrors := python.ParseRuntimeFile("spike.ty", input.Source)
-	erased, erasureErrors := python.EraseTypedPython(input.Source)
+	var decl *python.PythonSourceFile
+	var declErrors []python.TypeParseError
+	var runtime *python.RuntimeSourceFile
+	var runtimeErrors []python.RuntimeParseError
+	var erased string
+	var erasureErrors []python.ErasureDiagnostic
+	if strings.HasSuffix(input.FileName, ".d.ty") {
+		decl, declErrors = python.ParseDeclarationFile("spike.d.ty", input.Source)
+	} else {
+		decl, declErrors = python.ParseTypedSourceDeclarations("spike.ty", input.Source)
+		runtime, runtimeErrors = python.ParseRuntimeFile("spike.ty", input.Source)
+		erased, erasureErrors = python.EraseTypedPython(input.Source)
+	}
 	errors := []string{}
 	for _, e := range declErrors {
 		errors = append(errors, e.Message)
@@ -131,12 +147,68 @@ func main() {
 	}
 	inspect(reflect.ValueOf(decl))
 	inspect(reflect.ValueOf(runtime))
+	modifiers, keyParens := syntaxRoles(input.Source)
 	if err := json.NewEncoder(os.Stdout).Encode(map[string]any{
 		"declarations": normalize(reflect.ValueOf(decl)), "runtime": normalize(reflect.ValueOf(runtime)),
 		"erased": erased, "errors": errors, "unsupported": unsupported, "angles": angles, "colons": colons,
+		"modifiers": modifiers, "key_parens": keyParens,
 	}); err != nil {
 		panic(err)
 	}
+}
+
+// Let the shipped parser distinguish contextual modifiers from identifiers
+// and identify parentheses that carry item-key identity.
+func syntaxRoles(source string) (map[int]bool, map[int]bool) {
+	modifiers, keyParens := map[int]bool{}, map[int]bool{}
+	// Node ranges include trivia. Use token offsets so a keyword or opening
+	// parenthesis inside a comment cannot be mistaken for the syntax itself.
+	tokens := map[string][]int{}
+	s := scanner.NewScanner()
+	s.SetLanguageVariant(core.LanguageVariantPython)
+	s.SetSkipTrivia(true)
+	s.SetText(source)
+	for kind := s.Scan(); kind != ast.KindEndOfFile; kind = s.Scan() {
+		text := source[s.TokenStart():s.TokenEnd()]
+		if text == "optional" || text == "readonly" || text == "static" || text == "(" {
+			tokens[text] = append(tokens[text], s.TokenStart())
+		}
+	}
+	mark := func(node *ast.Node, spelling string, positions map[int]bool) {
+		if node != nil {
+			offsets := tokens[spelling]
+			index, _ := slices.BinarySearch(offsets, node.Pos())
+			if index < len(offsets) && offsets[index] < node.End() {
+				positions[offsets[index]] = true
+			}
+		}
+	}
+	var visit func(*ast.Node) bool
+	visit = func(node *ast.Node) bool {
+		if list := node.Modifiers(); list != nil {
+			for _, modifier := range list.Nodes {
+				for _, word := range []string{"optional", "readonly", "static"} {
+					mark(modifier, word, modifiers)
+				}
+			}
+		}
+		if node.Kind == ast.KindMappedType {
+			mark(node.QuestionToken(), "optional", modifiers)
+			mark(node.AsMappedTypeNode().ReadonlyToken, "readonly", modifiers)
+		}
+		if node.Kind == ast.KindIndexSignature {
+			for _, parameter := range node.Parameters() {
+				key := parameter.Type()
+				if key != nil && key.Kind == ast.KindParenthesizedType {
+					mark(key, "(", keyParens)
+				}
+			}
+		}
+		node.ForEachChild(visit)
+		return false
+	}
+	pyparser.ParseSourceFile("/formatter.ty", source).ForEachChild(visit)
+	return modifiers, keyParens
 }
 
 // Preserve node kinds and every semantic field; omit only source locations and

@@ -1,0 +1,21 @@
+{
+  "description": "Calling super init forbids positional-only input parameters.",
+  "tags": [
+    "initialization"
+  ],
+  "source": [
+    "class Base:",
+    "    def __init__(self, value: int, **kwargs):",
+    "        pass",
+    "class Child(Base):",
+    "    def __init__(self, value: int, /, **kwargs):",
+    "        super().__init__(value, **kwargs)"
+  ],
+  "diagnostics": [
+    {
+      "line": 5,
+      "kind": "type",
+      "messageContains": "must not have positional-only"
+    }
+  ]
+}

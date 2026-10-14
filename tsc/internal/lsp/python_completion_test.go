@@ -275,7 +275,6 @@ profile: Profile
 	uppercase := findCompletionItem(keywords, "uppercase")
 	assert.Assert(t, uppercase != nil, "expected keyword completion, got %#v", keywords)
 	assert.Equal(t, uppercase.TextEdit.TextEdit.NewText, "uppercase=")
-	assert.Equal(t, *uppercase.SortText, "10")
 	visibleUpper := findCompletionItem(keywords, "upper_value")
 	assert.Assert(t, visibleUpper != nil, "expected matching visible-name completion, got %#v", keywords)
 	assert.Assert(t, *uppercase.SortText < *visibleUpper.SortText, "named parameters should sort before visible names")

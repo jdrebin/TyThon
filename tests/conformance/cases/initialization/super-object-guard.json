@@ -1,0 +1,16 @@
+{
+  "description": "A parentless cooperative initializer distinguishes object before forwarding.",
+  "tags": [
+    "initialization"
+  ],
+  "source": [
+    "class Root:",
+    "    def __init__(self, value: int, **kwargs):",
+    "        next_init = super().__init__",
+    "        if next_init == object.__init__.__get__(self):",
+    "            next_init()",
+    "        else:",
+    "            next_init(value=value, **kwargs)"
+  ],
+  "diagnostics": []
+}

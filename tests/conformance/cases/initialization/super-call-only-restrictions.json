@@ -1,0 +1,15 @@
+{
+  "description": "Constructors without a super init call retain positional-only parameters and need no kwargs.",
+  "tags": [
+    "initialization"
+  ],
+  "source": [
+    "class Base:",
+    "    def __init__(self, value: int, /):",
+    "        pass",
+    "class Child(Base):",
+    "    def __init__(self, other: str, /):",
+    "        next_init = super().__init__"
+  ],
+  "diagnostics": []
+}

@@ -390,9 +390,15 @@ Required field initialization now queries the native constructor return-flow
 graph, including branches, early returns, loops, and `finally`. Class defaults
 and descriptors supply attributes without instance assignments; annotations do
 not overwrite inherited defaults. Optional fields, definite-assignment
-assertions, and declaration-only classes remain exempt. Synthesized initializer
-assertion signatures and cooperative base-initializer call effects still need
-to move from the compatibility frontend to the native checker.
+assertions, and declaration-only classes remain exempt. Cooperative initializer
+calls now check the current initializer and every immediate parent's effective
+initializer through the native keyword binder and call resolver. The named
+input intersection is also available to signature help. Calling the method
+requires accepting and forwarding kwargs and excludes positional-only inputs;
+constructors that do not call it acquire no such restrictions. Parentless
+forwarding uses a bound `object.__init__` comparison, with native flow narrowing
+for aliases, repeated accesses, early exits and branch joins. Successful calls
+apply the common guarantees of the base assertions; invalid calls do not.
 
 ## General decorator calls
 
@@ -429,3 +435,28 @@ decorator with a temporary declaration. Callable values rank ahead of noncallabl
 ones there. Visible-name ranking uses lexical distance and contextual
 assignability, including the existing flow graph for narrowed locals. Statement
 keywords and definition snippets use the shared syntax completion providers.
+
+Compatible visible names rank before incompatible names. With no typed prefix,
+public names rank before private names within each compatibility group; nearer
+scopes rank first within those groups. Dot-member suggestions check assignability to
+the surrounding expression's expected type, using the bound callable type for
+methods. Incompatible suggestions remain available and are labeled
+`not assignable`. Without an expected type, no compatibility penalty applies.
+LSP regression tests cover assignments, arguments, returns, collection values,
+nested scopes, narrowed locals, and member/callable completion.
+
+Open-ended completion uses contextual categories: required syntax first, then
+contextual literals, named arguments, ordinary keywords, and visible names.
+Alphabetical labels break ties. Dunders stay hidden until an underscore is typed,
+then sort last. External Jedi suggestions retain their lower fallback priority.
+Name lists refresh as the prefix changes so hidden candidates can become visible.
+
+Keyword filtering uses the Python scanner's logical lines and suite boundaries:
+`return`/`yield` require a function, `await` requires an async function, and
+`break`/`continue` require a loop in the same execution scope. Clause keywords
+follow their corresponding suites; match bodies offer `case`. Required
+continuations include `in`, conditional `else`, `import`, and try handlers.
+Comments, multiline strings, continued expressions, and nested function/class
+boundaries do not create false contexts. Expected literal values can be suggested
+before quotes are typed, with quotes included in the insertion. VS Code still
+controls client-side matching, snippet placement, and selection history.

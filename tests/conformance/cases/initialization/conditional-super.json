@@ -6,12 +6,12 @@
   "source": [
     "class Base:",
     "    id: int",
-    "    def __init__(self, id: int):",
+    "    def __init__(self, id: int, **kwargs):",
     "        self.id = id",
     "class Child(Base):",
-    "    def __init__(self, flag: bool):",
+    "    def __init__(self, flag: bool, **kwargs):",
     "        if flag:",
-    "            super().__init__(1)"
+    "            super().__init__(id=1, flag=flag, **kwargs)"
   ],
   "diagnostics": [
     {

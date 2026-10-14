@@ -2,6 +2,7 @@
 
 import json
 import os
+from pathlib import Path
 import subprocess
 import time
 import unittest
@@ -10,6 +11,11 @@ from adapter import BUILD, analyze, black, format_source, validate_output
 
 # These test actual source syntax, not Python-encoded approximations.
 CASES = {
+    "modified_methods": "interface Example:\n readonly optional value:int\n optional def __bytes__(self)->bytes\n",
+    "adjacent_computed_keys": 'interface Example:\n "name":str\n (str):int\n (*<"name">):bytes\n optional (bytes):str\n',
+    "unicode_syntax_roles": 'label="😀"\ninterface Example:\n readonly optional value:int\n (str):int\n',
+    "callable_parameter_markers": "type Getter=(self:object,/,**kwargs:any)->None\n",
+    "quoted_generic_call": "value=Box<'ada'>()\nnext_value=1\n",
     "annotation_only_classes": 'class User:\n id:str\n\nclass Me(User):\n id:"Shloimy"\n',
     "short_annotation_only_suite": "class A:\n x:T\n",
     "nested_annotation_only_suite": "def f():\n if True:\n  value:str\n",
@@ -63,7 +69,7 @@ CONTROLS = {
     "nested_untyped_lambdas": "outer=lambda x:lambda y:y\n",
     "untyped_lambda_dictionary": 'f=lambda value:{"name":value}\n',
     "comparisons_and_shifts": "flag=a<b>c\nshifted=value>>2\n",
-    "contextual_identifiers": "optional=1\nkeyof=2\nreadonly=3\n",
+    "contextual_identifiers": "optional=1\nkeyof=2\nreadonly=3\nstatic=4\nvalue=obj.optional+obj.readonly+obj.static\n",
     "comprehensions": "values=[n*n for n in range(10) if n%2==0]\nlookup={str(n):n for n in values}\n",
     "async": "async def collect(stream):\n async with resource() as handle:\n  return [x async for x in stream]\n",
     "with": "with resource() as handle:\n consume(handle)\n",
@@ -72,6 +78,9 @@ CONTROLS = {
 }
 
 EXPECTED = {
+    "modified_methods": "interface Example:\n    readonly optional value: int\n    optional def __bytes__(self) -> bytes\n",
+    "adjacent_computed_keys": 'interface Example:\n    "name": str\n    (str): int\n    (*<"name">): bytes\n    optional (bytes): str\n',
+    "callable_parameter_markers": "type Getter = (self: object, /, **kwargs: any) -> None\n",
     "long_lambda_header": "pair = (\n    lambda<T extends str> first: T, second: str: first as str\n)\n",
     "runtime_generic_call": 'result = identity<str>("value")\n',
     "generic_callable_type": "type Identity = <T>(value: T) -> T\n",
@@ -86,6 +95,25 @@ RESULTS = []
 
 
 class Feasibility(unittest.TestCase):
+    def test_repository_editor_sources(self):
+        root = Path(__file__).resolve().parents[2]
+        paths = [root / "tsc/internal/python/lib/builtins.d.ty"]
+        paths.extend(sorted((root / "vscode-extension-demo").rglob("*.ty")))
+        for path in paths:
+            with self.subTest(path=str(path.relative_to(root))):
+                source = path.read_text()
+                output = format_source(source, file_name=str(path))
+                self.assertEqual(format_source(output, file_name=str(path)), output)
+                RESULTS.append(
+                    {
+                        "name": "editor-"
+                        + str(path.relative_to(root)).replace("/", "-"),
+                        "status": "formatted",
+                        "input": source,
+                        "output": output,
+                    }
+                )
+
     def test_typed_syntax(self):
         for name, source in CASES.items():
             with self.subTest(name=name):
@@ -158,6 +186,7 @@ class Feasibility(unittest.TestCase):
             ("type X={id:int}\n", 'type X={"id":int}\n'),
             ('type X={"id":int}\n', 'type X={"id":str}\n'),
             ("type X={(str):int}\n", "type X={str:int}\n"),
+            ("interface X:\n (str):int\n", "interface X:\n str:int\n"),
             ("x=lambda value:str:value\n", "x=(lambda value:str:value,)\n"),
             ("x=1\n", "x=2\n"),
         ]:

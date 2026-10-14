@@ -10,7 +10,7 @@ interface Labeled(Named):
 class Device:
     name: str
 
-    def __init__(self, name: str) -> asserts self is {name: str}:
+    def __init__(self, name: str, **kwargs) -> asserts self is {name: str}:
         self.name = name
 
     def display(self) -> str:
@@ -18,8 +18,8 @@ class Device:
 
 
 class Thermostat(Device):
-    def __init__(self, name: str, temperature: int):
-        super().__init__(name)
+    def __init__(self, name: str, temperature: int, **kwargs):
+        super().__init__(name=name, temperature=temperature, **kwargs)
         self._temperature = temperature
 
     @property

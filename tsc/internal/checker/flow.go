@@ -515,6 +515,9 @@ func (c *Checker) narrowTypeByCallExpression(f *FlowState, t *Type, callExpressi
 }
 
 func (c *Checker) narrowTypeByBinaryExpression(f *FlowState, t *Type, expr *ast.BinaryExpression, assumeTrue bool) *Type {
+	if narrowed := c.narrowPythonSuperInitializer(f, t, expr, assumeTrue); narrowed != nil {
+		return narrowed
+	}
 	switch expr.OperatorToken.Kind {
 	case ast.KindEqualsToken, ast.KindBarBarEqualsToken, ast.KindAmpersandAmpersandEqualsToken, ast.KindQuestionQuestionEqualsToken:
 		return c.narrowTypeByTruthiness(f, c.narrowType(f, t, expr.Right, assumeTrue), expr.Left, assumeTrue)
@@ -2174,6 +2177,9 @@ func (c *Checker) getTypeOfSwitchClause(clause *ast.Node) *Type {
 }
 
 func (c *Checker) getEffectsSignature(node *ast.Node) *Signature {
+	if c.inPythonSourceFile(node) && ast.IsCallExpression(node) && c.isPythonSuperInitializerAlias(node.Expression()) {
+		return c.getResolvedSignature(node, nil, CheckModeNormal)
+	}
 	if c.inPythonSourceFile(node) && ast.IsCallExpression(node) && ast.IsPropertyAccessExpression(node.Expression()) && node.Expression().Name().Text() == "__init__" {
 		return c.getResolvedSignature(node, nil, CheckModeNormal)
 	}
@@ -2588,6 +2594,9 @@ func (c *Checker) getTypePredicateArgument(predicate *TypePredicate, callExpress
 		}
 	} else {
 		invokedExpression := ast.SkipParentheses(callExpression.Expression())
+		if call := c.pythonSuperInitializerCalls[callExpression]; call != nil {
+			return call.initializer.constructor.Parameters()[0].Name()
+		}
 		if ast.IsAccessExpression(invokedExpression) {
 			if invokedExpression.Name() != nil && invokedExpression.Name().Text() == "__init__" && c.pythonSuperBase(invokedExpression.Expression()) != nil {
 				method := ast.FindAncestor(callExpression, ast.IsFunctionLike)

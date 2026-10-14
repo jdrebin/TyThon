@@ -31,16 +31,29 @@ def main():
             # Editor transport is always UTF-8, regardless of a Python coding
             # cookie; preserve a BOM if present without mojibake.
             encoding = "utf-8-sig" if raw.startswith(b"\xef\xbb\xbf") else "utf-8"
-            source, encoding, newline = black.decode_bytes(raw, mode=black.Mode(), encoding_overwrite=encoding)
-            config_path = find_pyproject_toml((args.stdin_filename,)) if args.stdin_filename else None
+            source, encoding, newline = black.decode_bytes(
+                raw, mode=black.Mode(), encoding_overwrite=encoding
+            )
+            config_path = (
+                find_pyproject_toml((args.stdin_filename,))
+                if args.stdin_filename
+                else None
+            )
             config = parse_pyproject_toml(config_path) if config_path else {}
             width = config.get("line_length", 88)
             if type(width) is not int or not 1 <= width <= 10000:
-                raise ValueError("Black line-length must be an integer between 1 and 10000")
+                raise ValueError(
+                    "Black line-length must be an integer between 1 and 10000"
+                )
             skip_magic = config.get("skip_magic_trailing_comma", False)
             if type(skip_magic) is not bool:
                 raise ValueError("Black skip-magic-trailing-comma must be a boolean")
-            result = format_source(source, width, magic_trailing_comma=not skip_magic)
+            result = format_source(
+                source,
+                width,
+                magic_trailing_comma=not skip_magic,
+                file_name=args.stdin_filename or "spike.ty",
+            )
             # Print only after native type/runtime and Black stability checks.
             sys.stdout.buffer.write(result.replace("\n", newline).encode(encoding))
             return 0

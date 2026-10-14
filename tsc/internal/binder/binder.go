@@ -2698,6 +2698,14 @@ func containsNarrowableReference(expr *ast.Node) bool {
 }
 
 func isNarrowableReference(node *ast.Node) bool {
+	// Repeated zero-argument super().__init__ accesses identify the same bound
+	// method in a Python initializer. The checker verifies the builtin identity.
+	if ast.IsPropertyAccessExpression(node) && node.Name().Text() == "__init__" && ast.GetSourceFileOfNode(node).LanguageVariant == core.LanguageVariantPython {
+		call := node.Expression()
+		if ast.IsCallExpression(call) && len(call.Arguments()) == 0 && ast.IsIdentifier(call.Expression()) && call.Expression().Text() == "super" {
+			return true
+		}
+	}
 	switch node.Kind {
 	case ast.KindIdentifier, ast.KindThisKeyword, ast.KindSuperKeyword, ast.KindMetaProperty:
 		return true

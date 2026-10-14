@@ -50,7 +50,9 @@ passed through as supposedly formatted, or silently converted to Python syntax.
 
 ## What was demonstrated
 
-The current corpus has **43 typed examples** and **10 Python controls**.
+The corpus covers typed syntax, ordinary Python controls, the builtin declarations,
+and every `.ty` file in `vscode-extension-demo`. Each editor source must preserve
+its syntax trees and produce identical output on a second formatting pass.
 All five formerly unsupported examples now have positive formatting regressions,
 including narrow-width variants. There are also five mutation tests proving
 that the equivalence guard rejects changed types, key/attribute identity, and
@@ -93,8 +95,9 @@ interpreter with user code, and cancels the process group when superseded.
 
 1. Black's grammar generator and CST parser consume the actual source text.
    Additional productions describe tython syntax.
-2. The existing tython parser identifies typed-lambda annotation colons and
-   generic delimiters. The tiny native oracle in `tsc/cmd/blackspike` exposes
+2. The existing tython parsers identify typed-lambda annotation colons,
+   generic delimiters, contextual modifiers, and computed-key parentheses.
+   The tiny native oracle in `tsc/cmd/blackspike` exposes
    those positions and normalized syntax trees; it adds no parsing algorithm.
 3. Black's tokenizer adapter classifies those tokens, splits generic `>>`, and
    treats newlines inside recognized generic brackets as continuation lines.
@@ -119,6 +122,13 @@ Every accepted typed result must:
   and file identity only. Erasure alone cannot establish type preservation.
 - Pass Black's AST-equivalence check on the compiler-erased Python.
 - Pass Black's second-pass stability check.
+
+The editor's filename selects declaration-file handling for `.d.ty`: the complete
+ambient declaration tree is compared, and there is no runtime code to erase.
+Implementation files continue to require both declaration and runtime equivalence.
+Computed-key parentheses remain explicit because `(str): int` and `str: int`
+declare different members. Modifier words are classified from native syntax roles,
+so names such as `optional` remain usable as ordinary Python identifiers.
 
 Python controls additionally compare byte-for-byte with an **unmodified Black
 process** and pass Black's direct Python AST check. String normalization is

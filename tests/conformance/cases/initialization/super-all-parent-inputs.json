@@ -1,0 +1,24 @@
+{
+  "description": "A cooperative call must satisfy every immediate parent input contract.",
+  "tags": [
+    "initialization"
+  ],
+  "source": [
+    "class Left:",
+    "    def __init__(self, left: str, **kwargs):",
+    "        pass",
+    "class Right:",
+    "    def __init__(self, right: int, **kwargs):",
+    "        pass",
+    "class Child(Left, Right):",
+    "    def __init__(self, own: bool, **kwargs):",
+    "        super().__init__(own=own, left=\"ok\", right=\"wrong\", **kwargs)"
+  ],
+  "diagnostics": [
+    {
+      "line": 8,
+      "kind": "type",
+      "messageContains": "not assignable"
+    }
+  ]
+}

@@ -36,6 +36,7 @@ type CompletionEntry struct {
 	Snippet       bool
 	Distance      int
 	Incompatible  bool
+	Required      bool
 }
 
 type AttributeCompletionQuery struct {
@@ -62,6 +63,9 @@ type VisibleNameCompletionQuery struct {
 	StatementStart bool
 	AfterValue     bool
 	Decorator      bool
+	SyntaxWords    []string
+	RequiredWords  []string
+	OnlyKeywords   bool
 }
 
 type DefinitionCompletionQuery struct {
@@ -240,9 +244,9 @@ func PrepareVisibleNameCompletion(source string, offset int) (string, VisibleNam
 	}
 	query := VisibleNameCompletionQuery{
 		Prefix: source[start:offset], ScopeOffset: start, ReplaceFrom: start, ReplaceTo: end,
-		StatementStart: statementStart(source, start), AfterValue: afterValue(source, start),
 		Decorator: strings.TrimSpace(source[strings.LastIndexByte(source[:start], '\n')+1:start]) == "@",
 	}
+	prepareCompletionSyntax(source, start, &query)
 	return source[:start] + "__completion__" + source[end:], query, true
 }
 
@@ -269,27 +273,6 @@ func SyntaxCompletions(query VisibleNameCompletionQuery) []CompletionEntry {
 		return nil
 	}
 	return syntaxCompletions(query)
-}
-
-func statementStart(source string, start int) bool {
-	lineStart := strings.LastIndexByte(source[:start], '\n') + 1
-	return strings.TrimSpace(source[lineStart:start]) == ""
-}
-
-func afterValue(source string, start int) bool {
-	before := start - 1
-	for before >= 0 && (source[before] == ' ' || source[before] == '\t') {
-		before--
-	}
-	if before < 0 {
-		return false
-	}
-	switch source[before] {
-	case ')', ']', '"', '\'':
-		return true
-	}
-	r, _ := utf8.DecodeLastRuneInString(source[:before+1])
-	return isIdentifierContinue(r)
 }
 
 func previousWord(source string, start int) string {
@@ -1129,13 +1112,7 @@ func (p *PythonProgram) VisibleNameCompletionsAt(fileName string, query VisibleN
 }
 
 func syntaxCompletions(query VisibleNameCompletionQuery) []CompletionEntry {
-	var words []string
-	if query.StatementStart {
-		words = []string{"if", "elif", "else", "for", "while", "def", "class", "return", "yield", "match", "case", "try", "except", "with", "assert", "pass", "break", "continue", "raise", "import", "from", "async", "await", "del", "lambda", "global", "nonlocal", "type", "interface", "declare"}
-	}
-	if query.AfterValue {
-		words = append(words, "as", "satisfies", "if", "and", "or")
-	}
+	words := query.SyntaxWords
 	entries := make([]CompletionEntry, 0, len(words))
 	seen := map[string]bool{}
 	for _, word := range words {
@@ -1145,6 +1122,9 @@ func syntaxCompletions(query VisibleNameCompletionQuery) []CompletionEntry {
 		seen[word] = true
 		insert := word + " "
 		snippet := false
+		if word == "True" || word == "False" || word == "None" {
+			insert = word
+		}
 		if word == "as" || word == "satisfies" {
 			insert = word + " $0"
 			snippet = true
@@ -1152,13 +1132,16 @@ func syntaxCompletions(query VisibleNameCompletionQuery) []CompletionEntry {
 		entries = append(entries, CompletionEntry{
 			Label: word, Detail: "keyword", Kind: CompletionKindKeyword, InsertText: insert, Snippet: snippet,
 			ReplaceFrom: query.ReplaceFrom, ReplaceTo: query.ReplaceTo, Distance: 0,
+			Required: slices.Contains(query.RequiredWords, word),
 		})
 	}
 	return entries
 }
 
-var canonicalIntrinsicTypeNames = []string{"any", "unknown", "never", "str", "int", "float", "bool", "None", "object"}
-var builtinTypeFunctionNames = []string{}
+var (
+	canonicalIntrinsicTypeNames = []string{"any", "unknown", "never", "str", "int", "float", "bool", "None", "object"}
+	builtinTypeFunctionNames    = []string{}
+)
 
 // TypeCompletionsAt enumerates the module's actual declaration environment,
 // plus the intrinsic spellings and type functions recognized by that same

@@ -1,5 +1,17 @@
 # tython: Design and Implementation Plan
 
+## Near-term priorities (2026-10-13)
+
+- [ ] Improve editor suggestions and completion.
+- [ ] Iron out the remaining formatting kinks.
+- [x] Restore cooperative `super init` rules in the active checker: intersect
+      current/immediate-parent inputs, require kwargs, reject positional-only
+      inputs, and guard the terminal object initializer. Covered by native and
+      conformance regressions, including aliases and generic inheritance.
+- [ ] Review type expansion rules in hovers. These rules were worked out
+      previously and may have regressed; recover the intended behavior from existing
+      documentation, tests, and history before making changes.
+
 ## Project identity and repository migration
 
 The project is named **tython**. Its VS Code package is `tython`; the current
@@ -1327,6 +1339,16 @@ Not current work. Recorded so the behavior is not relitigated from scratch.
 
 The first job when phase 2 starts is porting the TypeScript test corpus onto Tython. The inputs live in `local/` and are not a running suite. Each ported case is a `.ty` test that checks Tython code. That is the coverage win: the checker is exercised through the language we ship. A ported case leaves `local/`. Do not convert a file in place so that one failure mixes a frontend bug with a checker bug.
 
+### Type declarations, project configuration, and CLI
+
+- [ ] Establish a DefinitelyTyped-style project for Tython: shared,
+      community-maintained `.d.ty` declarations for third-party Python libraries.
+- [ ] Add a project configuration file similar to `tsconfig`, adopting only
+      settings and concepts that apply to Tython and Python. The filename and
+      supported options remain to be designed.
+- [ ] Expand CLI functionality, including watch mode for rechecking files as
+      they change. Define additional commands and options as needs are identified.
+
 ### Tython types as Python annotations
 
 Phase one erases types, so runtime reflection (`__annotations__`,
@@ -1447,10 +1469,17 @@ Legacy `-> None` initializer annotations still receive inferred assertions.
 Initializer signatures are exempt from the ordinary base/base method-conflict
 and override rules. Ordinary methods retain the existing TS rules. For a
 cooperative `super().__init__` call, the outgoing arguments must satisfy the
-current initializer and each participating base initializer. They need not
-share parameter lists. The initializer must accept `**kwargs` and forward a
-keyword spread. This checks type contracts, not argument provenance: compatible
-replacement values are allowed, and their meaning is the author's responsibility.
+current initializer and every immediate parent's effective initializer. This
+is an intersection of input contracts, not a choice of one parent overload.
+Inherited initializers count; an overridden grandparent initializer adds no
+separate contract. They need not share parameter lists. The initializer must
+accept `**kwargs` and forward a keyword spread. Cooperative input contracts
+must not contain positional-only parameters (the already-bound receiver does
+not count). These restrictions are checked when `super().__init__` is called,
+including through an alias; reading the method or defining a constructor that
+does not call it adds no restrictions. This checks type contracts, not argument
+provenance: compatible replacement values are allowed, and their meaning is the
+author's responsibility.
 
 The super assertion is a union of base assertions, so only common required
 attributes are guaranteed. A missing initializer contributes no contract;
@@ -1469,10 +1498,13 @@ else:
     next_init(id=id, **kwargs)
 ```
 
-The object branch accepts no arguments. The other branch checks the cooperative
-contract. The descriptor surface is declared in the actual built-in library;
-the guard uses the existing native boolean flow machinery. No runtime helpers
-are emitted.
+The object branch can skip the call or call with no arguments. The other branch
+checks the cooperative contract. The check must precede calls even when the
+class has no declared parents, since a later subclass can give it a cooperative
+successor. Guard facts follow native branches, early exits and joins; an
+unguarded call after branches rejoin is rejected. The descriptor surface is
+declared in the actual built-in library; the guard uses the existing native
+boolean flow machinery. No runtime helpers are emitted.
 
 Implementation boundary: TS signature predicates, generic instantiation,
 assignability, unions and flow joins remain native. Python's keyword-aware
@@ -1557,9 +1589,9 @@ current binder until that rule is explicit.
 
 `object.__init__` takes no arguments. A cooperative forward that always passes
 `id=id, **kwargs` is wrong when the next initializer is `object`. The terminal
-case needs a check, not only the runtime guard recorded under initializer
-assertions. Calling `super().__init__` with arguments when the MRO ends at
-`object` is an error. Calling it with none is fine.
+case requires the guard recorded under initializer assertions. Calling
+`super().__init__` with arguments in the confirmed `object` branch is an error.
+Calling it with none or skipping it in that branch is fine.
 
 ### Hover on operator syntax
 

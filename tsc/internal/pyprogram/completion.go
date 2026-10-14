@@ -16,6 +16,11 @@ func (s *Session) AttributeCompletions(fileName string, query python.AttributeCo
 		return nil
 	}
 	receiverType, typeMember := s.attributeReceiverType(receiver)
+	var expected *checker.Type
+	if !typeMember && receiver.Parent != nil && ast.IsPropertyAccessExpression(receiver.Parent) && receiver.Parent.Expression() == receiver {
+		// The surrounding expression expects the completed member, not its receiver.
+		expected = s.checker.GetContextualType(receiver.Parent, checker.ContextFlagsNone)
+	}
 	_, sequenceKind := s.checker.GetPythonSequenceBackingType(receiverType)
 	tuple := sequenceKind == checker.PythonSequenceTuple
 	seen := map[string]bool{}
@@ -36,7 +41,7 @@ func (s *Session) AttributeCompletions(fileName string, query python.AttributeCo
 			return
 		}
 		seen[name] = true
-		entries = append(entries, s.propertyEntry(name, property, query.ReplaceFrom, query.ReplaceTo, typeMember, bind))
+		entries = append(entries, s.propertyEntry(name, property, query.ReplaceFrom, query.ReplaceTo, typeMember, bind, expected))
 	}
 	for _, property := range s.checker.PropertiesForCompletion(receiverType) {
 		add(property.Name, property, false)
@@ -57,6 +62,9 @@ func (s *Session) ItemCompletions(fileName string, query python.ItemCompletionQu
 }
 
 func (s *Session) VisibleNameCompletions(fileName string, query python.VisibleNameCompletionQuery) []python.CompletionEntry {
+	if query.OnlyKeywords {
+		return nil
+	}
 	location := s.nodeAt(fileName, query.ScopeOffset)
 	if location == nil {
 		return nil
@@ -66,6 +74,9 @@ func (s *Session) VisibleNameCompletions(fileName string, query python.VisibleNa
 	for _, symbol := range s.checker.GetSymbolsInScope(location, ast.SymbolFlagsValue) {
 		name := symbol.Name
 		if name == "" || strings.HasPrefix(name, "__completion") || strings.HasPrefix(name, ast.InternalSymbolNamePrefix) || !hasPrefix(name, query.Prefix) {
+			continue
+		}
+		if strings.HasPrefix(name, "__") && !strings.HasPrefix(query.Prefix, "_") {
 			continue
 		}
 		t := s.checker.GetPythonCompletionType(symbol, location)
@@ -94,6 +105,17 @@ func (s *Session) VisibleNameCompletions(fileName string, query python.VisibleNa
 			}
 		}
 		entries = append(entries, entry)
+	}
+	if !query.StatementStart && !query.AfterValue && !query.Decorator {
+		for _, literal := range finiteLiteralTypes(expected) {
+			label := s.typeText(literal)
+			if hasPrefix(label, query.Prefix) {
+				entries = append(entries, python.CompletionEntry{
+					Label: label, Detail: label, Kind: python.CompletionKindItem, InsertText: label,
+					ReplaceFrom: query.ReplaceFrom, ReplaceTo: query.ReplaceTo,
+				})
+			}
+		}
 	}
 	return entries
 }
@@ -334,7 +356,7 @@ func (s *Session) typeNameReceiverType(node *ast.Node) *checker.Type {
 	}
 }
 
-func (s *Session) propertyEntry(name string, property *ast.Symbol, from int, to int, typeMember bool, bind bool) python.CompletionEntry {
+func (s *Session) propertyEntry(name string, property *ast.Symbol, from int, to int, typeMember bool, bind bool, expected *checker.Type) python.CompletionEntry {
 	t := s.checker.GetTypeOfSymbol(property)
 	if bind || property.Flags&ast.SymbolFlagsMethod != 0 {
 		t = s.checker.BoundPythonCallable(t)
@@ -345,9 +367,14 @@ func (s *Session) propertyEntry(name string, property *ast.Symbol, from int, to 
 	} else if len(s.checker.GetSignaturesOfType(t, checker.SignatureKindCall)) != 0 {
 		kind = python.CompletionKindMethod
 	}
-	return python.CompletionEntry{
+	entry := python.CompletionEntry{
 		Label: name, Detail: s.typeText(t), Kind: kind, InsertText: name, ReplaceFrom: from, ReplaceTo: to,
 	}
+	if expected != nil && !s.checker.IsTypeAssignableTo(t, expected) {
+		entry.Incompatible = true
+		entry.Description = "not assignable"
+	}
+	return entry
 }
 
 func (s *Session) itemKeyEntries(t *checker.Type, prefix string, quote byte, raw bool, from int, to int) []python.CompletionEntry {
