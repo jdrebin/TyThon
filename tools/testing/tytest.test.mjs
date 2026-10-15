@@ -109,3 +109,32 @@ test("builder targets are local to each expectation and line targets skip indent
     assert.equal(prepared.assertions[2].whole, true);
     assert.throws(() => prepareCases(fixture([{ kind: "hover", expected: "x", at: 2, line: 2 }])), /either/);
 });
+
+
+test("append stages preserve raw fragments and strip only marked layout", () => {
+    const prepare = (source, appends) => prepareCases([{
+        ...fixture([{ kind: "suggest", expected: "" }])[0], source, appends,
+    }])[0];
+    assert.equal(prepare("word", [".", "upper()"]).source, "word.upper()");
+    assert.equal(prepare("x = 1", ["ty\ny = 2\n    ", "ty\nz = 3"]).source, "x = 1\ny = 2\nz = 3");
+    assert.equal(prepare("x = 1\n", ["ty\n\n  y = 2\n\n"]).source, "x = 1\n\n  y = 2\n");
+    assert.equal(prepare("", ["ty\r\nx = 1\r\n"]).source, "x = 1");
+    assert.equal(prepare("", ["  raw\n\n"]).source, "  raw\n\n");
+    const result = prepare("word", ["."]);
+    assert.deepEqual(result.assertions[0].range, {
+        start: { line: 0, character: 5 }, end: { line: 0, character: 5 },
+    });
+});
+
+
+test("suggestions use the end of text selections while hover uses the start", () => {
+    const [prepared] = prepareCases([{
+        ...fixture([])[0], source: "value = name",
+        assertions: [
+            { kind: "suggest", expected: "name", selectors: [{ kind: "text", text: "value = " }] },
+            { kind: "hover", expected: "int", selectors: [{ kind: "text", text: "value" }] },
+        ],
+    }]);
+    assert.deepEqual(prepared.assertions[0].range.start, { line: 0, character: 8 });
+    assert.deepEqual(prepared.assertions[1].range.start, { line: 0, character: 0 });
+});

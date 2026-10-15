@@ -81,7 +81,7 @@ func TestPythonEmbeddedCompletionAndSignature(t *testing.T) {
 	}
 }
 
-func TestPythonEmbeddedDiagnosticsAndIsolation(t *testing.T) {
+func TestPythonEmbeddedDiagnosticsAndRecognition(t *testing.T) {
 	source := "first = \"\"\"ty\ncount: int = 1\ncount = 'wrong'\n\"\"\"\nsecond = \"\"\"ty\ncount\n\"\"\"\n"
 	s, uri := embeddedTestService(t, source)
 	result, err := s.computeDiagnostics(t.Context(), &lsproto.DocumentDiagnosticParams{
@@ -91,11 +91,11 @@ func TestPythonEmbeddedDiagnosticsAndIsolation(t *testing.T) {
 		t.Fatalf("diagnostics = %+v, %v", result, err)
 	}
 	items := result.FullDocumentDiagnosticReport.Items
-	if len(items) != 2 {
-		t.Fatalf("expected independent embedded errors: %+v", items)
+	if len(items) != 1 {
+		t.Fatalf("expected one shared-context embedded error: %+v", items)
 	}
-	if items[0].Range.Start.Line != 2 || !strings.Contains(*items[0].Message.String, "not assignable") || items[1].Range.Start.Line != 5 || !strings.Contains(*items[1].Message.String, "Cannot find name") {
-		t.Fatalf("incorrect embedded diagnostics: %+v %+v", items[0], items[1])
+	if items[0].Range.Start.Line != 2 || !strings.Contains(*items[0].Message.String, "not assignable") {
+		t.Fatalf("incorrect embedded diagnostics: %+v", items[0])
 	}
 	for _, source := range []string{
 		"def ty(source: str) -> str:\n    return source\nty('missing_name')\n",

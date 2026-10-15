@@ -52,6 +52,11 @@ func (c *Checker) getSymbolsInScope(location *ast.Node, meaning ast.SymbolFlags)
 	// Copy the given symbol into symbol tables if the symbol has the given meaning
 	// and it doesn't already exists in the symbol table.
 	copySymbol := func(symbol *ast.Symbol, meaning ast.SymbolFlags) {
+		// These symbols support the inherited checker internally; they are not
+		// Python globals. User declarations with these names remain visible.
+		if symbol == c.undefinedSymbol || symbol == c.globalThisSymbol {
+			return
+		}
 		flags := symbol.CombinedLocalAndExportSymbolFlags()
 		if c.inPythonSourceFile(location) && flags&ast.SymbolFlagsAlias != 0 {
 			flags |= c.resolveAlias(symbol).Flags

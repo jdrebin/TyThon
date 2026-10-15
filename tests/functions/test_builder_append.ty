@@ -1,0 +1,22 @@
+from tytest import tytest
+
+test = tytest("value: int = 1", name="append preserves previous assertions").diagnostics()
+test.append("""ty
+value = "wrong"
+""").diagnostics("Type 'str' is not assignable to type 'int'.")
+# Branching from the original stage must not include the invalid assignment.
+test.append("\nother = value\n").diagnostics().hover("(variable) other: int", at="other")
+
+completion = tytest("""ty
+interface Named:
+    name: str
+value: Named
+""", name="incremental suggestions").diagnostics()
+completion.append("""ty
+value.
+""").suggest(["name"]).suggest("name")
+completion.append("value").append(".").suggest(["name"])
+completion.append("value.").suggest([], match="excludes")
+
+# A stage without assertions may be used as the base for an asserted stage.
+tytest("word = 'hello'").append("\ncopy = word").diagnostics()

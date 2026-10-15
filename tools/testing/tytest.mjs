@@ -106,6 +106,17 @@ export function prepareCases(cases) {
                 .map(([name, text]) => [fileName(name), sourceDocument(text)]),
         );
         const document = documents[test.file];
+        for (const addition of test.appends ?? []) {
+            const fragment = sourceDocument(addition);
+            // Marked snippets remove their header and one empty closing layout
+            // line. Unmarked text is appended verbatim, with no separator.
+            let text = fragment.text;
+            if (fragment.firstLine === 2) {
+                text = text.replace(/\n[ \t]*$/, "");
+                if (document.text && !document.text.endsWith("\n")) text = "\n" + text;
+            }
+            document.text += text;
+        }
         const assertions = test.assertions.map((expectation, index) => {
             const { kind, options = {} } = expectation;
             const selectors = [...(expectation.selectors ?? [])];
@@ -120,19 +131,21 @@ export function prepareCases(cases) {
             }
             assert(nativeKinds.has(kind) || editorKinds.has(kind), `Unknown assertion ${kind}`);
             assert.equal(typeof expectation.expected, "string", "Expected output must be a string");
-            if (pointKinds.has(kind)) assert(selectors.length, `${kind} requires at(), line(), or point()`);
+            if (pointKinds.has(kind) && kind !== "suggest") assert(selectors.length, `${kind} requires at(), line(), or point()`);
             if (["format", "format_error", "transpile"].includes(kind)) assert.equal(selectors.length, 0, `${kind} supports full files only`);
             if (options.verbosity !== undefined) assert(Number.isInteger(options.verbosity) && options.verbosity >= 0, "verbosity must be nonnegative");
             if (options.active_parameter != null) integer(options.active_parameter, "active_parameter");
             if (options.match !== undefined) assert(["exact", "includes", "excludes"].includes(options.match), "Unknown matching mode");
-            const span = select(document, selectors);
+            const span = kind === "suggest" && selectors.length === 0
+                ? { start: document.text.length, end: document.text.length }
+                : select(document, selectors);
             // A line target means its first code character for point requests.
             // Text targets for suggestions place the cursor after the text.
             if (pointKinds.has(kind) && selectors.at(-1)?.kind === "lines") {
                 span.start += document.text.slice(span.start, span.end).match(/^[ \t]*/)[0].length;
                 span.end = span.start;
             }
-            if (kind === "suggest" && typeof expectation.at === "string") span.start = span.end;
+            if (kind === "suggest" && selectors.at(-1)?.kind === "text") span.start = span.end;
             const range = { start: position(document.text, span.start), end: position(document.text, span.end) };
             const result = { ...expectation, options, id: `${caseIndex}/${index}`, range, span, whole: selectors.length === 0, native: nativeKinds.has(kind) };
             if (kind === "definition" && expectation.expected) {

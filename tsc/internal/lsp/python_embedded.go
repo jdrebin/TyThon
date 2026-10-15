@@ -25,7 +25,23 @@ func (s *pythonLanguageService) embeddedSources(ctx context.Context, sources map
 	var result []pyprogram.EmbeddedSource
 	for _, source := range pyprogram.EmbeddedSources(fileName, sources[fileName]) {
 		if source.Language == "ty" {
-			result = append(result, source)
+			// Implementation and declaration snippets each form one document.
+			// Keep the scanner's decoded-byte mapping across block boundaries.
+			index := -1
+			for i := range result {
+				if result[i].Declaration == source.Declaration {
+					index = i
+					break
+				}
+			}
+			if index < 0 {
+				result = append(result, source)
+				continue
+			}
+			combined := &result[index]
+			combined.Text += "\n" + source.Text
+			combined.Offsets = append(combined.Offsets, source.Offsets...)
+			combined.End = source.End
 		}
 	}
 	return result
@@ -50,7 +66,29 @@ func (s *pythonLanguageService) embeddedDocument(sources map[string]string, file
 }
 
 func (s *pythonLanguageService) embeddedAt(ctx context.Context, sources map[string]string, fileName, host string, offset int) *pythonEmbeddedDocument {
+	if s.embedded || ctx.Err() != nil {
+		return nil
+	}
+	// Gaps between strings belong to the host, even though the combined
+	// document's source map spans them.
+	inside := false
+	declaration := false
+	for _, source := range pyprogram.EmbeddedSources(fileName, host) {
+		if source.Language == "ty" {
+			if _, ok := source.EmbeddedOffset(offset); ok {
+				inside = true
+				declaration = source.Declaration
+				break
+			}
+		}
+	}
+	if !inside {
+		return nil
+	}
 	for _, source := range s.embeddedSources(ctx, sources, fileName) {
+		if source.Declaration != declaration {
+			continue
+		}
 		if _, ok := source.EmbeddedOffset(offset); ok {
 			return s.embeddedDocument(sources, fileName, host, source)
 		}

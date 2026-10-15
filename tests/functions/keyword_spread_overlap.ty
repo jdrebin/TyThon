@@ -1,0 +1,51 @@
+from tytest import tytest
+
+# Unknown mapping keys do not establish a duplicate keyword at compile time.
+test = tytest("""ty
+type AnyKwargs = Dict({ (str): str })
+
+def accept(name: str = "Ada", **kwargs: AnyKwargs):
+    pass
+
+def forward(options: AnyKwargs, other: AnyKwargs):
+    accept(**options)
+    accept(name="Ada", **options)
+    accept(**options, name="Ada")
+    accept(extra="value", **options)
+    accept(**options, extra="value")
+    accept("Ada", **options)
+    accept(**options, **other)
+""").diagnostics()
+
+(tytest("""ty
+def accept_required(name: str, **kwargs: Dict({ "age": int })):
+    pass
+
+with_name = {"name": "Ada"}
+accept_required(age=10, **with_name)
+""")
+.diagnostics()
+.append("""ty
+accept_required(name="as", )
+""")
+.diagnostics("Argument of type '{}' is not assignable to parameter of type '{ [x: \"age\"]: int; }'.")
+.at('"as",')
+.suggest("age", match="includes")
+)
+
+
+tytest("""ty
+def just_kwargs(**kwargs: Dict({ (str): str })):
+    pass
+
+just_kwargs(name="Ada", **{"name": "ok"})
+""").diagnostics('parameter "name" receives multiple values')
+
+# Known keys still establish a collision, even when unknown keys are present.
+# tytest("""ty
+# def accept(**kwargs: Dict({ (str): str })):
+#     pass
+
+# def forward(options: Dict({ (str): str })):
+#     accept(name="Ada", **{"name": "Grace"})
+# """).diagnostics('parameter "name" receives multiple values')

@@ -1,0 +1,42 @@
+from tytest import tytest
+
+# The outer test source contains two embedded strings in the same host file.
+tytest('''first = """ty
+a = 1
+"""
+second = """ty
+a = "wrong"
+"""
+''', name="embedded strings share assignments").diagnostics("Type 'str' is not assignable to type 'int'.")
+
+tytest('''first = """ty
+shared: int = 1
+"""
+host_value: str = "outside"
+second = """ty
+result = shared
+"""
+''', name="embedded navigation crosses strings").diagnostics().hover(
+    "(variable) shared: int", at="shared", line=6
+).definition("shared", at="shared", line=6, target_line=2).hover(
+    '(variable) host_value: str', at="host_value"
+)
+
+tytest('''first = """ty
+interface Named:
+    name: str
+value: Named
+"""
+second = """ty
+value.
+"""
+''', name="embedded suggestions cross strings").suggest(["name"], at="value.")
+
+# A block without a final newline must not run into the following block.
+# Escapes and supplementary Unicode still map to their original host positions.
+tytest('first = """ty\r\nemoji = "😀"\\ncount: int = 1"""\r\nsecond = """ty\r\ncopy = count\r\n"""\r\n',
+       name="embedded boundaries and decoded offsets").diagnostics().hover(
+    "(variable) count: int", at="count", line=4
+).definition("count", at="count", line=4, target_line=2).semantic(
+    "variable", at="count", line=4
+)

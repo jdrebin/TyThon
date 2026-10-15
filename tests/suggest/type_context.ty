@@ -1,0 +1,20 @@
+from tytest import tytest
+
+# Type positions use the native parser, including assertions and multiline types.
+tytest("value = 1\nvalue as ").suggest(["int", "typeof"], match="includes", ordered=False).suggest(
+    ["value"], match="excludes"
+)
+tytest("value = 1\nvalue satisfies ").suggest(["int"], match="includes").suggest(
+    ["value"], match="excludes"
+)
+tytest("type Choice = (\n    ").suggest(["typeof", "str"], match="includes", ordered=False)
+tytest("value = 1\ntype Alias = int\nresult: typeof ").suggest(["value"], match="includes").suggest(
+    ["Alias", "keyof", "typeof"], match="excludes"
+)
+
+# Runtime values, including explicitly declared JS-like names, remain visible.
+tytest("").suggest(["undefined", "globalThis", "null"], match="excludes")
+tytest("undefined = 1\nglobalThis = 2\ncopy = ").suggest(
+    ["undefined", "globalThis"], match="includes", ordered=False
+)
+tytest("value = 1\nresult = {\n    'key': ").suggest(["value"], match="includes")

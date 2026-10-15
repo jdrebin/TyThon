@@ -7,7 +7,9 @@ import (
 	"github.com/jdrebin/TyThon/tsc/internal/ast"
 	"github.com/jdrebin/TyThon/tsc/internal/astnav"
 	"github.com/jdrebin/TyThon/tsc/internal/checker"
+	"github.com/jdrebin/TyThon/tsc/internal/core"
 	"github.com/jdrebin/TyThon/tsc/internal/python"
+	"github.com/jdrebin/TyThon/tsc/internal/scanner"
 )
 
 func (s *Session) AttributeCompletions(fileName string, query python.AttributeCompletionQuery) []python.CompletionEntry {
@@ -137,6 +139,12 @@ func completionScopeDistance(symbol *ast.Symbol, location *ast.Node) int {
 }
 
 func (s *Session) TypeCompletions(fileName string, query python.TypeCompletionQuery) []python.CompletionEntry {
+	if query.ValueQuery {
+		return s.VisibleNameCompletions(fileName, python.VisibleNameCompletionQuery{
+			Prefix: query.Prefix, ScopeOffset: query.Offset,
+			ReplaceFrom: query.ReplaceFrom, ReplaceTo: query.ReplaceTo,
+		})
+	}
 	location := s.nodeAt(fileName, query.Offset)
 	if location == nil {
 		return nil
@@ -155,6 +163,7 @@ func (s *Session) TypeCompletions(fileName string, query python.TypeCompletionQu
 			ReplaceFrom: query.ReplaceFrom, ReplaceTo: query.ReplaceTo, Distance: 100,
 		})
 	}
+	entries = append(entries, python.TypeSyntaxCompletions(query)...)
 	return entries
 }
 
@@ -202,12 +211,38 @@ func (s *Session) KeywordArgumentCompletions(fileName string, query python.CallC
 	}
 	var entries []python.CompletionEntry
 	seen := map[string]bool{}
+	for index := range consumed {
+		if index < len(kinds) && kinds[index] == checker.CallParameterPositionalOnly {
+			continue
+		}
+		seen[signature.Parameters()[index].Name] = true
+	}
 	for index, parameter := range signature.Parameters() {
 		kind := checker.CallParameterPositionalOrKeyword
 		if index < len(kinds) {
 			kind = kinds[index]
 		}
 		name := parameter.Name
+		if kind == checker.CallParameterVarKeyword {
+			for _, key := range s.indexKeyLiterals(s.checker.GetTypeOfSymbol(parameter)) {
+				if !key.IsStringLiteral() {
+					continue
+				}
+				name := key.AsLiteralType().Value().(string)
+				if !scanner.IsIdentifierText(name, core.LanguageVariantPython) || scanner.IsPythonReservedKeyword(scanner.GetPythonIdentifierToken(name)) {
+					continue
+				}
+				if query.UsedKeywords[name] || seen[name] || !hasPrefix(name, query.Prefix) {
+					continue
+				}
+				seen[name] = true
+				entries = append(entries, python.CompletionEntry{
+					Label: name, Detail: s.typeText(s.checker.GetItemType(s.checker.GetTypeOfSymbol(parameter), key)), Kind: python.CompletionKindKeywordArgument,
+					InsertText: name + "=", ReplaceFrom: query.ReplaceFrom, ReplaceTo: query.ReplaceTo,
+				})
+			}
+			continue
+		}
 		if kind != checker.CallParameterPositionalOrKeyword && kind != checker.CallParameterKeywordOnly || consumed[index] || query.UsedKeywords[name] || seen[name] || !hasPrefix(name, query.Prefix) {
 			continue
 		}

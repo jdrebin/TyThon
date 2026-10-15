@@ -1,0 +1,13 @@
+from tytest import tytest
+
+test = tytest("""ty
+type Options = Dict({ "age": int, optional "label": str, "not-valid": str, "class": str })
+declare def accept(name: str, **kwargs: Options) -> None
+""").diagnostics()
+test.append('accept("Ada", ').suggest(["age", "label"], match="includes").suggest(
+    ["name", "kwargs", "not-valid", "class"], match="excludes"
+)
+test.append('accept("Ada", age=1, ').suggest(["label"], match="includes").suggest(
+    ["age"], match="excludes"
+)
+test.append('accept("Ada", la').suggest(["label"], match="includes")

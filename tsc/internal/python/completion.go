@@ -6,7 +6,9 @@ import (
 	"strings"
 	"unicode/utf8"
 
+	"github.com/jdrebin/TyThon/tsc/internal/ast"
 	"github.com/jdrebin/TyThon/tsc/internal/checker"
+	"github.com/jdrebin/TyThon/tsc/internal/pyparser"
 )
 
 type CompletionKind uint8
@@ -82,6 +84,7 @@ type DefinitionCompletionQuery struct {
 }
 
 type TypeCompletionQuery struct {
+	ValueQuery  bool
 	Prefix      string
 	Offset      int
 	ReplaceFrom int
@@ -570,116 +573,39 @@ func methodDefinitionEntry(query DefinitionCompletionQuery, name string, signatu
 }
 
 // PrepareTypeCompletion identifies the Python positions in which a name is a
-// type expression. It intentionally does not parse or resolve the type: the
-// declaration environment remains the sole source of candidates.
+// type expression, using the native parser's type nodes. Symbol candidates
+// still come from the checker's declaration environment.
 func PrepareTypeCompletion(source string, offset int) (TypeCompletionQuery, bool) {
 	start, end, ok := completionIdentifierRange(source, offset)
 	if !ok {
 		return TypeCompletionQuery{}, false
 	}
-	lineStart := strings.LastIndexByte(source[:start], '\n') + 1
-	before := source[lineStart:start]
-	if comment := strings.IndexByte(before, '#'); comment >= 0 {
+	// Ask the native parser whether a recovery identifier occupies a type
+	// position. This also handles multiline types and assertions after '='.
+	const marker = "__completion_type"
+	file := pyparser.ParseSourceFile("/completion.ty", source[:start]+marker+source[end:])
+	var location *ast.Node
+	var visit func(*ast.Node) bool
+	visit = func(node *ast.Node) bool {
+		if node.Kind == ast.KindIdentifier && node.Text() == marker && node.Pos() <= start && node.End() >= start+len(marker) {
+			location = node
+			return true
+		}
+		return node.ForEachChild(visit)
+	}
+	file.AsNode().ForEachChild(visit)
+	if location == nil {
 		return TypeCompletionQuery{}, false
 	}
-	trimmed := strings.TrimSpace(before)
-	// An annotated assignment switches back to value completion after '='.
-	// Defaults in a function signature do too. A type alias stays a type.
-	if !strings.HasPrefix(trimmed, "type ") {
-		if equal := strings.LastIndexByte(before, '='); equal >= 0 && equal > strings.LastIndexByte(before, ':') {
-			return TypeCompletionQuery{}, false
-		}
-	}
-	isType := false
-	if arrow := strings.LastIndex(before, "->"); arrow >= 0 {
-		isType = true
-	}
-	if !isType && strings.HasPrefix(trimmed, "type ") && strings.Contains(trimmed, "=") {
-		isType = true
-	}
-	if !isType && strings.HasPrefix(trimmed, "class ") && strings.Contains(trimmed, "(") {
-		isType = true
-	}
-	if !isType {
-		colon := strings.LastIndexByte(before, ':')
-		if colon >= 0 {
-			left := strings.TrimSpace(before[:colon])
-			isType = isSimpleAnnotationLeft(left) || strings.Contains(before[:colon], "def ") || isDeclaredMemberLeft(left) && insideDeclaredTypeBlock(source, lineStart)
-		}
-	}
-	if !isType {
-		as := strings.LastIndex(before, " as ")
-		isType = as >= 0 && !strings.HasPrefix(trimmed, "import ") && !strings.HasPrefix(trimmed, "from ")
-	}
-	if !isType {
+	valueQuery := location.Parent != nil && location.Parent.Kind == ast.KindTypeQuery
+	if !valueQuery && !ast.IsPartOfTypeNode(location) {
 		return TypeCompletionQuery{}, false
 	}
 	word := previousWord(source, start)
 	return TypeCompletionQuery{
-		Prefix: source[start:offset], Offset: start, ReplaceFrom: start, ReplaceTo: end,
+		Prefix: source[start:offset], Offset: start, ReplaceFrom: start, ReplaceTo: end, ValueQuery: valueQuery,
 		Infer: word == "extends", Extends: word != "" && word != "extends" && word != "keyof",
 	}, true
-}
-
-func isDeclaredMemberLeft(left string) bool {
-	left = strings.TrimSpace(left)
-	for {
-		if rest := trimOptionalMemberModifier(left); rest != left {
-			left = rest
-		} else if strings.HasPrefix(left, "readonly ") || strings.HasPrefix(left, "static ") {
-			left = strings.TrimSpace(left[strings.IndexByte(left, ' ')+1:])
-		} else {
-			break
-		}
-	}
-	return isSimpleIdentifier(left) || len(left) >= 2 && (left[0] == '\'' || left[0] == '"') && left[len(left)-1] == left[0] || strings.HasPrefix(left, "[") && strings.HasSuffix(left, "]") || strings.HasPrefix(left, "(") && strings.HasSuffix(left, ")")
-}
-
-func insideDeclaredTypeBlock(source string, lineStart int) bool {
-	lineEnd := lineStart
-	for lineEnd < len(source) && (source[lineEnd] == ' ' || source[lineEnd] == '\t') {
-		lineEnd++
-	}
-	indent := lineEnd - lineStart
-	searchEnd := lineStart
-	for searchEnd > 0 {
-		previousEnd := searchEnd - 1
-		previousStart := strings.LastIndexByte(source[:previousEnd], '\n') + 1
-		line := strings.TrimSpace(source[previousStart:previousEnd])
-		if line != "" && !strings.HasPrefix(line, "#") {
-			content := previousStart
-			for content < previousEnd && (source[content] == ' ' || source[content] == '\t') {
-				content++
-			}
-			if content-previousStart < indent {
-				return strings.HasPrefix(line, "type ") || strings.HasPrefix(line, "interface ") || strings.HasPrefix(line, "class ") || strings.HasPrefix(line, "declare class ")
-			}
-		}
-		searchEnd = previousStart
-	}
-	return false
-}
-
-func isSimpleAnnotationLeft(left string) bool {
-	if left == "" {
-		return false
-	}
-	if comma := strings.LastIndexByte(left, ','); comma >= 0 {
-		left = strings.TrimSpace(left[comma+1:])
-	}
-	if paren := strings.LastIndexByte(left, '('); paren >= 0 {
-		left = strings.TrimSpace(left[paren+1:])
-	}
-	for index, r := range left {
-		if index == 0 {
-			if !isIdentifierStart(r) {
-				return false
-			}
-		} else if !isIdentifierContinue(r) {
-			return false
-		}
-	}
-	return true
 }
 
 func completionIdentifierRange(source string, offset int) (start int, end int, ok bool) {
@@ -1192,22 +1118,13 @@ func (p *PythonProgram) TypeCompletionsAt(fileName string, query TypeCompletionQ
 	for _, parameter := range typeParametersAt(module.Declaration, query.Offset) {
 		add(parameter, "type parameter", CompletionKindTypeParameter, 0)
 	}
-	for _, word := range typeSyntaxWords(query) {
-		insert := word + " "
-		snippet := false
-		if word == "keyof" || word == "infer" {
-			insert = word + " $0"
-			snippet = true
+	for _, entry := range TypeSyntaxCompletions(query) {
+		if !seen[entry.Label] {
+			seen[entry.Label] = true
+			entries = append(entries, entry)
 		}
-		if seen[word] || query.Prefix != "" && !strings.HasPrefix(word, strings.ToLower(query.Prefix)) {
-			continue
-		}
-		seen[word] = true
-		entries = append(entries, CompletionEntry{
-			Label: word, Detail: "keyword", Kind: CompletionKindKeyword, InsertText: insert, Snippet: snippet,
-			ReplaceFrom: query.ReplaceFrom, ReplaceTo: query.ReplaceTo,
-		})
 	}
+
 	sortCompletionEntries(entries)
 	return entries
 }
@@ -1391,8 +1308,32 @@ func (p *PythonProgram) callableSignaturesAt(fileName string, query CallCompleti
 	return c, c.GetSignaturesOfType(t, checker.SignatureKindCall)
 }
 
+// TypeSyntaxCompletions supplies the language's intrinsic types and type
+// operators to both frontend paths, independently of symbols in scope.
+func TypeSyntaxCompletions(query TypeCompletionQuery) []CompletionEntry {
+	var entries []CompletionEntry
+	for _, name := range canonicalIntrinsicTypeNames {
+		if strings.HasPrefix(strings.ToLower(name), strings.ToLower(query.Prefix)) {
+			entries = append(entries, CompletionEntry{
+				Label: name, Detail: "intrinsic type", Kind: CompletionKindType, InsertText: name,
+				ReplaceFrom: query.ReplaceFrom, ReplaceTo: query.ReplaceTo, Distance: 200,
+			})
+		}
+	}
+	for _, word := range typeSyntaxWords(query) {
+		if !strings.HasPrefix(word, strings.ToLower(query.Prefix)) {
+			continue
+		}
+		entries = append(entries, CompletionEntry{
+			Label: word, Detail: "keyword", Kind: CompletionKindKeyword, InsertText: word + " $0", Snippet: true,
+			ReplaceFrom: query.ReplaceFrom, ReplaceTo: query.ReplaceTo,
+		})
+	}
+	return entries
+}
+
 func typeSyntaxWords(query TypeCompletionQuery) []string {
-	words := []string{"keyof"}
+	words := []string{"keyof", "typeof"}
 	if query.Infer {
 		words = append(words, "infer")
 	}

@@ -53,9 +53,18 @@ class TyTest:
         level = self._hover_verbosity if verbosity is None else verbosity
         return self._expect("hover", expected, {"verbosity": level}, at, line)
 
-    def suggest(self, expected: str, *, at: str | int | None = None, line: int | None = None, match: Match = "exact", ordered: bool = True) -> TyTest:
-        """One completion label per line, in editor sort order. Includes can check a subsequence."""
-        return self._expect("suggest", expected, {"match": match, "ordered": ordered}, at, line)
+    def suggest(self, expected: str | []str, *, at: str | int | None = None, line: int | None = None, match: Match = "exact", ordered: bool = True) -> TyTest:
+        """Labels as lines or a list, in editor sort order. Defaults to the end of the source."""
+        labels = (expected as str) if isinstance(expected, str) else "\n".join(expected)
+        return self._expect("suggest", labels, {"match": match, "ordered": ordered}, at, line)
+
+    def append(self, source: str) -> TyTest:
+        """Return a new source stage; previous assertions retain their original source."""
+        self._case["extended"] = True
+        stage = tytest(self._case["source"], name=self._case["name"], file=self._case["file"])
+        stage._case["appends"] = self._case.get("appends", []) + [source]
+        stage._case["files"] = self._case["files"].copy()
+        return stage.configure(hover_verbosity=self._hover_verbosity)
 
     def diagnostics(self, expected: str = "", *, at: str | int | None = None, line: int | None = None, match: TextMatch = "exact") -> TyTest:
         """Expect diagnostic messages in source order. Empty means no diagnostics in the selection."""

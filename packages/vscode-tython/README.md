@@ -104,10 +104,13 @@ test = tytest(ty)
 ```
 
 Hover, completion suggestions, signature help, definitions, diagnostics, and
-semantic tokens use an independent virtual module for each string. Locations
+semantic tokens share one virtual module across the file's TyThon strings,
+in source order, with a newline between blocks. Names declared in one block are
+available in later blocks, and incompatible reassignments report errors. Locations
 map back to the enclosing file, including escapes, Unicode, and CRLF. The marker
 line is excluded from the virtual source. A `.d.ty` marker selects declaration
-syntax; filenames do not register importable modules. Ordinary and raw triple
+syntax and shares a separate declaration context with other `.d.ty` blocks;
+filenames do not register importable modules. Ordinary and raw triple
 quotes work; interpolation and computed strings are not supported. String
 indentation is preserved, without automatic dedenting.
 

@@ -42,6 +42,8 @@ for module in modules:
     if not _cases:
         raise ValueError(f"{module}: no tytest cases collected")
     for case in _cases:
+        if case.get("extended") and not case["assertions"]:
+            continue
         case["origin"] = module
         collected.append(case)
 pathlib.Path(output).write_text(json.dumps(collected), encoding="utf-8")
