@@ -143,3 +143,23 @@ ordinary = lambda first: str
 		}
 	}
 }
+
+func TestErasurePreservesEmbeddedSourceStrings(t *testing.T) {
+	for _, delimiter := range []string{"\"\"\"", "'''"} {
+		literal := delimiter + "ty\ninterface Left:\n    id: int\n" +
+			"def identity<T>(value: T) -> T:\n    return value\n" +
+			"value: str = 'hello'\nfactory<str>()\n" +
+			"from module import type Name, value\n" +
+			"lambda value: int: value\n" + delimiter
+		source := "sample: str = " + literal + "\ncount: int = 1\n"
+		expected := "sample      = " + literal + "\ncount      = 1\n"
+		actual, diagnostics := EraseTypedPython(source)
+		if len(diagnostics) != 0 || actual != expected {
+			t.Fatalf("literal was changed: diagnostics=%v\nactual: %q\nexpected: %q", diagnostics, actual, expected)
+		}
+		projection := ProjectTypedPython(source)
+		if projection.Text != expected || len(projection.Errors) != 0 {
+			t.Fatalf("projection changed literal: %+v", projection)
+		}
+	}
+}

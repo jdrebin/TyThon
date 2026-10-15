@@ -69,6 +69,13 @@ func (c *Checker) TypeToStringForFrontend(t *Type, vc *VerbosityContext, render 
 	return c.typeToStringWithRenderer(t, nil, TypeFormatFlagsAllowUniqueESSymbolType|TypeFormatFlagsUseAliasDefinedOutsideCurrentScope, vc, render)
 }
 
+// TypeAliasToStringForFrontend displays the resolved right-hand side of an
+// alias declaration. The native alias flag unfolds only the outer alias;
+// nested named types still follow the ordinary verbosity rules.
+func (c *Checker) TypeAliasToStringForFrontend(t *Type, vc *VerbosityContext, render func(*ast.Node, *printer.EmitContext) string) string {
+	return c.typeToStringWithRenderer(t, nil, TypeFormatFlagsAllowUniqueESSymbolType|TypeFormatFlagsUseAliasDefinedOutsideCurrentScope|TypeFormatFlagsInTypeAlias, vc, render)
+}
+
 // SignatureToStringForFrontend prints a resolved signature through the same
 // declaration builder as TypeToStringForFrontend.
 func (c *Checker) SignatureToStringForFrontend(signature *Signature, render func(*ast.Node, *printer.EmitContext) string) string {

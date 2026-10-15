@@ -31,7 +31,8 @@ type DocumentationProvider = (document: vscode.TextDocument, position: vscode.Po
 class VerboseHoverProvider implements vscode.HoverProvider {
     private lastHoverAndLevel: [vscode.Hover, number] | undefined;
 
-    constructor(private readonly client: LanguageClient, private readonly documentation?: DocumentationProvider) {}
+    constructor(private readonly client: LanguageClient, private readonly documentation?: DocumentationProvider,
+        private readonly skip?: (document: vscode.TextDocument, position: vscode.Position) => Promise<boolean>) {}
 
     async provideHover(
         document: vscode.TextDocument,
@@ -40,6 +41,7 @@ class VerboseHoverProvider implements vscode.HoverProvider {
         context?: vscode.HoverContext,
     ): Promise<vscode.VerboseHover | vscode.Hover | undefined> {
         const version = document.version;
+        if (await this.skip?.(document, position)) return undefined;
         const verbosityDelta = typeof context?.verbosityDelta === "number" ? context.verbosityDelta : undefined;
         const previousHover = context?.previousHover instanceof vscode.Hover ? context.previousHover : undefined;
         const verbosityLevel = verbosityDelta !== undefined ? Math.max(0, this.getPreviousLevel(previousHover) + verbosityDelta) : undefined;
@@ -88,6 +90,7 @@ class VerboseHoverProvider implements vscode.HoverProvider {
     }
 }
 
-export function registerHoverFeature(selector: vscode.DocumentSelector, client: LanguageClient, documentation?: DocumentationProvider): vscode.Disposable {
-    return vscode.languages.registerHoverProvider(selector, new VerboseHoverProvider(client, documentation));
+export function registerHoverFeature(selector: vscode.DocumentSelector, client: LanguageClient, documentation?: DocumentationProvider,
+    skip?: (document: vscode.TextDocument, position: vscode.Position) => Promise<boolean>): vscode.Disposable {
+    return vscode.languages.registerHoverProvider(selector, new VerboseHoverProvider(client, documentation, skip));
 }

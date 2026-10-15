@@ -84,7 +84,7 @@
                         },
                         {
                             "name": "comment.typehint.type.notation.python",
-                            "match": "(?x)\n  (?<!\\.)\\b(\n    bool | bytes | float | int | object | str\n    | List | Dict | Iterable | Sequence | Set\n    | FrozenSet | Callable | Union | Tuple\n    | Any | None\n  )\\b\n"
+                            "match": "(?x)\n  (?<!\\.)\\b(\n    bool | bytes | complex | float | int | object | str\n    | List | Dict | Iterable | Sequence | Set\n    | FrozenSet | Callable | Union | Tuple\n    | Any | None\n  )\\b\n"
                         },
                         {
                             "name": "comment.typehint.punctuation.notation.python",

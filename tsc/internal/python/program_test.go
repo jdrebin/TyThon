@@ -259,7 +259,7 @@ normalized = normalize(b"Ada")
 	if signatures := module.Types.Checker().GetSignaturesOfType(callable, checker.SignatureKindCall); len(signatures) != 2 {
 		t.Fatalf("public overload count = %d, want 2", len(signatures))
 	}
-	if got := module.Runtime.Values["normalized"]; got != module.Types.symbols["bytes"].Instance {
+	if got := module.Runtime.Values["normalized"]; got != module.Types.Checker().GetBytesType() {
 		t.Fatalf("normalized = %s, want bytes", FormatType(module.Types.Checker(), got))
 	}
 }

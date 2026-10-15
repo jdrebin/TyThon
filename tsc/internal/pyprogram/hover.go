@@ -88,13 +88,13 @@ func formatAliasHover(c *checker.Checker, symbol *ast.Symbol, decl *ast.Node, no
 }
 
 func aliasBody(c *checker.Checker, symbol *ast.Symbol, decl *ast.Node, verbosity *checker.VerbosityContext) string {
+	if declared := c.GetDeclaredTypeOfSymbol(symbol); declared != nil {
+		return c.TypeAliasToStringForFrontend(declared, verbosity, python.PrintPythonTypeNode)
+	}
 	if decl != nil && decl.Type() != nil {
 		if text := python.PrintPythonTypeNode(decl.Type(), printer.NewEmitContext()); text != "" && text != "unknown" {
 			return text
 		}
-	}
-	if declared := c.GetDeclaredTypeOfSymbol(symbol); declared != nil {
-		return c.TypeToStringForFrontend(declared, verbosity, python.PrintPythonTypeNode)
 	}
 	return "unknown"
 }

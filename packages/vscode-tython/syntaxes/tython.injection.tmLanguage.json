@@ -1,8 +1,10 @@
 {
     "name": "tython syntax additions",
     "scopeName": "tython.injection",
-    "injectionSelector": "L:source.python.typed -comment -string",
+    "injectionSelector": "L:source.python.typed -comment -string -meta.embedded.typescript",
     "patterns": [
+        { "include": "#embedded-ts" },
+        { "include": "#embedded-ty" },
         {
             "include": "source.python.typed#comments"
         },
@@ -59,6 +61,62 @@
         }
     ],
     "repository": {
+        "embedded-ty": {
+            "begin": "(?:^\\s*|(?<![\\w]))([rRuU]?)(\"\"\"|''')[ \\t]*(ty|[^\\s\"']*\\.ty)[ \\t]*(?=\\r?$)",
+            "beginCaptures": {
+                "1": {
+                    "name": "storage.type.string.python"
+                },
+                "2": {
+                    "name": "punctuation.definition.string.begin.python"
+                },
+                "3": {
+                    "name": "entity.name.type.language.tython"
+                }
+            },
+            "end": "\\2",
+            "endCaptures": {
+                "0": {
+                    "name": "punctuation.definition.string.end.python"
+                }
+            },
+            "contentName": "meta.embedded.tython source.python.typed",
+            "patterns": [
+                {
+                    "match": "\\\\.",
+                    "name": "constant.character.escape.python"
+                },
+                {
+                    "include": "source.python.typed"
+                }
+            ]
+        },
+        "embedded-ts": {
+            "begin": "(?:^\\s*|(?<![\\w]))([rRuU]?)(\"\"\"|''')[ \\t]*(ts|[^\\s\"']*\\.ts)[ \\t]*(?=\\r?$)",
+            "beginCaptures": {
+                "1": {
+                    "name": "storage.type.string.python"
+                },
+                "2": {
+                    "name": "punctuation.definition.string.begin.python"
+                },
+                "3": {
+                    "name": "entity.name.type.language.tython"
+                }
+            },
+            "end": "\\2",
+            "endCaptures": {
+                "0": {
+                    "name": "punctuation.definition.string.end.python"
+                }
+            },
+            "contentName": "meta.embedded.typescript source.ts",
+            "patterns": [
+                {
+                    "include": "source.ts"
+                }
+            ]
+        },
         "type-alias-declaration": {
             "name": "meta.type.declaration.tython",
             "begin": "^(\\s*)(type)\\s+([[:alpha:]_]\\w*)",

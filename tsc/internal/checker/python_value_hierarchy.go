@@ -147,7 +147,7 @@ func (c *Checker) isPythonMarkerOnlyType(t *Type) bool {
 // Extending a Python primitive uses its existing wrapper surface for members;
 // the primitive itself is retained in the resulting intersection by the binder.
 func (c *Checker) PythonPrimitiveBase(t *Type) *Type {
-	if t != nil && t.flags&(TypeFlagsString|TypeFlagsNumber|TypeFlagsBigInt) != 0 {
+	if t != nil && t.flags&(TypeFlagsBytes|TypeFlagsComplex|TypeFlagsString|TypeFlagsNumber|TypeFlagsBigInt) != 0 {
 		return t
 	}
 	return nil
@@ -200,11 +200,13 @@ func (c *Checker) InstallPythonLibrary() {
 	intProtocol := c.pythonLibraryType("IntProtocol", 0)
 	floatProtocol := c.pythonLibraryType("FloatProtocol", 0)
 	boolProtocol := c.pythonLibraryType("BoolProtocol", 0)
-	if some == nil || structured == nil || stringProtocol == nil || intProtocol == nil || floatProtocol == nil || boolProtocol == nil {
+	bytesProtocol := c.pythonLibraryType("BytesProtocol", 0)
+	complexProtocol := c.pythonLibraryType("ComplexProtocol", 0)
+	if some == nil || structured == nil || stringProtocol == nil || intProtocol == nil || floatProtocol == nil || boolProtocol == nil || bytesProtocol == nil || complexProtocol == nil {
 		return
 	}
-	atomics := make([]*Type, 0, 4)
-	for _, name := range []string{"bytes", "complex", "NotImplementedType", "EllipsisType"} {
+	atomics := make([]*Type, 0, 2)
+	for _, name := range []string{"NotImplementedType", "EllipsisType"} {
 		t := c.pythonLibraryType(name, 0)
 		if t == nil {
 			return
@@ -215,6 +217,8 @@ func (c *Checker) InstallPythonLibrary() {
 		c.SetPythonAttributeInterface(star)
 	}
 	c.SetPythonValueHierarchy(some, structured, atomics, map[*Type]*Type{
+		c.bytesType:   bytesProtocol,
+		c.complexType: complexProtocol,
 		c.stringType:  stringProtocol,
 		c.bigintType:  intProtocol,
 		c.numberType:  floatProtocol,

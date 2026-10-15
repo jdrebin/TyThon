@@ -1192,6 +1192,12 @@ async function runTestExtension() {
     await run("npm", ["test", "-w", "tython"]);
 }
 
+export const testTy = task({
+    name: "test:ty",
+    description: "Runs the TyThon-authored language cases and their runner checks.",
+    run: () => run("npm", ["run", "test:ty:check"]),
+});
+
 export const testTsc = task({
     name: "test:tsc",
     description: "Runs all tests in the tsc module.",
@@ -1202,6 +1208,7 @@ export const test = task({
     name: "test",
     description: "Runs all tests. This is the most typical test task to need.",
     run: async () => {
+        await run("npm", ["run", "test:ty:check"]);
         await runTests();
         await runTestExtension();
     },
@@ -1271,6 +1278,7 @@ export const testAll = task({
     dependencies: [tsgo, buildAPITests],
     run: async () => {
         // Prevent interleaving by running these directly instead of in parallel.
+        await run("npm", ["run", "test:ty:check"]);
         await runTests();
         await runTestExtension();
         await runTestBenchmarks();

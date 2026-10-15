@@ -29,6 +29,7 @@ const (
 	EFTransformPrivateStaticElements                       // Indicates static private elements in a file or class should be transformed regardless of --target (used by esDecorators transform).
 	EFNoLexicalThis                                        // Do not capture `this` for this node's subtree. Set on relocated static initializers, where `this` is handled by the class fields transform.
 	EFPythonTuple                                          // Print this readonly tuple as `()`, not `readonly []`.
+	EFPythonOptional                                       // Preserve optional item signatures in Python display without adding a TS modifier.
 )
 
 const (

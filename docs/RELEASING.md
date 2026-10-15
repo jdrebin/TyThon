@@ -54,7 +54,7 @@ Build-time formatter dependencies may also need downloading on the first build.
 
 Successful output is under `built/release/tython-<version>-<build>-<wheel-hash>-linux-x64/`:
 
-- `tython-<version>-<build>-linux-x64.vsix`
+- `tython-<version>-<YYYY-MM-DD_HH-mm-ss>[-<label>]-linux-x64.vsix` (local build time; optional `--label` on `preview:package`)
 - `tython_lang-<version>-py3-none-manylinux_2_17_x86_64.whl`
 - `INSTALL.md` with the exact install commands
 - `SHA256SUMS` and `release.json` with hashes and test results

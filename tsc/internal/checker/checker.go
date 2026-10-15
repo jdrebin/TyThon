@@ -624,6 +624,7 @@ type Checker struct {
 	arrayVariances                         []VarianceFlags
 	globals                                ast.SymbolTable
 	evaluate                               evaluator.Evaluator
+	bytesLiteralTypes                      map[string]*Type
 	stringLiteralTypes                     map[string]*Type
 	numberLiteralTypes                     map[jsnum.Number]*Type
 	nanType                                *Type
@@ -734,6 +735,8 @@ type Checker struct {
 	optionalType                                *Type
 	nullType                                    *Type
 	nullWideningType                            *Type
+	bytesType                                   *Type
+	complexType                                 *Type
 	stringType                                  *Type
 	numberType                                  *Type
 	bigintType                                  *Type
@@ -954,6 +957,7 @@ func NewChecker(program Program, tracer *Tracer) (*Checker, *sync.Mutex) {
 	c.arrayVariances = []VarianceFlags{VarianceFlagsCovariant}
 	c.globals = make(ast.SymbolTable, countGlobalSymbols(c.files))
 	c.evaluate = evaluator.NewEvaluator(c.evaluateEntity, ast.OEKParentheses)
+	c.bytesLiteralTypes = make(map[string]*Type)
 	c.stringLiteralTypes = make(map[string]*Type)
 	c.numberLiteralTypes = make(map[jsnum.Number]*Type)
 	c.bigintLiteralTypes = make(map[jsnum.PseudoBigInt]*Type)
@@ -1013,6 +1017,8 @@ func NewChecker(program Program, tracer *Tracer) (*Checker, *sync.Mutex) {
 	c.optionalType = c.newIntrinsicType(TypeFlagsUndefined, "undefined")
 	c.nullType = c.newIntrinsicType(TypeFlagsNull, "null")
 	c.nullWideningType = c.createWideningType(c.nullType)
+	c.bytesType = c.newIntrinsicType(TypeFlagsBytes, "bytes")
+	c.complexType = c.newIntrinsicType(TypeFlagsComplex, "complex")
 	c.stringType = c.newIntrinsicType(TypeFlagsString, "string")
 	c.numberType = c.newIntrinsicType(TypeFlagsNumber, "number")
 	c.bigintType = c.newIntrinsicType(TypeFlagsBigInt, "bigint")
@@ -7909,13 +7915,16 @@ func (c *Checker) checkExpressionWorker(node *ast.Node, checkMode CheckMode) *Ty
 		return c.nullWideningType
 	case ast.KindStringLiteral, ast.KindNoSubstitutionTemplateLiteral:
 		if node.Kind == ast.KindStringLiteral && node.AsStringLiteral().TokenFlags&ast.TokenFlagsPythonBytes != 0 {
-			return c.pythonLibraryType("bytes", 0)
+			return c.getFreshTypeOfLiteralType(c.getBytesLiteralType(node.Text()))
 		}
 		if c.isSkipDirectInferenceNode(node) {
 			return c.blockedStringType
 		}
 		return c.getFreshTypeOfLiteralType(c.getStringLiteralType(node.Text()))
 	case ast.KindNumericLiteral:
+		if node.AsNumericLiteral().TokenFlags&ast.TokenFlagsPythonImaginary != 0 {
+			return c.complexType
+		}
 		c.checkGrammarNumericLiteral(node.AsNumericLiteral())
 		return c.getFreshTypeOfLiteralType(c.getNumberLiteralType(jsnum.FromString(node.Text())))
 	case ast.KindBigIntLiteral:
@@ -11097,6 +11106,14 @@ func (c *Checker) checkPrefixUnaryExpression(node *ast.Node) *Type {
 	if operandType == c.silentNeverType {
 		return c.silentNeverType
 	}
+	if c.inPythonSourceFile(node) && c.maybeTypeOfKind(operandType, TypeFlagsBytesLike|TypeFlagsComplex) &&
+		(expr.Operator == ast.KindPlusToken || expr.Operator == ast.KindMinusToken || expr.Operator == ast.KindTildeToken) {
+		result, errors := c.ResolvePythonUnaryOperation(scanner.TokenToString(expr.Operator), operandType)
+		for _, err := range errors {
+			c.error(node, diagnostics.NewAdHocMessage(err.Message))
+		}
+		return result
+	}
 	switch expr.Operand.Kind {
 	case ast.KindNumericLiteral:
 		switch expr.Operator {
@@ -12635,6 +12652,20 @@ func (c *Checker) checkBinaryLikeExpression(left *ast.Node, operatorToken *ast.N
 	}
 	leftType := c.checkExpressionEx(left, checkMode)
 	rightType := c.checkExpressionEx(right, checkMode)
+	// These Python primitives have no JavaScript arithmetic counterpart. Use
+	// their declared protocols, including reflected operations, for arithmetic.
+	if c.inPythonSourceFile(left) && (c.maybeTypeOfKind(leftType, TypeFlagsBytesLike|TypeFlagsComplex) || c.maybeTypeOfKind(rightType, TypeFlagsBytesLike|TypeFlagsComplex)) {
+		switch operator {
+		case ast.KindPlusToken, ast.KindMinusToken, ast.KindAsteriskToken, ast.KindAsteriskAsteriskToken,
+			ast.KindSlashToken, ast.KindPercentToken, ast.KindLessThanLessThanToken, ast.KindGreaterThanGreaterThanToken,
+			ast.KindBarToken, ast.KindCaretToken, ast.KindAmpersandToken:
+			result, errors := c.ResolvePythonBinaryOperation(scanner.TokenToString(operator), leftType, rightType)
+			for _, err := range errors {
+				c.error(errorNode, diagnostics.NewAdHocMessage(err.Message))
+			}
+			return result
+		}
+	}
 	if c.inPythonSourceFile(left) && isPythonComparisonOperator(operator) {
 		if previous := pythonComparisonOperand(left); previous != nil {
 			leftType = c.checkExpressionEx(previous, checkMode)
@@ -22495,6 +22526,8 @@ func (c *Checker) getApparentType(t *Type) *Type {
 		return c.pythonPrimitiveApparentType(t, c.globalStringType)
 	case t.flags&TypeFlagsNumberLike != 0:
 		return c.pythonPrimitiveApparentType(t, c.globalNumberType)
+	case t.flags&(TypeFlagsBytesLike|TypeFlagsComplex) != 0:
+		return c.pythonPrimitiveApparentType(t, c.emptyObjectType)
 	case t.flags&TypeFlagsBigIntLike != 0:
 		return c.pythonPrimitiveApparentType(t, c.getGlobalBigIntType())
 	case t.flags&TypeFlagsBooleanLike != 0:
@@ -26232,6 +26265,15 @@ func isFreshLiteralType(t *Type) bool {
 	return t.flags&TypeFlagsFreshable != 0 && t.AsLiteralType().freshType == t
 }
 
+func (c *Checker) getBytesLiteralType(value string) *Type {
+	t := c.bytesLiteralTypes[value]
+	if t == nil {
+		t = c.newLiteralType(TypeFlagsBytesLiteral, value, nil)
+		c.bytesLiteralTypes[value] = t
+	}
+	return t
+}
+
 func (c *Checker) getStringLiteralType(value string) *Type {
 	t := c.stringLiteralTypes[value]
 	if t == nil {
@@ -26369,6 +26411,8 @@ func (c *Checker) getBaseTypeOfLiteralType(t *Type) *Type {
 		return c.stringType
 	case t.flags&TypeFlagsNumberLiteral != 0:
 		return c.numberType
+	case t.flags&TypeFlagsBytesLiteral != 0:
+		return c.bytesType
 	case t.flags&TypeFlagsBigIntLiteral != 0:
 		return c.bigintType
 	case t.flags&TypeFlagsBooleanLiteral != 0:
@@ -26387,6 +26431,8 @@ func (c *Checker) getBaseTypeOfLiteralTypeForComparison(t *Type) *Type {
 		return c.stringType
 	case t.flags&(TypeFlagsNumberLiteral|TypeFlagsEnum) != 0:
 		return c.numberType
+	case t.flags&TypeFlagsBytesLiteral != 0:
+		return c.bytesType
 	case t.flags&TypeFlagsBigIntLiteral != 0:
 		return c.bigintType
 	case t.flags&TypeFlagsBooleanLiteral != 0:
@@ -26422,6 +26468,8 @@ func (c *Checker) getWidenedLiteralType(t *Type) *Type {
 		return c.stringType
 	case t.flags&TypeFlagsNumberLiteral != 0 && isFreshLiteralType(t):
 		return c.numberType
+	case t.flags&TypeFlagsBytesLiteral != 0 && isFreshLiteralType(t):
+		return c.bytesType
 	case t.flags&TypeFlagsBigIntLiteral != 0 && isFreshLiteralType(t):
 		return c.bigintType
 	case t.flags&TypeFlagsBooleanLiteral != 0 && isFreshLiteralType(t):
@@ -26466,6 +26514,7 @@ func (c *Checker) isLiteralOfContextualType(candidateType *Type, contextualType 
 			}
 			return c.maybeTypeOfKind(constraint, TypeFlagsString) && c.maybeTypeOfKind(candidateType, TypeFlagsStringLiteral) ||
 				c.maybeTypeOfKind(constraint, TypeFlagsNumber) && c.maybeTypeOfKind(candidateType, TypeFlagsNumberLiteral) ||
+				c.maybeTypeOfKind(constraint, TypeFlagsBytes) && c.maybeTypeOfKind(candidateType, TypeFlagsBytesLiteral) ||
 				c.maybeTypeOfKind(constraint, TypeFlagsBigInt) && c.maybeTypeOfKind(candidateType, TypeFlagsBigIntLiteral) ||
 				c.maybeTypeOfKind(constraint, TypeFlagsESSymbol) && c.maybeTypeOfKind(candidateType, TypeFlagsUniqueESSymbol) ||
 				c.isLiteralOfContextualType(candidateType, constraint)
@@ -26474,6 +26523,7 @@ func (c *Checker) isLiteralOfContextualType(candidateType *Type, contextualType 
 		// literal context for all literals of that primitive type.
 		return contextualType.flags&(TypeFlagsStringLiteral|TypeFlagsIndex|TypeFlagsTemplateLiteral|TypeFlagsStringMapping) != 0 && c.maybeTypeOfKind(candidateType, TypeFlagsStringLiteral) ||
 			contextualType.flags&TypeFlagsNumberLiteral != 0 && c.maybeTypeOfKind(candidateType, TypeFlagsNumberLiteral) ||
+			contextualType.flags&TypeFlagsBytesLiteral != 0 && c.maybeTypeOfKind(candidateType, TypeFlagsBytesLiteral) ||
 			contextualType.flags&TypeFlagsBigIntLiteral != 0 && c.maybeTypeOfKind(candidateType, TypeFlagsBigIntLiteral) ||
 			contextualType.flags&TypeFlagsBooleanLiteral != 0 && c.maybeTypeOfKind(candidateType, TypeFlagsBooleanLiteral) ||
 			contextualType.flags&TypeFlagsUniqueESSymbol != 0 && c.maybeTypeOfKind(candidateType, TypeFlagsUniqueESSymbol)
@@ -26773,6 +26823,7 @@ func (c *Checker) removeRedundantLiteralTypes(types []*Type, includes TypeFlags,
 		flags := t.flags
 		remove := flags&(TypeFlagsStringLiteral|TypeFlagsTemplateLiteral|TypeFlagsStringMapping) != 0 && includes&TypeFlagsString != 0 ||
 			flags&TypeFlagsNumberLiteral != 0 && includes&TypeFlagsNumber != 0 ||
+			flags&TypeFlagsBytesLiteral != 0 && includes&TypeFlagsBytes != 0 ||
 			flags&TypeFlagsBigIntLiteral != 0 && includes&TypeFlagsBigInt != 0 ||
 			flags&TypeFlagsUniqueESSymbol != 0 && includes&TypeFlagsESSymbol != 0 ||
 			reduceVoidUndefined && flags&TypeFlagsUndefined != 0 && includes&TypeFlagsVoid != 0 ||
@@ -27008,6 +27059,8 @@ func (c *Checker) getIntersectionTypeEx(types []*Type, flags IntersectionFlags, 
 		includes&TypeFlagsNonPrimitive != 0 && includes&(TypeFlagsDisjointDomains&^TypeFlagsNonPrimitive) != 0 ||
 		includes&TypeFlagsStringLike != 0 && includes&(TypeFlagsDisjointDomains&^TypeFlagsStringLike) != 0 ||
 		includes&TypeFlagsNumberLike != 0 && includes&(TypeFlagsDisjointDomains&^TypeFlagsNumberLike) != 0 ||
+		includes&TypeFlagsBytesLike != 0 && includes&(TypeFlagsDisjointDomains&^TypeFlagsBytesLike) != 0 ||
+		includes&TypeFlagsComplex != 0 && includes&(TypeFlagsDisjointDomains&^TypeFlagsComplex) != 0 ||
 		includes&TypeFlagsBigIntLike != 0 && includes&(TypeFlagsDisjointDomains&^TypeFlagsBigIntLike) != 0 ||
 		includes&TypeFlagsESSymbolLike != 0 && includes&(TypeFlagsDisjointDomains&^TypeFlagsESSymbolLike) != 0 ||
 		includes&TypeFlagsVoidLike != 0 && includes&(TypeFlagsDisjointDomains&^TypeFlagsVoidLike) != 0 {
@@ -27040,6 +27093,7 @@ func (c *Checker) getIntersectionTypeEx(types []*Type, flags IntersectionFlags, 
 	}
 	if includes&TypeFlagsString != 0 && includes&(TypeFlagsStringLiteral|TypeFlagsTemplateLiteral|TypeFlagsStringMapping) != 0 ||
 		includes&TypeFlagsNumber != 0 && includes&TypeFlagsNumberLiteral != 0 ||
+		includes&TypeFlagsBytes != 0 && includes&TypeFlagsBytesLiteral != 0 ||
 		includes&TypeFlagsBigInt != 0 && includes&TypeFlagsBigIntLiteral != 0 ||
 		includes&TypeFlagsESSymbol != 0 && includes&TypeFlagsUniqueESSymbol != 0 ||
 		includes&TypeFlagsVoid != 0 && includes&TypeFlagsUndefined != 0 ||
@@ -27229,6 +27283,7 @@ func (c *Checker) removeRedundantSupertypes(types []*Type, includes TypeFlags) [
 		t := types[i]
 		remove := t.flags&TypeFlagsString != 0 && includes&(TypeFlagsStringLiteral|TypeFlagsTemplateLiteral|TypeFlagsStringMapping) != 0 ||
 			t.flags&TypeFlagsNumber != 0 && includes&TypeFlagsNumberLiteral != 0 ||
+			t.flags&TypeFlagsBytes != 0 && includes&TypeFlagsBytesLiteral != 0 ||
 			t.flags&TypeFlagsBigInt != 0 && includes&TypeFlagsBigIntLiteral != 0 ||
 			t.flags&TypeFlagsESSymbol != 0 && includes&TypeFlagsUniqueESSymbol != 0 ||
 			t.flags&TypeFlagsVoid != 0 && includes&TypeFlagsUndefined != 0 ||
@@ -27349,6 +27404,8 @@ func (c *Checker) unionContainsType(union *Type, t *Type, matchSymbol bool) bool
 		primitive = c.stringType
 	case t.flags&(TypeFlagsEnum|TypeFlagsNumberLiteral) != 0:
 		primitive = c.numberType
+	case t.flags&TypeFlagsBytesLiteral != 0:
+		primitive = c.bytesType
 	case t.flags&TypeFlagsBigIntLiteral != 0:
 		primitive = c.bigintType
 	case t.flags&TypeFlagsUniqueESSymbol != 0 && matchSymbol:
@@ -28198,6 +28255,11 @@ func getIndexNodeForAccessExpression(accessNode *ast.Node) *ast.Node {
 
 func (c *Checker) errorIfWritingToReadonlyIndex(indexInfo *IndexInfo, objectType *Type, accessExpression *ast.Node) {
 	if indexInfo != nil && indexInfo.isReadonly && accessExpression != nil && (ast.IsAssignmentTarget(accessExpression) || isDeleteTarget(accessExpression)) {
+		if c.inPythonSourceFile(accessExpression) {
+			// The primitive's indexing protocol is readonly, independently of
+			// which literal value the receiver currently holds.
+			objectType = c.getBaseTypeOfLiteralType(objectType)
+		}
 		c.error(accessExpression, diagnostics.Index_signature_in_type_0_only_permits_reading, c.TypeToString(objectType))
 	}
 }
@@ -30028,6 +30090,10 @@ func (c *Checker) extractDefinitelyFalsyTypes(t *Type) *Type {
 
 func (c *Checker) getDefinitelyFalsyPartOfType(t *Type) *Type {
 	switch {
+	case t.flags&TypeFlagsBytes != 0:
+		return c.getBytesLiteralType("")
+	case t.flags&TypeFlagsComplex != 0:
+		return t
 	case t.flags&TypeFlagsString != 0:
 		return c.emptyStringType
 	case t.flags&TypeFlagsNumber != 0:
@@ -30036,7 +30102,7 @@ func (c *Checker) getDefinitelyFalsyPartOfType(t *Type) *Type {
 		return c.zeroBigIntType
 	case t == c.regularFalseType || t == c.falseType ||
 		t.flags&(TypeFlagsVoid|TypeFlagsUndefined|TypeFlagsNull|TypeFlagsAnyOrUnknown) != 0 ||
-		t.flags&TypeFlagsStringLiteral != 0 && getStringLiteralValue(t) == "" ||
+		t.flags&(TypeFlagsStringLiteral|TypeFlagsBytesLiteral) != 0 && getStringLiteralValue(t) == "" ||
 		t.flags&TypeFlagsNumberLiteral != 0 && getNumberLiteralValue(t) == 0 ||
 		t.flags&TypeFlagsBigIntLiteral != 0 && isZeroBigInt(t):
 		return t
@@ -31934,6 +32000,19 @@ func (c *Checker) getTypeFactsWorker(t *Type, callerOnlyNeeds TypeFacts) TypeFac
 	}
 	flags := t.flags
 	switch {
+	case flags&(TypeFlagsBytesLike|TypeFlagsComplex) != 0:
+		facts := TypeFactsObjectStrictFacts | TypeFactsTruthy | TypeFactsFalsy
+		if !c.strictNullChecks {
+			facts = TypeFactsObjectFacts | TypeFactsTruthy | TypeFactsFalsy
+		}
+		if flags&TypeFlagsBytesLiteral != 0 {
+			if getStringLiteralValue(t) == "" {
+				facts &^= TypeFactsTruthy
+			} else {
+				facts &^= TypeFactsFalsy
+			}
+		}
+		return facts
 	case flags&(TypeFlagsString|TypeFlagsStringMapping) != 0:
 		if c.strictNullChecks {
 			return TypeFactsStringStrictFacts

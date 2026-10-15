@@ -10,6 +10,7 @@ import (
 	"github.com/jdrebin/TyThon/tsc/internal/checker"
 	"github.com/jdrebin/TyThon/tsc/internal/diagnosticwriter"
 	"github.com/jdrebin/TyThon/tsc/internal/locale"
+	"github.com/jdrebin/TyThon/tsc/internal/printer"
 )
 
 // FormatType presents checker types using the Python-facing primitive
@@ -95,6 +96,12 @@ func formatType(c *checker.Checker, t *checker.Type, state *typeFormatState) str
 		return "Awaitable<" + formatType(c, awaited, state) + ">"
 	}
 	switch {
+	case t.Flags()&checker.TypeFlagsBytes != 0:
+		return "bytes"
+	case t.Flags()&checker.TypeFlagsComplex != 0:
+		return "complex"
+	case t.Flags()&checker.TypeFlagsBytesLiteral != 0:
+		return printer.PythonBytesLiteralText(t.AsLiteralType().Value().(string))
 	case t.Flags()&checker.TypeFlagsTypeParameter != 0 && t.AsTypeParameter().IsThisType():
 		return "self"
 	case t.Flags()&checker.TypeFlagsString != 0:
@@ -613,6 +620,23 @@ func replaceCheckerTypeWords(text string) string {
 	}
 	var result strings.Builder
 	for index := 0; index < len(text); {
+		// Diagnostic messages quote types with single quotes and string literal
+		// values with double quotes. Translate type words, never literal content.
+		if text[index] == '"' {
+			start := index
+			index++
+			for index < len(text) {
+				ch := text[index]
+				index++
+				if ch == '\\' && index < len(text) {
+					index++
+				} else if ch == '"' {
+					break
+				}
+			}
+			result.WriteString(text[start:index])
+			continue
+		}
 		r := rune(text[index])
 		if unicode.IsLetter(r) || r == '_' {
 			end := index + 1

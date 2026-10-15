@@ -1,0 +1,59 @@
+ty = """ty
+interface Child:
+    value: int
+
+interface Parent:
+    __len__: () -> int
+    child: Child
+    name: str
+    __repr__: () -> str
+
+type Box(T) = { value: T }
+parent: Parent
+box: Box(int)
+text: str
+integer: int
+floating: float
+boolean: bool
+
+class Base:
+    def __len__(self) -> int:
+        return 1
+
+class Derived(Base):
+    count: int = 0
+
+derived: Derived
+
+interface ObjectDerived(ObjectProtocol):
+    value: int
+    def __repr__(self) -> str
+
+object_derived: ObjectDerived
+
+interface Callable:
+    __call__: () -> Child
+    label: str
+
+callable: Callable
+"""
+
+from tytest import tytest
+
+test = tytest(ty).diagnostics()
+test.at("parent:").hover("(variable) parent: Parent")
+test.at("parent:").hover("(variable) parent: { child: Child, name: str }", verbosity=1)
+test.at("parent:").hover("(variable) parent: { child: { value: int }, name: str, __len__: () -> int, __repr__: () -> str }", verbosity=2)
+test.at("box:").hover("(variable) box: Box(int)")
+test.at("box:").hover("(variable) box: { value: int }", verbosity=1)
+test.at("text:").hover("(variable) text: str", verbosity=5)
+test.at("integer:").hover("(variable) integer: int", verbosity=5)
+test.at("floating:").hover("(variable) floating: float", verbosity=5)
+test.at("boolean:").hover("(variable) boolean: bool", verbosity=5)
+
+test.at("derived:", occurrence=1).hover("(variable) derived: { count: int }", verbosity=1)
+test.at("derived:", occurrence=1).hover("(variable) derived: { count: int, def __len__(self: Base) -> int }", verbosity=2)
+test.at("object_derived:").hover("(variable) object_derived: { value: int, def __repr__(self: ObjectDerived) -> str }", verbosity=2)
+test.at("callable:").hover("(variable) callable: { label: str }", verbosity=1)
+test.at("callable:").hover("(variable) callable: { label: str, __call__: () -> Child }", verbosity=2)
+test.at("callable:").hover("(variable) callable: { label: str, __call__: () -> { value: int } }", verbosity=3)

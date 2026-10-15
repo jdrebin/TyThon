@@ -79,6 +79,7 @@ __debug_bin*
 !**/.vscode/settings.template.json
 !**/.vscode/launch.template.json
 !**/.vscode/extensions.json
+!/.vscode/tytest.code-snippets
 .DS_Store
 .idea
 

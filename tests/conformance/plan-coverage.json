@@ -491,6 +491,17 @@
   ],
   "integrations": [
     {
+      "id": "tytest",
+      "command": ["npm", "run", "test:ty:check"],
+      "files": [
+        { "path": "tools/testing/discovery.test.mjs" },
+        { "path": "tools/testing/workflow.test.mjs" },
+        { "path": "tools/testing/tytest.test.mjs" },
+        { "path": "tools/testing/fixtures/tools.ty" },
+        { "path": "tests/tobe_named_and_classified/test.ty" }
+      ]
+    },
+    {
       "id": "cli-emission",
       "command": [
         "go",

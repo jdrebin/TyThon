@@ -13,8 +13,10 @@ import { createVSIX } from "@vscode/vsce";
 import AdmZip from "adm-zip";
 import { canRun, targetByName, hostTargetName } from "../../../tools/scripts/targets.mjs";
 import { checkGoToolchainNotices, copyGoToolchainNotices } from "../../../tools/scripts/go-toolchain-notices.mjs";
+import { validateBuildLabel, vsixName } from "./vsix-name.mjs";
 
-const { values } = parseArgs({ options: { target: { type: "string" }, "skip-checks": { type: "boolean", default: false } } });
+const { values } = parseArgs({ options: { target: { type: "string" }, label: { type: "string" }, "skip-checks": { type: "boolean", default: false } } });
+validateBuildLabel(values.label);
 const target = targetByName(values.target ?? hostTargetName());
 const runnable = canRun(target);
 const extension = fileURLToPath(new URL("..", import.meta.url));
@@ -62,7 +64,7 @@ const copy = async (source, relative) => {
     });
 };
 // Explicit allowlist: no workspace settings, caches, credentials, or user code.
-for (const relative of ["README.md", "language-configuration.json", "icon.png", "icons", "syntaxes", "preview", "dist/extension.bundle.js", "dist/extension.bundle.js.map",
+for (const relative of ["README.md", "language-configuration.json", "icon.png", "icons", "syntaxes", "preview", "dist/typescript", "dist/extension.bundle.js", "dist/extension.bundle.js.map",
     "scripts/contained-server.sh", "scripts/python-provider.py", "scripts/python_declarations.py"]) {
     await copy(path.join(extension, relative), relative);
 }
@@ -174,6 +176,7 @@ const info = {
     version: manifest.version, publisher: manifest.publisher, target: target.name,
     buildID: payloadHash.slice(0, 16), payloadSHA256: payloadHash,
     builtAt: new Date().toISOString(),
+    label: values.label,
     sourceCommit: run("git", ["rev-parse", "HEAD"], root, true),
     sourceDirty: !!run("git", ["status", "--porcelain"], root, true),
     compilerFile: target.compilerFile,
@@ -208,7 +211,7 @@ if (runnable) {
     run(process.execPath, [path.join(extension, "test/icons.test.mjs"), installed], root);
 }
 // Only a passing extracted artifact gets a distributable filename.
-const artifact = path.join(output, `tython-${manifest.version}-${info.buildID}-${target.name}.vsix`);
+const artifact = path.join(output, vsixName(manifest.version, target.name, info.builtAt, info.label));
 assert(!existsSync(artifact), `Artifact already exists: ${artifact}; do not overwrite a verified build.`);
 await rename(pending, artifact);
 await writeFile(`${artifact}.sha256`, `${await sha(artifact)}  ${path.basename(artifact)}\n`);

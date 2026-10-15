@@ -1,0 +1,14 @@
+ty = """ty
+a: int = 1
+b: typeof a = 2
+"""
+
+from tytest import tytest
+
+test = tytest(ty)
+
+test.at("typeof ").suggest("a", match="includes")
+
+test.at("b: ty").suggest("typeof", match="includes")
+
+test.at("typeof a").suggest("bool", match="excludes")

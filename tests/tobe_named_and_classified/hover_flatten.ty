@@ -1,0 +1,53 @@
+ty = """ty
+type Pick(T, K extends keyof T) = {(P): T[P] for P in K}
+
+type User = {
+    id: int,
+    name: str,
+    age: int,
+}
+
+type UserName = Pick(User, *<"name">)
+
+interface Obj<T>:
+    "value": T
+
+type Obj2(T) = {"value": T}
+
+objGen: Obj<int> = {"value": 1}
+objType: Obj2(int) = {"value": 1}
+
+type ObjConditional(T) = {"value": T} if T extends T else never
+objConditional: ObjConditional(int) = {"value": 1}
+"""
+
+"""ts
+type User = {
+    id: number,
+    name: string,
+    age: number,
+};
+
+type UserName = Pick<User, "name">;
+
+interface Obj<T> {
+  value: T
+}
+
+type Obj2<T> = { value: T }
+
+const objGen: Obj<number> = { value: 1 }
+const objType: Obj2<number> = { value: 1 }
+"""
+
+from tytest import tytest
+
+test = tytest(ty)
+
+test.at("UserName").hover("type UserName = { name: str }")
+
+test.at("objType").hover("(variable) objType: Obj2(int)")
+
+test.at("objGen").hover("(variable) objGen: Obj<int>")
+
+test.at('objConditional').hover('(variable) objConditional: { "value": int }')

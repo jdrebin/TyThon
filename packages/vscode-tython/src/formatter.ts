@@ -10,7 +10,8 @@ export class BundledFormatter implements vscode.Disposable {
     private disposed = false;
 
     constructor(private readonly context: vscode.ExtensionContext,
-        private readonly output: vscode.OutputChannel) {
+        private readonly output: vscode.OutputChannel,
+        private readonly embeddedRanges?: (document: vscode.TextDocument, token: vscode.CancellationToken) => Promise<readonly [number, number][]>) {
         const selector = { language: "tython", scheme: "file", pattern: "**/*.ty" };
         this.subscriptions = [
             vscode.languages.registerDocumentFormattingEditProvider(selector, {
@@ -30,6 +31,11 @@ export class BundledFormatter implements vscode.Disposable {
         const current = () => !this.disposed && !controller.signal.aborted && !token.isCancellationRequested
             && !document.isClosed && document.version === version;
         try {
+            const protectedRanges = await this.embeddedRanges?.(document, token) ?? [];
+            if (!current()) return [];
+            // Embedded fixtures may intentionally contain invalid source. Do
+            // not send their host document through a mutating formatter.
+            if (protectedRanges.length) return [];
             const python = vscode.workspace.getConfiguration("pythonTypeScript", document.uri).get<string>("tools.pythonPath", "");
             const formatted = await runFormatter({
                 ...resolveFormatterLaunch(this.context.extensionPath, this.context.extensionMode === vscode.ExtensionMode.Development, python || undefined),

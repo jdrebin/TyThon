@@ -1,0 +1,22 @@
+{
+    "TyThon language test": {
+        "scope": "tython",
+        "prefix": "tytest",
+        "isFileTemplate": true,
+        "description": "Source first, followed by pasted editor expectations",
+        "body": [
+            "ty = \"\"\"ty",
+            "${1:value = 1}",
+            "\"\"\"",
+            "",
+            "from tytest import tytest",
+            "",
+            "(",
+            "    tytest(ty)",
+            "    .diagnostics()",
+            "    .hover(\"${2:(variable) value: int}\", at=\"${3:value}\")",
+            ")",
+            "$0"
+        ]
+    }
+}

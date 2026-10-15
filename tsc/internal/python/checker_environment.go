@@ -155,16 +155,17 @@ func (e *CheckerTypeEnvironment) installBuiltinTypeSurfaces() {
 	e.builtinObjectValue = e.values["object"]
 	// Editable declarations may be incomplete. Keep their ordinary diagnostics
 	// instead of dereferencing a missing bootstrap declaration during a request.
-	for _, name := range []string{"*", "Some", "Object", "bytes", "complex", "NotImplementedType", "EllipsisType", "StringProtocol", "IntProtocol", "FloatProtocol", "BoolProtocol"} {
+	for _, name := range []string{"*", "Some", "Object", "BytesProtocol", "ComplexProtocol", "NotImplementedType", "EllipsisType", "StringProtocol", "IntProtocol", "FloatProtocol", "BoolProtocol"} {
 		if symbol := e.symbols[name]; symbol == nil || symbol.Instance == nil {
 			return
 		}
 	}
 	e.checker.SetPythonAttributeInterface(e.symbols["*"].Instance)
 	e.checker.SetPythonValueHierarchy(e.symbols["Some"].Instance, e.symbols["Object"].Instance, []*checker.Type{
-		e.symbols["bytes"].Instance, e.symbols["complex"].Instance,
 		e.symbols["NotImplementedType"].Instance, e.symbols["EllipsisType"].Instance,
 	}, map[*checker.Type]*checker.Type{
+		e.checker.GetBytesType():   e.symbols["BytesProtocol"].Instance,
+		e.checker.GetComplexType(): e.symbols["ComplexProtocol"].Instance,
 		e.checker.GetStringType():  e.symbols["StringProtocol"].Instance,
 		e.checker.GetBigIntType():  e.symbols["IntProtocol"].Instance,
 		e.checker.GetNumberType():  e.symbols["FloatProtocol"].Instance,
@@ -203,7 +204,10 @@ func (e *CheckerTypeEnvironment) Declare(file *PythonSourceFile) []TypeDiagnosti
 		switch declaration := declaration.(type) {
 		case *TypeAliasDeclaration:
 			if e.installingBuiltins && isBuiltinIntrinsicAlias(declaration) {
-				key := e.checker.PythonPrivateTypeKey(declaration.Name)
+				key := e.intrinsicType(declaration.Name)
+				if key == nil {
+					key = e.checker.PythonPrivateTypeKey(declaration.Name)
+				}
 				if declaration.Name == "attr_name" {
 					key = e.checker.PythonAttributeNameKey()
 				}
@@ -501,6 +505,10 @@ func (e *CheckerTypeEnvironment) intrinsicType(name string) *checker.Type {
 		return e.checker.GetUnknownType()
 	case "never":
 		return e.checker.GetNeverType()
+	case "bytes":
+		return e.checker.GetBytesType()
+	case "complex":
+		return e.checker.GetComplexType()
 	case "str", "string":
 		return e.checker.GetStringType()
 	case "int":

@@ -4,8 +4,6 @@
 type attr_name = intrinsic
 type some_type = intrinsic
 type structured_type = intrinsic
-type bytes_type = intrinsic
-type complex_type = intrinsic
 type ellipsis_type = intrinsic
 type not_implemented_type = intrinsic
 
@@ -316,9 +314,11 @@ object: (() -> object) & {
     }
 }
 
-declare class bytes(Some):
-    (bytes_type): unknown
-    def __init__(self, source: any = ...) -> None
+type bytes = intrinsic
+declare def bytes(source: any = ...) -> bytes
+
+interface BytesProtocol(Some):
+    readonly (int): int
     def __iter__(self) -> Iterator<int>
     def __contains__(self, value: int) -> bool
     def __len__(self) -> int
@@ -328,9 +328,10 @@ declare class bytes(Some):
     def __mul__(self, count: int) -> bytes
     def __rmul__(self, count: int) -> bytes
 
-declare class complex(Some):
-    (complex_type): unknown
-    def __init__(self, real: float = ..., imaginary: float = ...) -> None
+type complex = intrinsic
+declare def complex(real: int | float | complex = ..., imaginary: int | float = ...) -> complex
+
+interface ComplexProtocol(Some):
     def __add__(self, other: int | float | complex) -> complex
     def __radd__(self, other: int | float | complex) -> complex
     def __sub__(self, other: int | float | complex) -> complex

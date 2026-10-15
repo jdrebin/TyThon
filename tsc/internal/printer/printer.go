@@ -1046,8 +1046,40 @@ func (p *Printer) emitBigIntLiteral(node *ast.BigIntLiteral) {
 
 func (p *Printer) emitStringLiteral(node *ast.StringLiteral) {
 	state := p.enterNode(node.AsNode())
-	p.emitLiteral(node.AsNode(), getLiteralTextFlagsNone)
+	if node.TokenFlags&ast.TokenFlagsPythonBytes != 0 {
+		p.writer.WriteStringLiteral(PythonBytesLiteralText(node.Text))
+	} else {
+		p.emitLiteral(node.AsNode(), getLiteralTextFlagsNone)
+	}
 	p.exitNode(node.AsNode(), state)
+}
+
+// PythonBytesLiteralText prints the scanner's decoded byte values (stored as
+// code points 0..255) without turning non-ASCII bytes into Unicode escapes.
+func PythonBytesLiteralText(value string) string {
+	var text strings.Builder
+	text.WriteString(`b"`)
+	for _, ch := range value {
+		switch ch {
+		case '\\', '"':
+			text.WriteByte('\\')
+			text.WriteRune(ch)
+		case '\n':
+			text.WriteString(`\n`)
+		case '\r':
+			text.WriteString(`\r`)
+		case '\t':
+			text.WriteString(`\t`)
+		default:
+			if ch < 32 || ch >= 127 {
+				fmt.Fprintf(&text, `\x%02x`, ch)
+			} else {
+				text.WriteRune(ch)
+			}
+		}
+	}
+	text.WriteByte('"')
+	return text.String()
 }
 
 func (p *Printer) emitNoSubstitutionTemplateLiteral(node *ast.NoSubstitutionTemplateLiteral) {

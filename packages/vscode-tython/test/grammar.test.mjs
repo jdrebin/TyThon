@@ -29,6 +29,9 @@ const registry = new Registry({
     }),
     getInjections: scopeName => scopeName === rootScope ? [injectionScope] : [],
     loadGrammar: async scopeName => {
+        // A sentinel TS grammar verifies routing; VS Code supplies source.ts in the editor.
+        if (scopeName === "source.ts" && process.env.TYTHON_TS_GRAMMAR) return parseRawGrammar(await readFile(process.env.TYTHON_TS_GRAMMAR, "utf8"), process.env.TYTHON_TS_GRAMMAR);
+        if (scopeName === "source.ts") return { scopeName, patterns: [{ name: "storage.type.interface.ts", match: "\\binterface\\b" }] };
         const fileName = grammarFiles.get(scopeName);
         if (!fileName) return null;
         return parseRawGrammar(await readFile(fileName, "utf8"), fileName);
@@ -36,6 +39,31 @@ const registry = new Registry({
 });
 const grammar = await registry.loadGrammar(rootScope);
 assert(grammar, "tython grammar did not load");
+
+const embedded = tokenize('ty = """ty\ntype Name = str\ncount: int = 1\ncount\n"""\ntext = "type Name = str"');
+assertExactToken(embedded, 0, embedded[0].text.lastIndexOf("ty"), "ty", "entity.name.type.language.tython");
+assertScope(embedded, 1, "type", "storage.type.type.tython");
+assertScope(embedded, 2, "count", "meta.embedded.tython");
+assertScope(embedded, 3, "count", "meta.embedded.tython");
+assertNotScope(embedded, 5, "type", "meta.embedded.tython");
+for (const marker of ["*.ty", "example.ty", "example.d.ty"]) {
+    const marked = tokenize(`sample = r'''${marker}\ncount: int\n'''\nvalue = "plain"`);
+    assertScope(marked, 1, "count", "meta.embedded.tython");
+    assertNotScope(marked, 3, "plain", "meta.embedded.tython");
+}
+const embeddedIndented = tokenize('def f():\n    """ty\n    count: int = 1\n    """');
+assertScope(embeddedIndented, 2, "count", "meta.embedded.tython");
+for (const opening of ['ty("""', '"""python', '"""description of example.ty', 'f"""ty', 'b"""ty']) {
+    const ordinary = tokenize(`${opening}\ncount\n"""`);
+    assertNotScope(ordinary, 1, "count", "meta.embedded.tython");
+}
+
+for (const marker of ["ts", "*.ts", "example.ts", "example.d.ts"]) {
+    const reference = tokenize(`reference = """${marker}\ninterface User { name: string; }\n"""\nvalue = 1`);
+    assertScope(reference, 1, "interface", "meta.embedded.typescript");
+    assertScope(reference, 1, "interface", "storage.type.interface.ts");
+    assertNotScope(reference, 3, "value", "meta.embedded.typescript");
+}
 
 const source = [
     "type Maybe(T) = T | None",
@@ -252,4 +280,3 @@ assert(languageConfiguration.onEnterRules?.some(rule => /def\|class/.test(rule.b
 assert(languageConfiguration.indentationRules?.increaseIndentPattern, "missing indentationRules");
 assert.equal(languageConfiguration.wordPattern.includes("[A-Za-z_]"), true, "wordPattern must be identifier-bounded");
 console.log("Language configuration: indent-on-enter and identifier word pattern are present.");
-

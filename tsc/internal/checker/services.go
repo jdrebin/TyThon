@@ -1194,6 +1194,9 @@ func (c *Checker) IsTypeExpandableForHover(t *Type, isAlias bool) bool {
 	if t == nil {
 		return false
 	}
+	if c.pythonValueHierarchy != nil && t.flags&TypeFlagsPrimitive != 0 {
+		return false
+	}
 	if isAlias {
 		return t.alias != nil && !c.IsLibSymbolForHoverVerbosity(t.alias.Symbol())
 	}

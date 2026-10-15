@@ -14,7 +14,7 @@
         "line": 0,
         "text": "Copy"
       },
-      "text": "type Copy(T) = { ((K)): T[K] for K in keyof T }"
+      "text": "type Copy(T) = { (K): T[K] for K in keyof T }"
     }
   ]
 }

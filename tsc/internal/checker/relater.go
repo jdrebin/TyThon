@@ -222,6 +222,9 @@ func (c *Checker) isSimpleTypeRelatedTo(source *Type, target *Type, relation *Re
 	if t&TypeFlagsNever != 0 {
 		return false
 	}
+	if s&TypeFlagsBytesLike != 0 && t&TypeFlagsBytes != 0 {
+		return true
+	}
 	if s&TypeFlagsStringLike != 0 && t&TypeFlagsString != 0 {
 		return true
 	}
@@ -3077,7 +3080,7 @@ func (r *Relater) typeRelatedToSomeType(source *Type, target *Type, reportErrors
 			return TernaryTrue
 		}
 		if r.relation != r.c.comparableRelation && target.objectFlags&ObjectFlagsPrimitiveUnion != 0 && source.flags&TypeFlagsEnumLiteral == 0 &&
-			(source.flags&(TypeFlagsStringLiteral|TypeFlagsBooleanLiteral|TypeFlagsBigIntLiteral) != 0 ||
+			(source.flags&(TypeFlagsBytesLiteral|TypeFlagsStringLiteral|TypeFlagsBooleanLiteral|TypeFlagsBigIntLiteral) != 0 ||
 				(r.relation == r.c.subtypeRelation || r.relation == r.c.strictSubtypeRelation) && source.flags&TypeFlagsNumberLiteral != 0) {
 			// When relating a literal type to a union of primitive types, we know the relation is false unless
 			// the union contains the base primitive type or the literal type in one of its fresh/regular forms.
@@ -3093,6 +3096,8 @@ func (r *Relater) typeRelatedToSomeType(source *Type, target *Type, reportErrors
 			}
 			var primitive *Type
 			switch {
+			case source.flags&TypeFlagsBytesLiteral != 0:
+				primitive = r.c.bytesType
 			case source.flags&TypeFlagsStringLiteral != 0:
 				primitive = r.c.stringType
 			case source.flags&TypeFlagsNumberLiteral != 0:

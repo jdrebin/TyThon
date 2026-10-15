@@ -94,7 +94,10 @@
                 "path": "./syntaxes/tython.injection.tmLanguage.json",
                 "injectTo": [
                     "source.python.typed"
-                ]
+                ],
+                "embeddedLanguages": {
+                    "meta.embedded.typescript": "typescript"
+                }
             }
         ],
         "snippets": [
@@ -169,7 +172,7 @@
         "tools:prepare": "node scripts/prepare-python-tools.mjs",
         "tools:test": "node test/pythonTools.test.mjs && node test/declarations.test.mjs",
         "build": "tsc && npm run bundle",
-        "bundle": "esbuild src/extension.ts --bundle --external:vscode --external:pyright-typeserver --platform=node --format=cjs --outfile=dist/extension.bundle.js --sourcemap --metafile=dist/extension.meta.json",
+        "bundle": "node scripts/prepare-typescript.mjs && esbuild src/extension.ts --bundle --external:vscode --external:pyright-typeserver --platform=node --format=cjs --outfile=dist/extension.bundle.js --sourcemap --metafile=dist/extension.meta.json",
         "preview:package": "node scripts/package-preview.mjs",
         "formatter:prepare": "node scripts/prepare-formatter.mjs",
         "formatter:test": "node test/formatter.test.mjs && node test/formatterProvider.test.mjs",
@@ -177,19 +180,21 @@
         "grammar:test": "node test/grammar.test.mjs && node test/icons.test.mjs",
         "grammar:update": "node scripts/update-python-grammar.mjs",
         "conformance:test": "node --test test/conformance.test.mjs",
-        "test": "npm run grammar:test && node test/documentScope.test.mjs && node test/completionFallback.test.mjs && node test/serverLaunch.test.mjs && node test/hoverLatency.test.mjs && node test/compilerPath.test.mjs && node --test test/goToolchainNotices.test.mjs && node --experimental-strip-types --no-warnings test/starLigature.test.ts && npm run formatter:test && npm run conformance:test",
+        "test": "node scripts/prepare-typescript.mjs && node --test test/embeddedTypeScript.test.mjs && npm run grammar:test && node test/documentScope.test.mjs && node test/completionFallback.test.mjs && node test/serverLaunch.test.mjs && node test/hoverLatency.test.mjs && node test/compilerPath.test.mjs && node --test test/goToolchainNotices.test.mjs && node --experimental-strip-types --no-warnings test/starLigature.test.ts && npm run formatter:test && npm run conformance:test",
         "watch": "npm run bundle -- --watch"
     },
     "devDependencies": {
         "@types/vscode": "~1.125.0",
-        "esbuild": "^0.28.2",
         "@vscode/vsce": "^3.9.2",
+        "esbuild": "^0.28.2",
         "vscode-oniguruma": "^2.0.1",
         "vscode-textmate": "^9.3.2"
     },
     "dependencies": {
         "@vscode/python-extension": "^1.0.6",
         "pyright-typeserver": "1.1.414",
+        "source-map-support": "0.5.21",
+        "typescript": "6.0.3",
         "vscode-jsonrpc": "9.0.2",
         "vscode-languageclient": "^10.1.1",
         "vscode-languageserver-protocol": "3.18.3"

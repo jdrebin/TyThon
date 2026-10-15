@@ -153,11 +153,7 @@ func printPythonTypeNode(node *ast.Node, emit *printer.EmitContext) string {
 			}
 			return "{ " + join(node.Members(), ", ") + " }"
 		case ast.KindPropertySignature:
-			prefix := ""
-			if node.QuestionToken() != nil {
-				prefix = "optional "
-			}
-			return prefix + render(node.Name()) + ": " + render(node.Type())
+			return pythonMemberPrefix(node, emit) + render(node.Name()) + ": " + render(node.Type())
 		case ast.KindIndexSignature:
 			parameters := node.Parameters()
 			if len(parameters) == 1 {
@@ -166,11 +162,7 @@ func printPythonTypeNode(node *ast.Node, emit *printer.EmitContext) string {
 				if key.Kind != ast.KindLiteralType {
 					text = "(" + text + ")"
 				}
-				prefix := ""
-				if node.QuestionToken() != nil {
-					prefix = "optional "
-				}
-				return prefix + text + ": " + render(node.Type())
+				return pythonMemberPrefix(node, emit) + text + ": " + render(node.Type())
 			}
 		case ast.KindCallSignature:
 			return "def" + pythonFunctionTail(node, render, join)
@@ -222,6 +214,21 @@ func pythonFunctionTail(node *ast.Node, render func(*ast.Node) string, join func
 	return generics + "(" + parameters + ") -> " + render(node.Type())
 }
 
+func pythonMemberPrefix(node *ast.Node, emit *printer.EmitContext) string {
+	prefix := ""
+	if ast.HasSyntacticModifier(node, ast.ModifierFlagsReadonly) {
+		prefix = "readonly "
+	}
+	optional := node.QuestionToken() != nil || emit != nil && emit.EmitFlags(node)&printer.EFPythonOptional != 0
+	for _, modifier := range node.ModifierNodes() {
+		optional = optional || modifier.Kind == ast.KindOptionalKeyword
+	}
+	if optional {
+		prefix += "optional "
+	}
+	return prefix
+}
+
 // printPythonTuple prints `(A, B)`, `(A,)`, `()`, or `()T` for nodes marked as
 // Python tuples, including homogeneous tuples backed by native arrays.
 func printPythonTuple(node *ast.Node, render func(*ast.Node) string) string {
@@ -248,6 +255,11 @@ func printPythonTuple(node *ast.Node, render func(*ast.Node) string) string {
 	parts := make([]string, len(elements))
 	for i, element := range elements {
 		parts[i] = render(element)
+		if element.Kind == ast.KindRestType && element.AsRestTypeNode().Type.Kind == ast.KindArrayType {
+			// Native tuple rest nodes use arrays; inside a Python tuple the
+			// same tail must retain the homogeneous tuple spelling.
+			parts[i] = "*" + printPythonTuple(element.AsRestTypeNode().Type, render)
+		}
 	}
 	return "(" + strings.Join(parts, ", ") + ")"
 }

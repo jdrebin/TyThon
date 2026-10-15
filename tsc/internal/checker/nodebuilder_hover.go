@@ -2,6 +2,7 @@ package checker
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/jdrebin/TyThon/tsc/internal/ast"
 	"github.com/jdrebin/TyThon/tsc/internal/collections"
@@ -15,6 +16,68 @@ import (
 // isExpanding returns whether the node builder context is operating in hover-expansion mode.
 func isExpanding(ctx *NodeBuilderContext) bool {
 	return ctx.maxExpansionDepth != -1
+}
+
+func isPythonHoverDunder(name string) bool {
+	return len(name) > 4 && strings.HasPrefix(name, "__") && strings.HasSuffix(name, "__")
+}
+
+// Python hover keeps ordinary members first and charges one more expansion
+// level for special methods. Compare declaration origins, not signatures:
+// an override of object.__repr__ still belongs to the user's class.
+func (b *NodeBuilderImpl) pythonHoverProperties(properties []*ast.Symbol) []*ast.Symbol {
+	if !isExpanding(b.ctx) || b.ch.pythonValueHierarchy == nil {
+		return properties
+	}
+	ordinary := make([]*ast.Symbol, 0, len(properties))
+	var dunders []*ast.Symbol
+	for _, property := range properties {
+		if b.ch.IsPythonPrivateAttributeName(property.Name) {
+			continue
+		}
+		if !isPythonHoverDunder(property.Name) {
+			ordinary = append(ordinary, property)
+			continue
+		}
+		if b.ch.pythonHoverObjectMember(property) {
+			continue
+		}
+		if b.ctx.depth >= b.ctx.maxExpansionDepth {
+			b.ctx.canIncreaseExpansionDepth = true
+			continue
+		}
+		dunders = append(dunders, property)
+	}
+	return append(ordinary, dunders...)
+}
+
+func (c *Checker) pythonHoverObjectMember(property *ast.Symbol) bool {
+	var base *ast.Symbol
+	if protocol := c.pythonLibraryType("ObjectProtocol", 0); protocol != nil {
+		base = c.getPropertyOfType(protocol, property.Name)
+	}
+	if base == nil {
+		if object := c.getGlobalSymbol("object", ast.SymbolFlagsValue, nil); object != nil {
+			base = c.getPropertyOfType(c.getTypeOfSymbol(object), property.Name)
+		}
+	}
+	if base == nil {
+		return false
+	}
+	roots := c.GetRootSymbols(base)
+	for _, root := range c.GetRootSymbols(property) {
+		found := false
+		for _, original := range roots {
+			if root == original {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return false
+		}
+	}
+	return true
 }
 
 // expandSymbolForHover produces declaration nodes (class, interface, enum, module) for a symbol
@@ -297,6 +360,7 @@ func (b *NodeBuilderImpl) hoverHeritageClauses(declarations []*ast.Node) []*ast.
 // serializePropertiesWithTruncation iterates properties using addPropertyToElementList,
 // with truncation checks matching Strada's createTypeNodesFromResolvedType behavior.
 func (b *NodeBuilderImpl) serializePropertiesWithTruncation(properties []*ast.Symbol, elements []*ast.Node) []*ast.Node {
+	properties = b.pythonHoverProperties(properties)
 	properties = core.Filter(properties, func(p *ast.Symbol) bool {
 		return p.Flags&ast.SymbolFlagsPrototype == 0
 	})

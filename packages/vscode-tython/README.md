@@ -87,6 +87,38 @@ Extensions view and the Marketplace listing show. The extension also supplies an
 after updating to see it. This is a language-default icon: your active file-icon
 theme can override it or disable language defaults. We do not change that theme.
 
+## Embedded TyThon
+
+Start a triple-quoted string with a line containing `ty` or a filename ending
+in `.ty` (including `*.ty`) to enable embedded editor support:
+
+```python
+ty = """ty
+count: int = 1
+count
+"""
+
+from tytest import tytest
+
+test = tytest(ty)
+```
+
+Hover, completion suggestions, signature help, definitions, diagnostics, and
+semantic tokens use an independent virtual module for each string. Locations
+map back to the enclosing file, including escapes, Unicode, and CRLF. The marker
+line is excluded from the virtual source. A `.d.ty` marker selects declaration
+syntax; filenames do not register importable modules. Ordinary and raw triple
+quotes work; interpolation and computed strings are not supported. String
+indentation is preserved, without automatic dedenting.
+
+The string remains an ordinary runtime value, including its marker line. Its
+variable name and any function receiving it do not affect editor support. Test
+helpers such as `tests/tytest.ty` use normal imports; there are no implicit globals.
+
+Embedded suggestions are read-only. Document formatting is disabled for files
+containing embedded source, and supplementary Python tools cannot apply fixes through it.
+These capabilities do not implement a test runner or assertion API.
+
 ## Formatting
 
 Use **Format Document** (`Shift+Alt+F` on Linux/Windows) in a `.ty` or `.d.ty`
@@ -196,8 +228,45 @@ server smoke test. `release:platforms` writes VSIXes under `built/preview` and
 wheels under `built/release`. `preview:package` writes only a VSIX. Neither
 command publishes or installs. See `docs/RELEASING.md`.
 
+VSIX filenames include the version, local build date/time (to the second), and
+platform, for example `tython-0.1.3-2026-10-14_14-30-05-darwin-arm64.vsix`.
+Add an optional label with:
+
+```sh
+npm run preview:package -- --skip-checks --label embedded-ts
+```
+
+That adds `embedded-ts` before the platform in the filename. Labels accept
+letters, numbers, and separating hyphens. Build hashes, commit details, the UTC
+timestamp, and the label remain in the accompanying `.build-info.json` file.
+
 The canonical source library is `tsc/internal/python/lib/builtins.d.ty`.
 `Launch tython standard library` opens it directly in extension development.
 Saved library edits reach other workspaces after rebuilding the compiler; local
 authoring examples use imports of the editable source. Packaging includes that
 same source, attribution notices, dependency versions and checksums.
+
+TypeScript reference strings use the same convention:
+
+```python
+ts = """ts
+interface Left { id: number; }
+interface Right { id: string; }
+interface Combined extends Left, Right { name: string; }
+"""
+```
+
+`ts` or a filename ending in `.ts` enables upstream TypeScript 6.0.3 hovers,
+errors, completion suggestions, signature help, definitions, and syntax/semantic
+highlighting inside the string. `.d.ts` selects declaration-file rules. These
+are live reference examples, not executable TypeScript tests; no helper or
+import is required. Each block is independent. The filename marker selects the
+language, without declaring an importable module.
+
+Imports resolve beside the containing `.ty` file, using the nearest `tsconfig.json`
+when present, including unsaved open TS/JS files. Without a config, blocks use
+strict checking, ESNext, and NodeNext. TypeScript's standard declaration libraries
+ship with the extension. As with embedded TY, language tools leave the string
+unchanged: completion suggestions are inspectable but do not insert text, and
+formatting/refactoring does not rewrite embedded examples. Raw strings (`r"""ts`)
+are useful for examples containing backslashes.

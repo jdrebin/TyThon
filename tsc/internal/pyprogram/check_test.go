@@ -336,10 +336,10 @@ func TestHoverOptionalMembers(t *testing.T) {
 		}
 		return text
 	}
-	if got := hover("type CopiedProfile", "CopiedProfile"); !strings.Contains(got, "Copy(Profile)") {
+	if got := hover("type CopiedProfile", "CopiedProfile"); got != `type CopiedProfile = { "id": int, optional "nickname": str, optional display_name: str }` {
 		t.Fatalf("CopiedProfile hover %q", got)
 	}
-	if got := hover("type RequiredProfile", "RequiredProfile"); !strings.Contains(got, "Required(Profile)") {
+	if got := hover("type RequiredProfile", "RequiredProfile"); got != `type RequiredProfile = { "id": int, "nickname": str, display_name: str }` {
 		t.Fatalf("RequiredProfile hover %q", got)
 	}
 }
@@ -624,6 +624,7 @@ func TestNativeColorAndHover(t *testing.T) {
 		{"flag: ", "bool"},
 		{"-> ", "str"},
 		{"obj: ", "object"},
+		{"raw: ", "bytes"},
 	} {
 		if _, ok := kindAt(name.marker, name.name); ok {
 			t.Errorf("%s in %s should keep the builtin type color", name.name, name.marker)
@@ -634,7 +635,6 @@ func TestNativeColorAndHover(t *testing.T) {
 		kind         ast.Kind
 	}{
 		{"text = ", "str", ast.KindFunctionDeclaration},
-		{"raw: ", "bytes", ast.KindClassDeclaration},
 		{"class Box(", "Named", ast.KindInterfaceDeclaration},
 		{"def ", "__init__", ast.KindMethodDeclaration},
 		{"self.", "value", ast.KindPropertyDeclaration},
@@ -660,7 +660,7 @@ func TestNativeColorAndHover(t *testing.T) {
 		{"count: ", "int", "int"},
 		{"flag: ", "bool", "bool"},
 		{"obj: ", "object", "object"},
-		{"raw: ", "bytes", "class bytes"},
+		{"raw: ", "bytes", "bytes"},
 		{"type ", "Label", "type Label = str"},
 		{"type ", "User", "type User(T) = { id: T, name: str }"},
 		{"class Box(", "Named", "interface Named"},

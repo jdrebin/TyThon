@@ -10,13 +10,21 @@ Include a minimal example and a test of the intended behavior with fixes. Preser
 attribution and unrelated changes. Discuss new language-design decisions before
 implementing them.
 
-Keep product behavior tests in the [shared conformance corpus](tests/conformance/README.md),
-including coverage introduced by bug fixes. Organize and name cases by the
-language rule or editor behavior they specify. Extend the relevant feature's
-cases when fixing a bug; describe the expected result without referring to the
-bug's history or creating a separate regression category.
-It checks transpilation, formatting, hover, completions, syntax highlighting,
-semantic classification, and diagnostics from small, reviewable fixtures:
+Prefer small [TyThon-authored cases](tests/README.md) for new bugs and intended
+language/editor behavior. Put a `.ty` file under `tests/`, write the embedded
+source first, and build expectations from the displayed editor text with
+`tytest`. Organize files by the behavior they specify. New cases are discovered
+automatically; no manifest or plan entry is required for each case.
+
+Use the workspace `tytest` snippet and **Run current TyThon test** task, or run:
+
+```sh
+npm run test:ty
+npm run test:ty -- tests/test.ty
+```
+
+The existing [shared conformance corpus](tests/conformance/README.md) remains
+part of verification. Both test formats exercise the compiler and editor tools:
 
 ```sh
 npm ci
@@ -32,7 +40,8 @@ and needs Python 3.12+ and network access. Subsequent runs rebuild the native
 formatter helper without downloading dependencies. See the corpus guide for
 case selection, expected-output conventions, and the coverage roadmap.
 Keep [the plan inventory](tests/conformance/plan-coverage.json) up to date when
-adding a feature or fixture. A failing intended-behavior test records a product
+adding a feature or JSON corpus fixture. The `tytest` integration already runs
+all discovered `.ty` cases in CI and in `npm test`. A failing intended-behavior test records a product
 gap; do not replace its expectation with the faulty result to make CI pass.
 
 Checks used by the preview:

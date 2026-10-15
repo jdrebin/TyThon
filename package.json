@@ -21,6 +21,8 @@
         "build:watch:debug": "hereby build:watch --debug",
         "test": "hereby test",
         "test:conformance": "node tools/scripts/test-conformance.mjs",
+        "test:ty": "node tools/scripts/test-ty.mjs",
+        "test:ty:check": "node --test tools/testing/tytest.test.mjs tools/testing/discovery.test.mjs tools/testing/workflow.test.mjs && node tools/scripts/test-ty.mjs tests tools/testing/fixtures",
         "test:conformance:prepare": "npm run -w tython formatter:prepare",
         "test:plan": "node tools/scripts/test-plan.mjs",
         "lint": "hereby lint",

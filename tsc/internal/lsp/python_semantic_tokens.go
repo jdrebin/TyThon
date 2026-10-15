@@ -63,5 +63,30 @@ func (s *pythonLanguageService) computeSemanticTokens(ctx context.Context, uri l
 		entries = append(entries, FrontendSemanticToken{Range: lsproto.Range{Start: start, End: end}, DeclarationKind: info.Kind, Type: info.Type, Readonly: info.Readonly, Async: info.Async})
 	}
 	data := SemanticTokensForFrontend(ctx, session.Checker(), entries)
+	tokens := pythonAbsoluteTokens(data)
+	for _, document := range s.embeddedSources(ctx, sources, fileName) {
+		embedded := s.embeddedDocument(sources, fileName, source, document)
+		result, err := embedded.service.computeSemanticTokens(ctx, embedded.uri, nil, encoding)
+		if err != nil {
+			return lsproto.SemanticTokensResponse{}, err
+		}
+		if result.SemanticTokens == nil {
+			continue
+		}
+		for _, token := range pythonAbsoluteTokens(result.SemanticTokens.Data) {
+			span := embedded.hostRange(lsproto.Range{
+				Start: lsproto.Position{Line: token.line, Character: token.column},
+				End:   lsproto.Position{Line: token.line, Character: token.column + token.length},
+			}, encoding)
+			if span.Start.Line != span.End.Line || span.Start.Character >= span.End.Character {
+				continue
+			}
+			if requested != nil && (span.Start.Line < requested.Start.Line || span.Start.Line == requested.Start.Line && span.Start.Character < requested.Start.Character || span.End.Line > requested.End.Line || span.End.Line == requested.End.Line && span.End.Character > requested.End.Character) {
+				continue
+			}
+			tokens = append(tokens, pythonAbsoluteToken{span.Start.Line, span.Start.Character, span.End.Character - span.Start.Character, token.kind, token.modifiers})
+		}
+	}
+	data = encodePythonAbsoluteTokens(tokens)
 	return lsproto.SemanticTokensOrNull{SemanticTokens: &lsproto.SemanticTokens{Data: data}}, nil
 }

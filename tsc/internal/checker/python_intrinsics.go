@@ -19,6 +19,10 @@ import (
 // pythonPrimitiveType returns the checker type a primitive name denotes, or nil.
 func (c *Checker) pythonPrimitiveType(name string) *Type {
 	switch name {
+	case "bytes":
+		return c.bytesType
+	case "complex":
+		return c.complexType
 	case "str":
 		return c.stringType
 	case "int":
@@ -37,8 +41,8 @@ func (c *Checker) pythonPrimitiveType(name string) *Type {
 }
 
 var pythonPrivateKeyNames = map[string]bool{
-	"attr_name": true, "some_type": true, "structured_type": true, "bytes_type": true,
-	"complex_type": true, "ellipsis_type": true, "not_implemented_type": true,
+	"attr_name": true, "some_type": true, "structured_type": true,
+	"ellipsis_type": true, "not_implemented_type": true,
 }
 
 // isPythonIntrinsicAlias reports whether `type name = intrinsic` is a valid
@@ -74,3 +78,6 @@ func (c *Checker) pythonIntrinsicTypeOfAlias(symbol *ast.Symbol) *Type {
 	c.pythonPrivateTypeKeys[symbol.Name] = uniqueType
 	return uniqueType
 }
+
+func (c *Checker) GetBytesType() *Type   { return c.bytesType }
+func (c *Checker) GetComplexType() *Type { return c.complexType }

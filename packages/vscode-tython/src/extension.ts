@@ -20,6 +20,7 @@ import { registerHoverFeature } from "./hover";
 import { createServerLaunch } from "./serverLaunch";
 import { PythonTools } from "./pythonTools";
 import { BundledFormatter } from "./formatter";
+import { EmbeddedTypeScript } from "./embeddedTypeScript";
 import { resolveCompilerPath } from "./compilerPath";
 
 let languageClient: LanguageClient | undefined;
@@ -88,6 +89,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         { language: "tython", scheme: "tython" },
     ];
     let pythonTools: PythonTools | undefined;
+    let embeddedTypeScript: EmbeddedTypeScript | undefined;
     const clientOptions: LanguageClientOptions = {
         documentSelector,
         outputChannelName: "TyThon Language Server",
@@ -95,7 +97,12 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         // the server, so suppress the language client's default provider.
         middleware: {
             provideHover: () => undefined,
+            async provideSignatureHelp(document, position, context, token, next) {
+                if (await embeddedTypeScript?.contains(document, position)) return undefined;
+                return next(document, position, context, token);
+            },
             async provideCompletionItem(document, position, completionContext, token, next) {
+                if (await embeddedTypeScript?.contains(document, position)) return undefined;
                 const version = document.version;
                 const native = await next(document, position, completionContext, token);
                 if (token.isCancellationRequested || document.isClosed || document.version !== version) return undefined;
@@ -119,13 +126,24 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
                 for (const item of merged) presentDunderCompletion(item);
                 return new vscode.CompletionList(merged, (!Array.isArray(native) && native?.isIncomplete) || false);
             },
-            provideDocumentSemanticTokens(document, token, next) {
-                return recolorSemanticTokens(document, next(document, token));
+            async provideDocumentSemanticTokens(document, token, next) {
+                const version = document.version;
+                const native = await recolorSemanticTokens(document, next(document, token));
+                if (token.isCancellationRequested || document.version !== version) return undefined;
+                const legend = languageClient?.initializeResult?.capabilities.semanticTokensProvider?.legend;
+                const combined = embeddedTypeScript && legend ? await embeddedTypeScript.semanticTokens(document, native, legend) : native;
+                return combined;
             },
-            provideDocumentRangeSemanticTokens(document, range, token, next) {
-                return recolorSemanticTokens(document, next(document, range, token));
+            async provideDocumentRangeSemanticTokens(document, range, token, next) {
+                const version = document.version;
+                const native = await recolorSemanticTokens(document, next(document, range, token));
+                if (token.isCancellationRequested || document.version !== version) return undefined;
+                const legend = languageClient?.initializeResult?.capabilities.semanticTokensProvider?.legend;
+                const combined = embeddedTypeScript && legend ? await embeddedTypeScript.semanticTokens(document, native, legend, range) : native;
+                return combined;
             },
             async provideDefinition(document, position, token, next) {
+                if (await embeddedTypeScript?.contains(document, position)) return undefined;
                 const native = await next(document, position, token);
                 if (native && (!Array.isArray(native) || native.length)) return native;
                 return pythonTools?.definition(document, position, token);
@@ -183,7 +201,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         [{ language: "tython", scheme: "file", pattern: "**/*.ty" }, { language: "tython", scheme: "tython" }],
         {
             async provideDefinition(document, position, token) {
-                if (!languageClient?.isRunning()) return undefined;
+                if (!languageClient?.isRunning() || await embeddedTypeScript?.contains(document, position)) return undefined;
                 const result = await languageClient.sendRequest<DefinitionResult | null>("textDocument/definition", {
                     textDocument: { uri: document.uri.toString() },
                     position: { line: position.line, character: position.character },
@@ -194,11 +212,19 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     ));
     try {
         await languageClient.start();
-        context.subscriptions.push(new BundledFormatter(context, output));
+        embeddedTypeScript = new EmbeddedTypeScript(languageClient, context.asAbsolutePath("dist/typescript"), output);
+        context.subscriptions.push(embeddedTypeScript);
+        context.subscriptions.push(new BundledFormatter(context, output, async (document, token) => {
+            const projection = await languageClient!.sendRequest<{ embedded?: [number, number][] }>("typedPython/project", {
+                textDocument: { uri: document.uri.toString() },
+            }, token);
+            return projection.embedded ?? [];
+        }));
         pythonTools = new PythonTools(context, languageClient, output);
         context.subscriptions.push(pythonTools);
         context.subscriptions.push(registerHoverFeature(documentSelector, languageClient,
-            (document, position, token, wait) => pythonTools!.docs(document, position, token, wait)));
+            (document, position, token, wait) => pythonTools!.docs(document, position, token, wait),
+            (document, position) => embeddedTypeScript!.contains(document, position)));
     }
     catch (error) {
         output.appendLine(`Could not start tython language server: ${String(error)}`);

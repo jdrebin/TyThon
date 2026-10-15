@@ -12,6 +12,7 @@ import (
 // literal widens (`x = "v1"` is str). A non-fresh literal union does not
 // (`x = registry.version` stays 'v1' | 'v2', and `x = "v3"` is an error). An
 // annotated name is a VariableDeclaration and does not come through here.
+// Bytes literals retain their precision on bindings that are not reassigned.
 
 // isPythonMatchPattern reports a case pattern that binds names rather than a
 // value compared with the subject (`User(name=nam)`, `{"score": score}`).
@@ -94,12 +95,38 @@ func (c *Checker) getPythonAssignmentDeclarationType(symbol *ast.Symbol) *Type {
 		}
 		assignment := declaration.AsBinaryExpression()
 		// Only the initializer. A later `"v2"` must not widen 'v1' | 'v2' to str.
-		value := c.getWidenedLiteralType(c.checkExpressionCached(assignment.Right))
+		value := c.checkExpressionCached(assignment.Right)
+		if value.flags&TypeFlagsBytesLiteral == 0 || !ast.IsIdentifier(assignment.Left) || c.pythonBindingIsReassigned(symbol, assignment.Left) {
+			value = c.getWidenedLiteralType(value)
+		}
 		if t := c.pythonTargetType(assignment.Left, value, symbol.Name); t != nil {
 			return c.pythonDictType(c.getWidenedType(t))
 		}
 	}
 	return c.errorType
+}
+
+// Plain Python assignments bind names through BinaryExpressions, so the
+// native variable-declaration assignment cache does not cover these symbols.
+func (c *Checker) pythonBindingIsReassigned(symbol *ast.Symbol, initialTarget *ast.Node) bool {
+	if len(symbol.Declarations) != 1 {
+		return true
+	}
+	container := ast.FindAncestor(initialTarget, ast.IsFunctionOrSourceFile)
+	if container == nil {
+		return true
+	}
+	var visit func(*ast.Node) bool
+	visit = func(node *ast.Node) bool {
+		if ast.IsTypeNode(node) {
+			return false
+		}
+		if ast.IsIdentifier(node) && node != initialTarget && getAssignmentTargetKind(node) != AssignmentKindNone {
+			return c.getResolvedSymbol(node) == symbol
+		}
+		return node.ForEachChild(visit)
+	}
+	return visit(container)
 }
 
 // pythonTargetType returns the type that name receives when sourceType is assigned

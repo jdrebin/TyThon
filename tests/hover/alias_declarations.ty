@@ -1,0 +1,33 @@
+ty = """ty
+type Pick(T, K extends keyof T) = {(P): T[P] for P in K}
+type Person = { name: str, age: int }
+type NameOnly = Pick(Person, *<"name">)
+
+interface Named:
+    name: str
+
+type Wrapped = { child: Named }
+type Chain = { "value": int, optional "next": Chain }
+type Tail = (int, *()str)
+type FirstString(T) = U if T extends (infer U extends str, *()any) else never
+
+type Copy(T) = {(P): T[P] for P in keyof T}
+type Profile = { readonly "id": int, optional "nickname": str, optional title: str }
+type Copied = Copy(Profile)
+type Required(T) = {-optional (P): T[P] for P in keyof T}
+type RequiredProfile = Required(Profile)
+"""
+
+from tytest import tytest
+
+(
+    tytest(ty)
+    .diagnostics()
+    .hover("type NameOnly = { name: str }", at="NameOnly")
+    .hover("type Wrapped = { child: Named }", at="Wrapped")
+    .hover('type Chain = { "value": int, optional "next": Chain }', at="Chain =")
+    .hover("type Tail = (int, *()str)", at="Tail")
+    .hover("type FirstString(T) = U if T extends (infer U extends str, *()any) else never", at="FirstString")
+    .hover('type Copied = { readonly "id": int, optional "nickname": str, optional title: str }', at="Copied =")
+    .hover('type RequiredProfile = { readonly "id": int, "nickname": str, title: str }', at="RequiredProfile")
+)

@@ -1,0 +1,58 @@
+from tytest import tytest
+
+(
+    tytest("""ty
+interface Named:
+    name: str
+value: Named
+value.
+""", name="editor tools")
+    .suggest("name", at="value.")
+    .suggest("missing", at="value.", match="excludes")
+    .hover("(variable) value: Named", at=4)
+    .configure(hover_verbosity=1)
+    .hover("""
+        ```python
+        (variable) value: { name: str }
+        ```
+    """, at=4)
+    .semantic("interface", at="Named", line=2)
+    .syntax("entity.name.type.interface.tython", at="Named", line=2)
+)
+
+(
+    tytest("""ty
+def greet(name: str, count: int) -> str:
+    return name
+result = greet("Ada", count=2)
+""", name="call tools")
+    .diagnostics()
+    .signature("(name: str, count: int) -> str", at="2", active_parameter=2)
+    .definition("greet", at="greet", line=4, target_line=2)
+)
+
+(
+    tytest("name:str='Ada'\nprint( name )\n", name="output tools")
+    .diagnostics()
+    .transpile("name    ='Ada'\nprint( name )\n")
+    .format("name: str = 'Ada'\nprint(name)\n")
+)
+
+(
+    tytest("def broken(\n", name="formatter rejection")
+    .format_error("Formatting refused")
+)
+
+(
+    tytest("from model import value\nvalue\n", name="companion modules")
+    .with_file("model.d.ty", "value: int\n")
+    .diagnostics()
+    .hover("(variable) value: int", at=2)
+    .definition("value", at=2, file="model.d.ty")
+)
+
+(
+    tytest("declare def greet(name: str) -> str\n", name="declaration source", file="main.d.ty")
+    .diagnostics()
+    .hover("def greet(name: str) -> str", at="greet")
+)

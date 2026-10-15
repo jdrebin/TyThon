@@ -1,0 +1,104 @@
+# Assertions are collected here and executed by `npm run test:ty`.
+# Public inputs are typed; the private dictionaries are the runner wire format.
+type Match = "exact" | "includes" | "excludes"
+type TextMatch = "exact" | "includes"
+type SemanticKind = "class" | "enum" | "interface" | "namespace" | "typeParameter" | "type" | "parameter" | "variable" | "enumMember" | "property" | "function" | "method"
+
+_cases = [] as []any
+
+
+class TyTest:
+    def __init__(self, case: any, selectors: []any, hover_verbosity: int = 0):
+        self._case = case
+        self._selectors = selectors
+        self._hover_verbosity = hover_verbosity
+
+    def _select(self, selector: any) -> TyTest:
+        return TyTest(self._case, self._selectors + [selector], self._hover_verbosity)
+
+    def _expect(self, kind: str, expected: str, options: any, at: str | int | None = None, line: int | None = None) -> TyTest:
+        self._case["assertions"].append({
+            "kind": kind, "expected": expected,
+            "selectors": self._selectors, "options": options, "at": at, "line": line,
+        })
+        return self
+
+    def at(self, text: str, *, occurrence: int | None = None, after: bool = False) -> TyTest:
+        """Select text within the current selection. Ambiguous text requires an occurrence (1-based)."""
+        return self._select({"kind": "text", "text": text, "occurrence": occurrence, "after": after})
+
+    def line(self, number: int) -> TyTest:
+        """Select a full line. Lines start at 1; a ty marker occupies line 1."""
+        return self._select({"kind": "lines", "start": number, "end": number})
+
+    def range(self, start: int, end: int) -> TyTest:
+        """Select complete lines, including both endpoints."""
+        return self._select({"kind": "lines", "start": start, "end": end})
+
+    def point(self, line: int, column: int) -> TyTest:
+        """Select a cursor position. Lines and UTF-16 columns start at 1."""
+        return self._select({"kind": "point", "line": line, "column": column})
+
+    def span(self, start_line: int, start_column: int, end_line: int, end_column: int) -> TyTest:
+        """Select a range with an exclusive end; all coordinates are 1-based."""
+        return self._select({"kind": "span", "start_line": start_line, "start_column": start_column,
+                             "end_line": end_line, "end_column": end_column})
+
+    def configure(self, *, hover_verbosity: int) -> TyTest:
+        """Return a view with different hover settings; sibling views are unchanged."""
+        return TyTest(self._case, self._selectors, hover_verbosity)
+
+    def hover(self, expected: str, *, at: str | int | None = None, line: int | None = None, verbosity: int | None = None) -> TyTest:
+        """Expect the displayed hover text, without Markdown fences. Empty means no hover."""
+        level = self._hover_verbosity if verbosity is None else verbosity
+        return self._expect("hover", expected, {"verbosity": level}, at, line)
+
+    def suggest(self, expected: str, *, at: str | int | None = None, line: int | None = None, match: Match = "exact", ordered: bool = True) -> TyTest:
+        """One completion label per line, in editor sort order. Includes can check a subsequence."""
+        return self._expect("suggest", expected, {"match": match, "ordered": ordered}, at, line)
+
+    def diagnostics(self, expected: str = "", *, at: str | int | None = None, line: int | None = None, match: TextMatch = "exact") -> TyTest:
+        """Expect diagnostic messages in source order. Empty means no diagnostics in the selection."""
+        return self._expect("diagnostics", expected, {"match": match}, at, line)
+
+    def definition(self, expected: str, *, at: str | int | None = None, line: int | None = None, target_line: int | None = None, occurrence: int | None = None, file: str | None = None) -> TyTest:
+        """Expect navigation to the selected text in this file or an added file."""
+        return self._expect("definition", expected, {"line": target_line, "occurrence": occurrence, "file": file}, at, line)
+
+    def signature(self, expected: str, *, at: str | int | None = None, line: int | None = None, active_parameter: int | None = None) -> TyTest:
+        """Expect the signature label; optionally check the active parameter (1-based)."""
+        return self._expect("signature", expected, {"active_parameter": active_parameter}, at, line)
+
+    def semantic(self, expected: SemanticKind, *, at: str | int | None = None, line: int | None = None, modifiers: str = "") -> TyTest:
+        """Expect this semantic token kind throughout the selection; modifiers are space-separated."""
+        return self._expect("semantic", expected, {"modifiers": modifiers}, at, line)
+
+    def syntax(self, expected: str, *, at: str | int | None = None, line: int | None = None, match: Match = "includes") -> TyTest:
+        """Expect grammar scopes, one per line, on every token intersecting the selection."""
+        return self._expect("syntax", expected, {"match": match}, at, line)
+
+    def transpile(self, expected: str) -> TyTest:
+        """Expect exact emitted Python for the full file, including blank lines."""
+        return self._expect("transpile", expected, {})
+
+    def format(self, expected: str) -> TyTest:
+        """Expect full-file formatting; ignore one opening layout newline and check idempotence."""
+        return self._expect("format", expected, {})
+
+    def format_error(self, expected: str) -> TyTest:
+        """Expect a formatter error containing this text."""
+        return self._expect("format_error", expected, {})
+
+    def with_file(self, name: str, source: str) -> TyTest:
+        """Add an ordinary companion .ty/.d.ty module for import resolution."""
+        if name in self._case["files"] or name == self._case["file"]:
+            raise ValueError("Duplicate test file: " + name)
+        self._case["files"][name] = source
+        return self
+
+
+def tytest(source: str, *, name: str = "case", file: str = "main.ty") -> TyTest:
+    """Create an isolated language test. A first-line ty/*.ty marker is optional."""
+    case: any = {"name": name, "file": file, "source": source, "files": {}, "assertions": []}
+    _cases.append(case)
+    return TyTest(case, [])

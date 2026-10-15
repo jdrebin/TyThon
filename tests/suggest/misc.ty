@@ -1,0 +1,24 @@
+ty = """ty
+a = 1
+b = a
+c = "str"
+
+def take_int(i: int):
+    pass
+
+take_int(i=a)
+"""
+
+from tytest import tytest
+
+test = tytest(ty)
+
+test.at("b = ").suggest("a", match="includes", ordered=True)
+
+test.at("take_int(i=").suggest("a", match="includes", ordered=True)
+
+tytest("a = 1 as ").suggest("a", match="excludes")
+
+tytest("a = 1 ").suggest("as", match="includes")
+
+tytest("").suggest("undefined", match="excludes").suggest("None", match="includes").suggest("null", match="excludes")

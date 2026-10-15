@@ -220,6 +220,13 @@ existing checker machinery.
 
 ## Type declarations and generic syntax
 
+Bracket generics, named type arguments, and colon upper bounds are deferred as
+of October 15, 2026, including the upper-bound change independently of bracket
+syntax. The current rules below remain in effect. See
+[the deferred generic syntax discussion](docs/GENERIC_SYNTAX_PROPOSALS.md) for
+the alternatives, runtime findings, and unresolved tradeoffs. `infer A: int`
+was explicitly declined; constrained inference retains `extends`.
+
 Type utility functions use parentheses both when declared and called:
 
 ```ty
@@ -275,8 +282,24 @@ Status: the following is the migration plan, not a claim that all hover paths
 or the complete standard library already follow it.
 
 Hover expansion has one authority: the native TypeScript node builder and
-language-service display flags. Python may change spelling, not decide a
-different expansion depth, alias-flattening rule, recursion rule, or limit.
+language-service display flags. Python spelling remains in the frontend;
+Python-specific member visibility also uses that same native depth counter.
+
+Rules agreed October 14, 2026:
+
+- Preserve named types at use sites by default, including type-function results
+  such as `Obj2(int)` and dictionary types. Explicit expansion reveals the body.
+- Primitive types are terminal at every expansion level. `bytes` and `complex`
+  are primitives too; bytes literals such as `b"abc"` retain their own identity,
+  separate from string literals. Inferred bytes bindings that are not
+  reassigned retain their literal type; mutable bindings, parameter defaults,
+  and writable properties widen to `bytes`. Bytes concatenation returns `bytes`.
+- Dunders require one additional expansion level relative to ordinary members
+  of the same object and appear after all ordinary members. Expanding their
+  member types also consumes that extra level.
+- Omit dunders inherited directly from `object`. Use declaration provenance,
+  preserving explicit overrides and dunders inherited from user classes even
+  when their signatures match an object method.
 
 - At usage sites, preserve the named form selected by TS, including names
   nested in generic arguments, unions, intersections, and callable signatures.
@@ -766,9 +789,10 @@ The existing scalar representations are retained. Their Python wrapper protocols
 inherit `Some` in the bundled declarations. The source-side apparent-type adapter
 uses those declarations for primitive membership, and supplies the `Object` base
 for structured values. Ordinary structural target shapes do not acquire hidden
-nominal requirements. `bytes`, `complex`, `EllipsisType`, and `NotImplementedType`
-have private identities and inherit `Some`; their subclasses can also inherit
-`Object`.
+nominal requirements. `bytes` and `complex` have primitive checker identities
+with declared wrapper protocols inheriting `Some`. `EllipsisType` and
+`NotImplementedType` retain private nominal keys and inherit `Some`; subclasses
+of these families can also inherit `Object`.
 
 Python's universal `object` retains top-type semantics and its declaration-driven
 runtime member fallback. Extending that universal root imposes no additional
@@ -1065,7 +1089,8 @@ Language-service requirements:
 - bracket completion from finite ordinary item keys only;
 - named parameters ranked first inside calls;
 - dunder completions last, or hidden until `_` is typed;
-- dunders hidden from hover expansions when identical to `object`;
+- dunders delayed by one hover expansion level, sorted last, and omitted only
+  when inherited from `object` without an override;
 - attribute-key syntax and `Extract`/`Exclude` highlighted in type contexts.
 
 Attribute patterns cannot enumerate infinitely many completion entries. They
@@ -1305,6 +1330,9 @@ verification does not substitute for an interactive extension-host smoke test.
 
 ## Deferred decisions
 
+- [generic syntax and upper bounds](docs/GENERIC_SYNTAX_PROPOSALS.md): bracket
+  declarations/application, named type arguments, disambiguation and runtime
+  replacement semantics, and colon upper bounds are all shelved;
 - project/configuration syntax and Python-version selection;
 - package discovery and the declaration distribution ecosystem;
 - exact static semantics for more exotic hashable key types;
@@ -1605,8 +1633,7 @@ of the operator token.
 
 Nominal identity today is a compiler keyword. `builtins.d.ty` is the only file
 allowed to write `type name = intrinsic`, and it uses that for `attr_name`,
-`some_type`, `structured_type`, `bytes_type`, `complex_type`, `ellipsis_type`,
-and `not_implemented_type`. User code that writes `intrinsic` is an error. The
+`some_type`, `structured_type`, `ellipsis_type`, and `not_implemented_type`. User code that writes `intrinsic` is an error. The
 checker already stores those keys with TypeScript unique-symbol identity.
 Matching a public shape does not forge the key, and inheritance carries it.
 

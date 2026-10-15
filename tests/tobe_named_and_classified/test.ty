@@ -1,0 +1,44 @@
+ty = """ty
+interface Left:
+    id: int
+interface Right:
+    id: str
+interface Combined(Left, Right):
+    name: str
+""" as const
+
+from tytest import tytest
+
+test = tytest(ty)
+
+(test.at("Combined").diagnostics("Interface 'Combined' cannot simultaneously extend types 'Left' and 'Right'."))
+
+test.format("""
+interface Left:
+    id: int
+
+
+interface Right:
+    id: str
+
+
+interface Combined(Left, Right):
+    name: str
+""")
+
+
+
+(
+    tytest(ty)
+    .diagnostics("Interface 'Combined' cannot simultaneously extend types 'Left' and 'Right'.")
+    .hover("interface Combined", at="Combined")
+    .hover("(property) id: int", at=3)
+    .definition("Left", at="Left, Right", target_line=2)
+)
+
+# Live TypeScript reference: hover and diagnostics here document the comparison.
+ts = """ts
+interface Left { id: number; }
+interface Right { id: string; }
+interface Combined extends Left, Right { name: string; }
+"""

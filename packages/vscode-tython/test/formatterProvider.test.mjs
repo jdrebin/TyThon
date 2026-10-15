@@ -31,8 +31,9 @@ const result = await build({ entryPoints: [path.join(extension, "src/formatter.t
 const module = { exports: {} };
 new Function("require", "module", "exports", result.outputFiles[0].text)(
     name => name === "vscode" ? vscode : require(name), module, module.exports);
+let embeddedRanges = [];
 const instance = new module.exports.BundledFormatter({ extensionPath: extension, extensionMode: 2 },
-    { appendLine: message => logs.push(message) });
+    { appendLine: message => logs.push(message) }, async () => embeddedRanges);
 const token = { isCancellationRequested: false, onCancellationRequested: () => ({ dispose() {} }) };
 const doc = text => ({ uri: { fsPath: path.join(root, "unsaved.ty") }, fileName: path.join(root, "unsaved.ty"),
     version: 1, isClosed: false, getText: () => text, positionAt: offset => offset });
@@ -43,6 +44,11 @@ assert.equal(edits.length, 1);
 assert.equal(source.slice(0, edits[0].range.start) + edits[0].text + source.slice(edits[0].range.end),
     'type A = []str\nf = lambda<T> value: T: value\n');
 assert.deepEqual(await format(doc('type A = []str\n')), [], "idempotent document produces no edit");
+const embeddedSource = 'sample= """ty\nvalue=1\nvalue\n"""\nother=2\n';
+embeddedRanges = [[embeddedSource.indexOf("ty\n"), embeddedSource.lastIndexOf('"""')]];
+assert.deepEqual(await format(doc(embeddedSource)), [], "formatting edits must not span embedded source");
+assert.equal(warnings.length, 0, warnings.join("\n"));
+embeddedRanges = [];
 const stale = doc(source);
 const pending = format(stale);
 stale.version++;

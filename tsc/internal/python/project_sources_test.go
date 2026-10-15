@@ -52,3 +52,20 @@ func TestProjectDiscoveryIgnoresPythonEntriesAndOverlays(t *testing.T) {
 		t.Fatalf("Python sources were enrolled: %v", sources)
 	}
 }
+
+func TestProjectDiscoveryDoesNotLoadImplicitGlobals(t *testing.T) {
+	disk := map[string]string{
+		"/app/tests/nested/main.ty": "ty('source')\n",
+		"/app/tests/global.d.ty":    "from .support import Result\ndeclare def ty(source: str) -> Result\n",
+		"/app/tests/support.d.ty":   "interface Result:\n    value: int\n",
+		"/app/other/global.d.ty":    "unrelated: str\n",
+		"/app/tests/global.ty":      "runtime_side_effect()\n",
+	}
+	read := func(name string) (string, bool) { text, ok := disk[name]; return text, ok }
+	load := func(overlays map[string]string) map[string]string {
+		return CollectProjectSources(t.Context(), []string{"/app/tests/nested/main.ty"}, []string{"/app/tests/nested"}, overlays, read)
+	}
+	if sources := load(nil); len(sources) != 1 {
+		t.Fatalf("unimported files were loaded: %v", sources)
+	}
+}

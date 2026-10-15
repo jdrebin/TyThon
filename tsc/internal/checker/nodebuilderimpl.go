@@ -2252,7 +2252,11 @@ func (b *NodeBuilderImpl) indexInfoToIndexSignatureDeclarationHelper(indexInfo *
 		b.ctx.approximateLength += 9
 		modifiers = b.f.NewModifierList([]*ast.Node{b.f.NewModifier(ast.KindReadonlyKeyword)})
 	}
-	return b.f.NewIndexSignatureDeclaration(modifiers, b.f.NewNodeList([]*ast.Node{indexingParameter}), typeNode)
+	node := b.f.NewIndexSignatureDeclaration(modifiers, b.f.NewNodeList([]*ast.Node{indexingParameter}), typeNode)
+	if indexInfo.pythonOptional {
+		b.e.AddEmitFlags(node, printer.EFPythonOptional)
+	}
+	return node
 }
 
 func hasTypeAnnotation(declaration *ast.Declaration) bool {
@@ -2598,6 +2602,10 @@ func (b *NodeBuilderImpl) getPropertyNameNodeForSymbolFromNameType(symbol *ast.S
 }
 
 func (b *NodeBuilderImpl) addPropertyToElementList(propertySymbol *ast.Symbol, typeElements []*ast.TypeElement) []*ast.TypeElement {
+	if isExpanding(b.ctx) && b.ch.pythonValueHierarchy != nil && isPythonHoverDunder(propertySymbol.Name) {
+		b.ctx.depth++
+		defer func() { b.ctx.depth-- }()
+	}
 	propertyIsReverseMapped := propertySymbol.CheckFlags&ast.CheckFlagsReverseMapped != 0
 	var propertyType *Type
 	if b.shouldUsePlaceholderForProperty(propertySymbol) {
@@ -2760,7 +2768,7 @@ func (b *NodeBuilderImpl) createTypeNodesFromResolvedType(resolvedType *Structur
 		typeElements = slices.Concat(typeElements, b.indexInfoToObjectComputedNamesOrSignatureDeclaration(info, core.IfElse(resolvedType.objectFlags&ObjectFlagsReverseMapped != 0, b.createElidedInformationPlaceholder(), nil)))
 	}
 
-	properties := resolvedType.properties
+	properties := b.pythonHoverProperties(resolvedType.properties)
 	if len(properties) == 0 {
 		return b.f.NewNodeList(typeElements)
 	}
@@ -3355,6 +3363,18 @@ func (b *NodeBuilderImpl) typeToTypeNode(t *Type) *ast.TypeNode {
 	}
 	if t.flags&TypeFlagsUnknown != 0 {
 		return b.f.NewKeywordTypeNode(ast.KindUnknownKeyword)
+	}
+	if t.flags&(TypeFlagsBytes|TypeFlagsComplex) != 0 {
+		name := t.AsIntrinsicType().intrinsicName
+		b.ctx.approximateLength += len(name)
+		return b.f.NewTypeReferenceNode(b.f.NewIdentifier(name), nil)
+	}
+	if t.flags&TypeFlagsBytesLiteral != 0 {
+		value := t.AsLiteralType().value.(string)
+		b.ctx.approximateLength += len(value) + 3
+		lit := b.newStringLiteral(value)
+		lit.AsStringLiteral().TokenFlags |= ast.TokenFlagsPythonBytes
+		return b.f.NewLiteralTypeNode(lit)
 	}
 	if t.flags&TypeFlagsString != 0 {
 		b.ctx.approximateLength += 6

@@ -67,10 +67,22 @@ func registerPythonDefinitionHandlers(handlers handlerMap) {
 				if !ok {
 					return nil, fmt.Errorf("Python document is not open")
 				}
+				projection := pythonfrontend.ProjectTypedPython(document.text)
+				fileName := filepath.Clean(params.TextDocument.Uri.FileName())
+				var typescript []pythonEmbeddedTypeScript
+				for _, embedded := range pyprogram.EmbeddedSources(fileName, document.text) {
+					if embedded.Language == "ts" {
+						typescript = append(typescript, embeddedTypeScript(document.text, embedded))
+					}
+					span := [2]int{len(utf16.Encode([]rune(document.text[:embedded.HeaderStart]))), len(utf16.Encode([]rune(document.text[:embedded.End])))}
+					projection.Embedded = append(projection.Embedded, span)
+					projection.Erased = append(projection.Erased, span)
+				}
 				return struct {
 					pythonfrontend.ToolingProjection
-					Version int32 `json:"version"`
-				}{pythonfrontend.ProjectTypedPython(document.text), document.version}, nil
+					Version    int32                      `json:"version"`
+					TypeScript []pythonEmbeddedTypeScript `json:"typescript,omitempty"`
+				}{projection, document.version, typescript}, nil
 			})
 			if err != nil {
 				return err
@@ -84,6 +96,7 @@ func registerPythonDefinitionHandlers(handlers handlerMap) {
 // LSP server. Transport, document lifecycle, cancellation, checker semantics,
 // and completion presentation remain shared with the TypeScript service.
 type pythonLanguageService struct {
+	embedded             bool
 	mu                   sync.RWMutex
 	fs                   vfs.FS
 	documents            map[string]pythonDocument
@@ -165,6 +178,24 @@ func (s *pythonLanguageService) computeCompletion(ctx context.Context, params *l
 	offset, ok := pythonByteOffset(source, params.Position, encoding)
 	if !ok {
 		return lsproto.CompletionItemsOrListOrNull{}, nil
+	}
+	if embedded := s.embeddedAt(ctx, sources, fileName, source, offset); embedded != nil {
+		forward := *params
+		forward.TextDocument.Uri = embedded.uri
+		forward.Position = embedded.position(offset, encoding)
+		result, err := embedded.service.computeCompletion(ctx, &forward, encoding)
+		if result.List != nil {
+			for _, item := range result.List.Items {
+				// Suggestions are inspectable, but accepting one must not rewrite
+				// an embedded fixture. Use an explicit no-op edit, not the label.
+				item.TextEdit = &lsproto.TextEditOrInsertReplaceEdit{TextEdit: &lsproto.TextEdit{Range: lsproto.Range{Start: params.Position, End: params.Position}, NewText: ""}}
+				item.AdditionalTextEdits = nil
+				item.Command = nil
+				item.InsertText = new("")
+				item.CommitCharacters = nil
+			}
+		}
+		return result, err
 	}
 	recovered, attributeQuery, attributeOK := pythonfrontend.PrepareAttributeCompletion(source, offset)
 	var itemQuery pythonfrontend.ItemCompletionQuery
@@ -352,6 +383,17 @@ func (s *pythonLanguageService) computeHover(ctx context.Context, params *lsprot
 	if !ok {
 		return lsproto.HoverOrNull{}, nil
 	}
+	if embedded := s.embeddedAt(ctx, sources, fileName, source, offset); embedded != nil {
+		forward := *params
+		forward.TextDocument.Uri = embedded.uri
+		forward.Position = embedded.position(offset, encoding)
+		result, err := embedded.service.computeHover(ctx, &forward, encoding)
+		if result.Hover != nil && result.Hover.Range != nil {
+			mapped := embedded.hostRange(*result.Hover.Range, encoding)
+			result.Hover.Range = &mapped
+		}
+		return result, err
+	}
 	inputs := make([]pythonfrontend.SourceInput, 0, len(sources))
 	for name, text := range sources {
 		inputs = append(inputs, pythonfrontend.SourceInput{FileName: name, Text: text})
@@ -399,6 +441,17 @@ func (s *pythonLanguageService) computeDefinition(ctx context.Context, params *l
 	offset, ok := pythonByteOffset(source, params.Position, encoding)
 	if !ok {
 		return lsproto.DefinitionResponse{}, nil
+	}
+	if embedded := s.embeddedAt(ctx, sources, fileName, source, offset); embedded != nil {
+		forward := *params
+		forward.TextDocument.Uri = embedded.uri
+		forward.Position = embedded.position(offset, encoding)
+		result, err := embedded.service.computeDefinition(ctx, &forward, encoding)
+		if result.Location != nil && result.Location.Uri == embedded.uri {
+			result.Location.Uri = params.TextDocument.Uri
+			result.Location.Range = embedded.hostRange(result.Location.Range, encoding)
+		}
+		return result, err
 	}
 	inputs := make([]pythonfrontend.SourceInput, 0, len(sources))
 	for name, text := range sources {
@@ -461,6 +514,22 @@ func (s *pythonLanguageService) computeDiagnostics(ctx context.Context, params *
 		related[uri] = report
 	}
 	var relatedDocuments *map[lsproto.DocumentUri]lsproto.FullDocumentDiagnosticReportOrUnchangedDocumentDiagnosticReport
+	for _, document := range s.embeddedSources(ctx, sources, fileName) {
+		embedded := s.embeddedDocument(sources, fileName, sources[fileName], document)
+		forward := *params
+		forward.TextDocument.Uri = embedded.uri
+		result, err := embedded.service.computeDiagnostics(ctx, &forward, encoding)
+		if err != nil {
+			return lsproto.DocumentDiagnosticResponse{}, err
+		}
+		if result.FullDocumentDiagnosticReport != nil {
+			for _, item := range result.FullDocumentDiagnosticReport.Items {
+				item.Range = embedded.hostRange(item.Range, encoding)
+				item.Source = new("TyThon (embedded)")
+				items = append(items, item)
+			}
+		}
+	}
 	if len(related) != 0 {
 		relatedDocuments = &related
 	}
@@ -568,6 +637,12 @@ func (s *pythonLanguageService) computeSignatureHelp(ctx context.Context, params
 	offset, ok := pythonByteOffset(source, params.Position, encoding)
 	if !ok {
 		return lsproto.SignatureHelpOrNull{}, nil
+	}
+	if embedded := s.embeddedAt(ctx, sources, fileName, source, offset); embedded != nil {
+		forward := *params
+		forward.TextDocument.Uri = embedded.uri
+		forward.Position = embedded.position(offset, encoding)
+		return embedded.service.computeSignatureHelp(ctx, &forward, encoding)
 	}
 	inputs := func() []pythonfrontend.SourceInput {
 		result := make([]pythonfrontend.SourceInput, 0, len(sources))

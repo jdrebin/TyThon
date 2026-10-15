@@ -1,0 +1,39 @@
+ty = """ty
+literal = b"abc"
+copy = literal
+specific: b"abc" = literal
+annotated: bytes = b"abc"
+concatenated = b"abc" + b"def"
+mutable = b"abc"
+mutable = b"def"
+mutable += b"ghi"
+
+def accept(value = b"abc") -> bytes:
+    return value
+
+accepted = accept(b"def")
+
+class Holder:
+    payload = b"abc"
+
+holder = Holder()
+holder.payload = b"def"
+
+augmented = b"abc"
+augmented += b"def"
+"""
+
+from tytest import tytest
+
+(
+    tytest(ty)
+    .diagnostics()
+    .hover('(variable) literal: b"abc"', at="literal =")
+    .hover('(variable) copy: b"abc"', at="copy =")
+    .hover("(variable) annotated: bytes", at="annotated:")
+    .hover("(variable) concatenated: bytes", at="concatenated =")
+    .hover("(variable) mutable: bytes", at="mutable =", line=7)
+    .hover("(variable) accepted: bytes", at="accepted =")
+    .hover("(variable) augmented: bytes", at="augmented =")
+    .hover("(property) payload: bytes", at="payload =", line=17)
+)

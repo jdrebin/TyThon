@@ -427,7 +427,7 @@ func CompareTypes(t1, t2 *Type) int {
 		panic("Cannot compare types from different checkers")
 	}
 	// First sort in order of increasing type flags values.
-	if c := getSortOrderFlags(t1) - getSortOrderFlags(t2); c != 0 {
+	if c := cmp.Compare(getSortOrderFlags(t1), getSortOrderFlags(t2)); c != 0 {
 		return c
 	}
 	// Order named types by name and, in the case of aliased types, by alias type arguments.
@@ -436,7 +436,7 @@ func CompareTypes(t1, t2 *Type) int {
 	}
 	// We have unnamed types or types with identical names. Now sort by data specific to the type.
 	switch {
-	case t1.flags&(TypeFlagsAny|TypeFlagsUnknown|TypeFlagsString|TypeFlagsNumber|TypeFlagsBoolean|TypeFlagsBigInt|TypeFlagsESSymbol|TypeFlagsVoid|TypeFlagsUndefined|TypeFlagsNull|TypeFlagsNever|TypeFlagsNonPrimitive) != 0:
+	case t1.flags&(TypeFlagsBytes|TypeFlagsComplex|TypeFlagsAny|TypeFlagsUnknown|TypeFlagsString|TypeFlagsNumber|TypeFlagsBoolean|TypeFlagsBigInt|TypeFlagsESSymbol|TypeFlagsVoid|TypeFlagsUndefined|TypeFlagsNull|TypeFlagsNever|TypeFlagsNonPrimitive) != 0:
 		// Only distinguished by type IDs, handled below.
 	case t1.flags&TypeFlagsObject != 0:
 		// Order instantiation expression types without relying on lazy symbol IDs.
@@ -529,7 +529,7 @@ func CompareTypes(t1, t2 *Type) int {
 		if c := t1.checker.compareSymbols(t1.symbol, t2.symbol); c != 0 {
 			return c
 		}
-	case t1.flags&TypeFlagsStringLiteral != 0:
+	case t1.flags&(TypeFlagsStringLiteral|TypeFlagsBytesLiteral) != 0:
 		// String literal types are ordered by their values.
 		if c := strings.Compare(t1.AsLiteralType().value.(string), t2.AsLiteralType().value.(string)); c != 0 {
 			return c
@@ -610,12 +610,12 @@ func CompareTypes(t1, t2 *Type) int {
 	return int(t1.id) - int(t2.id)
 }
 
-func getSortOrderFlags(t *Type) int {
+func getSortOrderFlags(t *Type) TypeFlags {
 	// Return TypeFlagsEnum for all enum-like unit types (they'll be sorted by their symbols)
 	if t.flags&(TypeFlagsEnumLiteral|TypeFlagsEnum) != 0 && t.flags&TypeFlagsUnion == 0 {
-		return int(TypeFlagsEnum)
+		return TypeFlagsEnum
 	}
-	return int(t.flags)
+	return t.flags
 }
 
 func compareTypeNames(t1, t2 *Type) int {

@@ -1,0 +1,99 @@
+ty = r"""ty
+type Packet = b"abc"
+type Words = b"string number boolean this"
+type ByteUnion = bytes | b"abc"
+type ByteIntersection = bytes & b"abc"
+type Impossible = b"abc" & b"def"
+type DifferentDomains = bytes & str
+type Escaped = b"\x00\xff\n\"\\"
+type SameByte = b"\xff" & b"\377"
+payload = b"abc"
+exact: Packet = b"abc"
+constructed = bytes()
+combined = payload + b"def"
+first = payload[0]
+size = len(payload)
+number = complex(1, 2)
+imaginary = 3j
+sum = number + imaginary
+negative = -imaginary
+negative_literal = -3j
+positive = +imaginary
+product = number * imaginary
+reflected = 2 * imaginary
+repeated = payload * 2
+repeated_left = 2 * payload
+quotient = number / imaginary
+power = imaginary ** 2
+base: Some = payload
+complex_base: Some = number
+union: bytes | int = b"abc"
+type LiteralOrInt = b"abc" | int
+literal_union: LiteralOrInt = b"abc"
+type ByteKeys = { b"abc": int, "abc": str }
+byte_keys: ByteKeys = { b"abc": 1, "abc": "text" }
+byte_item = byte_keys[b"abc"]
+string_item = byte_keys["abc"]
+
+class TaggedBytes(bytes):
+    tag: str = ""
+
+tagged: TaggedBytes
+as_bytes: bytes = tagged
+
+def identity<T extends bytes>(value: T) -> T:
+    return value
+inferred = identity(b"abc")
+
+def narrow(value: b"a" | b"b"):
+    if value == b"a":
+        selected = value
+    else:
+        other = value
+
+def truthy(value: b"" | b"a"):
+    if value:
+        nonempty = value
+    else:
+        empty = value
+"""
+
+from tytest import tytest
+
+test = tytest(ty).diagnostics()
+test.at("Packet =", occurrence=1).hover('type Packet = b"abc"')
+test.at("ByteUnion").hover("type ByteUnion = bytes")
+test.at("ByteIntersection").hover('type ByteIntersection = b"abc"')
+test.at("Impossible").hover("type Impossible = never")
+test.at("DifferentDomains").hover("type DifferentDomains = never")
+test.at("Escaped").hover(r'type Escaped = b"\x00\xff\n\"\\"')
+test.at("SameByte").hover(r'type SameByte = b"\xff"')
+test.at("payload =").hover('(variable) payload: b"abc"', verbosity=5)
+test.at("exact").hover('(variable) exact: b"abc"', verbosity=5)
+test.at("constructed").hover("(variable) constructed: bytes")
+test.at("combined").hover("(variable) combined: bytes")
+test.at("first").hover("(variable) first: int")
+test.at("size").hover("(variable) size: int")
+test.at("number =").hover("(variable) number: complex", verbosity=5)
+test.at("imaginary =").hover("(variable) imaginary: complex")
+test.at("sum").hover("(variable) sum: complex")
+test.at("negative =").hover("(variable) negative: complex")
+test.at("inferred").hover('(variable) inferred: b"abc"')
+test.at("selected").hover('(variable) selected: b"a"')
+test.at("other =").hover('(variable) other: b"b"')
+test.at("nonempty").hover('(variable) nonempty: b"a"')
+test.at("empty =", occurrence=2).hover('(variable) empty: b""')
+
+test.at("negative_literal").hover("(variable) negative_literal: complex")
+test.at("positive").hover("(variable) positive: complex")
+test.at("product").hover("(variable) product: complex")
+test.at("reflected").hover("(variable) reflected: complex")
+test.at("repeated =").hover("(variable) repeated: bytes")
+test.at("repeated_left").hover("(variable) repeated_left: bytes")
+test.at("quotient").hover("(variable) quotient: complex")
+test.at("power").hover("(variable) power: complex")
+
+test.at("byte_item").hover("(variable) byte_item: int")
+test.at("string_item").hover("(variable) string_item: str")
+
+test.at("Words").hover('type Words = b"string number boolean this"')

@@ -1,0 +1,29 @@
+ty = """ty
+literal: b"abc" = b"def"
+text: str = b"abc"
+raw: bytes = "abc"
+imaginary: complex = b"abc"
+wrong: bytes = 2j
+bad_add = b"abc" + "def"
+value = b"abc"
+value[0] = 1
+words: b"string" = b"number"
+add_bytes = b"abc" + b"def"
+"""
+
+from tytest import tytest
+
+test = tytest(ty)
+test.line(2).diagnostics("Type 'b\"def\"' is not assignable to type 'b\"abc\"'.")
+test.line(3).diagnostics("Type 'bytes' is not assignable to type 'str'.")
+test.line(4).diagnostics("Type 'str' is not assignable to type 'bytes'.")
+test.line(5).diagnostics("Type 'bytes' is not assignable to type 'complex'.")
+test.line(6).diagnostics("Type 'complex' is not assignable to type 'bytes'.")
+test.line(7).diagnostics('operator "+" is not declared for the operand types')
+test.line(9).diagnostics("Index signature in type 'bytes' only permits reading.")
+
+test.line(10).diagnostics("Type 'b\"number\"' is not assignable to type 'b\"string\"'.")
+
+test.line(8).at('value').hover('(variable) value: b"abc"')
+
+test.at('add_bytes').hover('(variable) add_bytes: bytes')

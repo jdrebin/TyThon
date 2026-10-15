@@ -518,6 +518,9 @@ func (p *Parser) parseDictEntry() *ast.Node {
 // bigint, so it becomes a BigIntLiteral; a literal with a fraction or exponent is a
 // `float` and stays a NumericLiteral.
 func (p *Parser) newNumberLiteral(text string, flags ast.TokenFlags) *ast.Node {
+	if flags&ast.TokenFlagsPythonImaginary != 0 {
+		return p.factory.NewNumericLiteral(text, flags)
+	}
 	raw := strings.ReplaceAll(p.scanner.TokenText(), "_", "")
 	if isIntegerLiteralText(raw) {
 		return p.factory.NewBigIntLiteral(raw+"n", flags&ast.TokenFlagsNumericLiteralFlags)

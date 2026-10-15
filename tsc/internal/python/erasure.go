@@ -82,6 +82,7 @@ func erasedSuitePlaceholders(source string, removed []bool) map[int]byte {
 // ToolingProjection preserves UTF-16 positions for editor tools. Erased spans
 // are protected: diagnostics and edits must not be mapped through those spans.
 type ToolingProjection struct {
+	Embedded     [][2]int `json:"embedded,omitempty"`
 	Text         string   `json:"text"`
 	Erased       [][2]int `json:"erased"`
 	Errors       []string `json:"errors"`
@@ -197,12 +198,16 @@ func typedPythonErasureMask(source string) ([]bool, []ErasureDiagnostic) {
 		index++
 	}
 
-	eraseDefinitionAnnotations(source, removed, &diagnostics)
-	eraseVariableAnnotations(source, removed, &diagnostics)
-	eraseLambdaAnnotations(source, removed)
-	eraseGenericApplications(source, removed, &diagnostics)
+	// The line-oriented passes must not interpret the contents of runtime
+	// strings as declarations. Hide literal contents while keeping their
+	// quotes, newlines and byte offsets (quoted dict keys must stay quoted).
+	code := erasureCodeWithoutStrings(source)
+	eraseDefinitionAnnotations(code, removed, &diagnostics)
+	eraseVariableAnnotations(code, removed, &diagnostics)
+	eraseLambdaAnnotations(code, removed)
+	eraseGenericApplications(code, removed, &diagnostics)
 	eraseExpressionTypeAssertions(source, removed)
-	eraseTypeOnlyImportBindings(source, removed)
+	eraseTypeOnlyImportBindings(code, removed)
 	// The scanner excludes strings/comments and keeps != as a single token.
 	// Only the static presence marker is removed; no runtime helper is emitted.
 	tokens, _ := scanRuntimeTokens(source, 0)
@@ -213,6 +218,31 @@ func typedPythonErasureMask(source string) ([]bool, []ErasureDiagnostic) {
 	}
 
 	return removed, diagnostics
+}
+
+func erasureCodeWithoutStrings(source string) string {
+	code := []byte(source)
+	tokens, _ := scanRuntimeTokens(source, 0)
+	for _, token := range tokens {
+		if token.kind != runtimeTokenString {
+			continue
+		}
+		quote := token.start + strings.IndexAny(token.text, "\"'")
+		width := 1
+		if quote+2 < token.end && source[quote+1] == source[quote] && source[quote+2] == source[quote] {
+			width = 3
+		}
+		end, terminated := scanRuntimeStringEnd(source, quote)
+		if terminated {
+			end -= width
+		}
+		for index := quote + width; index < end; index++ {
+			if code[index] != '\n' && code[index] != '\r' {
+				code[index] = 'x'
+			}
+		}
+	}
+	return string(code)
 }
 
 func eraseLambdaAnnotations(source string, removed []bool) {
